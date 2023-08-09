@@ -9,6 +9,10 @@ open class StrReader(val str: String) : BaseReader {
     override var pos: Int = 0
     override val len: Int get() = str.length
     override fun peekChar(offset: Int): Char = str.getOrElse(pos + offset) { '\u0000' }
+    override fun peek(count: Int): String = str.substring(pos, (pos + count).coerceAtMost(len))
+    override fun readAbsoluteRange(start: Int, end: Int): String = str.substring(start, end)
+
+    override fun toString(): String = "StrReader(pos=$pos, len=$len, current='${peek(8)}')"
 }
 
 interface BaseReader {
@@ -16,10 +20,14 @@ interface BaseReader {
     val len: Int
     val eof: Boolean get() = pos >= len
     val hasMore: Boolean get() = !eof
+
+    fun readAbsoluteRange(start: Int, end: Int): String
+
     fun skip(count: Int = 1) { pos += count }
     fun peekChar(offset: Int = 0): Char
     fun readChar(): Char = peekChar().also { skip(1) }
-    //fun peek(count: Int): String = str.substring(pos, (pos + count).coerceAtMost(len))
+    fun peek(count: Int): String
+    fun read(count: Int): String = peek(count).also { skip(it.length) }
 
     fun matches(str: String, consume: Boolean = false): Boolean {
         for (n in str.indices) {
@@ -38,6 +46,11 @@ inline fun <T> BaseReader.keep(block: () -> T): T {
         pos = oldPos
     }
 }
+
+data class StringSet(val strings: List<String>) {
+    constructor(vararg strings: String) : this(strings.toList())
+}
+
 inline fun <T> BaseReader.resetOnException(block: () -> T): Boolean {
     val oldPos = pos
     try {
@@ -52,15 +65,15 @@ inline fun <T> BaseReader.resetOnException(block: () -> T): Boolean {
 interface BaseParser : BaseReader {
     fun unexpected(reason: String? = null): Nothing = TODO("reason=$reason")
 
-    fun OR(vararg func: () -> Unit) {
-        TODO()
-    }
-
     fun expect(str: String) {
-        TODO()
+        if (!matches(str, consume = true)) error("Expected '$str' but found $this")
     }
     fun expectChar(char: Char) {
-        TODO()
+        val c = peekChar()
+        when (c) {
+            char -> skip(1)
+            else -> error("Expected '$char' but found '·c'")
+        }
     }
 
     fun expectAny(vararg strs: String): String {
@@ -73,24 +86,52 @@ interface BaseParser : BaseReader {
     }
 
     fun expectOpt(str: String): Boolean {
-        return expectAnyOpt(str) != null
+        return matches(str, consume = true)
+    }
+
+    fun <T> expectAndRecoverSure(start: String, end: String, block: () -> T): T {
+        return expectAndRecover(start, end, block) ?: TODO("expectAndRecoverSure recovery")
     }
 
     //@OptIn(ExperimentalContracts::class)
     fun <T> expectAndRecover(start: String, end: String, block: () -> T): T? {
         //contract { callsInPlace(block, InvocationKind.EXACTLY_ONCE) }
-        TODO()
+        expect(start)
+        try {
+            val res = block()
+            expect(end)
+            return res
+        } catch (e: Throwable) {
+            println("RECOVERING NOT IMPLEMENTED!")
+            throw e
+        }
+        return null
     }
 
     fun peekIdentifier(): String {
-        TODO()
+        TODO("peekIdentifier")
     }
 
     fun EOF() {
-        TODO()
+        TODO("EOF")
     }
 
 }
+
+inline fun <T> BaseParser.OR(vararg funcs: () -> T): T {
+    val rpos = pos
+    val exceptions = arrayListOf<Throwable>()
+    for (func in funcs) {
+        pos = rpos
+        try {
+            return func()
+        } catch (e: Throwable) {
+            exceptions += e
+        }
+    }
+    error("Couldn't match any of OR [${funcs.size}]: ${exceptions.toList()}")
+}
+
 
 @OptIn(ExperimentalContracts::class)
 inline fun <T> BaseParser.opt(block: () -> T): T? {
@@ -113,7 +154,7 @@ inline fun <T> BaseParser.oneOrMore(block: () -> T): List<T> = multiple(atLeastO
 inline fun <T> BaseParser.zeroOrMore(block: () -> T): List<T> = multiple(atLeastOne = false, block)
 
 inline fun BaseParser.recoverWithExpect(token: String, block: () -> Unit) {
-    TODO()
+    TODO("recoverWithExpect")
 }
 
 inline fun <T : Node> BaseParser.enrich(block: () -> T): T {

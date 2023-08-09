@@ -1,5 +1,9 @@
 package valentia.parser
 
+import valentia.ast.BoolLiteralExpr
+import valentia.ast.IntLiteralExpr
+import valentia.ast.enrich
+
 interface KotlinLexer : UnicodeLexer {
     /**
      * Kotlin lexical grammar in ANTLR4 notation
@@ -13,26 +17,26 @@ interface KotlinLexer : UnicodeLexer {
     //ShebangLine
     //    : '#!' ~[\r\n]*
     //    ;
-    fun ShebangLine(): Unit = TODO()
+    fun ShebangLine(): Unit = TODO("ShebangLine")
 
     //DelimitedComment
     //    : '/*' ( DelimitedComment | . )*? '*/'
     //      -> channel(HIDDEN)
     //    ;
-    fun DelimitedComment(): Unit = TODO()
+    fun DelimitedComment(): Unit = TODO("DelimitedComment")
 
     //LineComment
     //    : '//' ~[\r\n]*
     //      -> channel(HIDDEN)
     //    ;
-    fun LineComment(): Unit = TODO()
+    fun LineComment(): Unit = TODO("LineComment")
 
     //WS
     //    : [\u0020\u0009\u000C]
     //      -> channel(HIDDEN)
     //    ;
     /** WhiteSpace */
-    fun WS(): Unit = TODO()
+    fun WS(): Unit = TODO("WS")
 
     //NL: '\n' | '\r' '\n'?;
     fun NL(): Unit {
@@ -58,16 +62,20 @@ interface KotlinLexer : UnicodeLexer {
 
     //fragment Hidden: DelimitedComment | LineComment | WS;
     fun Hidden(): Unit {
-        when {
-            matches("/*", consume = false) -> DelimitedComment()
-            matches("//", consume = false) -> LineComment()
-            peekChar() in setOf(' ', '\t', '\u000c') -> WS()
+        loop@while (hasMore) {
+            val c = peekChar()
+            when {
+                c == ' ' || c == '\t' || c == '\u000c' -> skip()
+                matches("/*", consume = false) -> DelimitedComment()
+                matches("//", consume = false) -> LineComment()
+                else -> break@loop
+            }
         }
     }
 
     // SECTION: separatorsAndOperations
     //RESERVED: '...';
-    fun RESERVED(): Unit = TODO()
+    fun RESERVED(): Unit = TODO("...")
 
     //DOT: '.';
     //val _DOT = "."
@@ -75,54 +83,54 @@ interface KotlinLexer : UnicodeLexer {
 
     //COMMA: ',';
     //val _COMMA = ","
-    fun COMMA(): Unit = TODO()
+    fun COMMA(): Unit = TODO(",")
 
     //LPAREN: '(' -> pushMode(Inside);
     //val _LPAREN = "("
-    fun LPAREN(): Unit = TODO()
+    fun LPAREN(): Unit = TODO("(")
 
     //RPAREN: ')';
     //val _RPAREN = ")"
-    fun RPAREN(): Unit = TODO()
+    fun RPAREN(): Unit = TODO(")")
 
     //LSQUARE: '[' -> pushMode(Inside);
     //val _LSQUARE = "["
-    fun LSQUARE(): Unit = TODO()
+    fun LSQUARE(): Unit = TODO("[")
 
     //RSQUARE: ']';
     //val _RSQUARE = "]"
-    fun RSQUARE(): Unit = TODO()
+    fun RSQUARE(): Unit = TODO("]")
 
     //LCURL: '{' -> pushMode(DEFAULT_MODE);
-    fun LCURL(): Unit = TODO()
+    fun LCURL(): Unit = TODO("{")
 
     ///*
     // * When using another programming language (not Java) to generate a parser,
     // * please replace this code with the corresponding code of a programming language you are using.
     // */
     //RCURL: '}' { if (!_modeStack.isEmpty()) { popMode(); } };
-    fun RCURL(): Unit = TODO()
+    fun RCURL(): Unit = TODO("}")
 
     //MULT: '*';
-    fun MULT(): Unit = TODO()
+    fun MULT(): Unit = TODO("*")
 
     //MOD: '%';
-    fun MOD(): Unit = TODO()
+    fun MOD(): Unit = TODO("%")
 
     //DIV: '/';
-    fun DIV(): Unit = TODO()
+    fun DIV(): Unit = TODO("/")
 
     //ADD: '+';
-    fun ADD(): Unit = TODO()
+    fun ADD(): Unit = TODO("+")
 
     //SUB: '-';
-    fun SUB(): Unit = TODO()
+    fun SUB(): Unit = TODO("-")
 
     //INCR: '++';
-    fun INCR(): Unit = TODO()
+    fun INCR(): Unit = TODO("++")
 
     //DECR: '--';
-    fun DECR(): Unit = TODO()
+    fun DECR(): Unit = TODO("--")
 
     //CONJ: '&&';
     fun CONJ(): String = expectAny("&&")
@@ -131,61 +139,61 @@ interface KotlinLexer : UnicodeLexer {
     fun DISJ(): String = expectAny("||")
 
     //EXCL_WS: '!' Hidden;
-    fun EXCL_WS(): Unit = TODO()
+    fun EXCL_WS(): Unit = TODO("! Hidden")
 
     //EXCL_NO_WS: '!';
-    fun EXCL_NO_WS(): Unit = TODO()
+    fun EXCL_NO_WS(): Unit = TODO("!")
 
     //COLON: ':';
-    fun COLON(): Unit = TODO()
+    fun COLON(): Unit = TODO(":")
 
     //SEMICOLON: ';';
-    fun SEMICOLON(): Unit = TODO()
+    fun SEMICOLON(): Unit = TODO(";")
 
     //ASSIGNMENT: '=';
-    fun ASSIGNMENT(): Unit = TODO()
+    fun ASSIGNMENT(): Unit = TODO("=")
 
     //ADD_ASSIGNMENT: '+=';
-    fun ADD_ASSIGNMENT(): Unit = TODO()
+    fun ADD_ASSIGNMENT(): Unit = TODO("+=")
 
     //SUB_ASSIGNMENT: '-=';
-    fun SUB_ASSIGNMENT(): Unit = TODO()
+    fun SUB_ASSIGNMENT(): Unit = TODO("-=")
 
     //MULT_ASSIGNMENT: '*=';
-    fun MULT_ASSIGNMENT(): Unit = TODO()
+    fun MULT_ASSIGNMENT(): Unit = TODO("*=")
 
     //DIV_ASSIGNMENT: '/=';
-    fun DIV_ASSIGNMENT(): Unit = TODO()
+    fun DIV_ASSIGNMENT(): Unit = TODO("/=")
 
     //MOD_ASSIGNMENT: '%=';
-    fun MOD_ASSIGNMENT(): Unit = TODO()
+    fun MOD_ASSIGNMENT(): Unit = TODO("%=")
 
     //ARROW: '->';
-    fun ARROW(): Unit = TODO()
+    fun ARROW(): Unit = TODO("->")
 
     //DOUBLE_ARROW: '=>';
-    fun DOUBLE_ARROW(): Unit = TODO()
+    fun DOUBLE_ARROW(): Unit = TODO("=>")
 
     //RANGE: '..';
-    fun RANGE(): Unit = TODO()
+    fun RANGE(): Unit = TODO("..")
 
     //RANGE_UNTIL: '..<';
-    fun RANGE_UNTIL(): Unit = TODO()
+    fun RANGE_UNTIL(): Unit = TODO("--<")
 
     //COLONCOLON: '::';
-    fun COLONCOLON(): Unit = TODO()
+    fun COLONCOLON(): Unit = TODO("::")
 
     //DOUBLE_SEMICOLON: ';;';
-    fun DOUBLE_SEMICOLON(): Unit = TODO()
+    fun DOUBLE_SEMICOLON(): Unit = TODO(";;")
 
     //HASH: '#';
-    fun HASH(): Unit = TODO()
+    fun HASH(): Unit = TODO("#")
 
     //AT_NO_WS: '@';
-    fun AT_NO_WS(): Unit = TODO()
+    fun AT_NO_WS(): Unit = TODO("@")
 
     //AT_POST_WS: '@' (Hidden | NL);
-    fun AT_POST_WS(): Unit = TODO()
+    fun AT_POST_WS(): Unit = TODO("@ (Hidden | NL)")
 
     //AT_PRE_WS: (Hidden | NL) '@' ;
     fun AT_PRE_WS(): Unit = TODO()
@@ -197,63 +205,63 @@ interface KotlinLexer : UnicodeLexer {
     fun QUEST_WS(): Unit = TODO()
 
     //QUEST_NO_WS: '?';
-    fun QUEST_NO_WS(): Unit = TODO()
+    fun QUEST_NO_WS(): Unit = TODO("?")
 
     //LANGLE: '<';
-    fun LANGLE(): Unit = TODO()
+    fun LANGLE(): Unit = TODO("<")
 
     //RANGLE: '>';
-    fun RANGLE(): Unit = TODO()
+    fun RANGLE(): Unit = TODO(">")
 
     //LE: '<=';
-    fun LE(): Unit = TODO()
+    fun LE(): Unit = TODO("<=")
 
     //GE: '>=';
-    fun GE(): Unit = TODO()
+    fun GE(): Unit = TODO(">=")
 
     //EXCL_EQ: '!=';
-    fun EXCL_EQ(): Unit = TODO()
+    fun EXCL_EQ(): Unit = TODO("!=")
 
     //EXCL_EQEQ: '!==';
-    fun EXCL_EQEQ(): Unit = TODO()
+    fun EXCL_EQEQ(): Unit = TODO("!==")
 
     //AS_SAFE: 'as?';
-    fun AS_SAFE(): Unit = TODO()
+    fun AS_SAFE(): Unit = TODO("as?")
 
     //EQEQ: '==';
-    fun EQEQ(): Unit = TODO()
+    fun EQEQ(): Unit = TODO("==")
 
     //EQEQEQ: '===';
-    fun EQEQEQ(): Unit = TODO()
+    fun EQEQEQ(): Unit = TODO("===")
 
     //SINGLE_QUOTE: '\'';
-    fun SINGLE_QUOTE(): Unit = TODO()
+    fun SINGLE_QUOTE(): Unit = TODO("\'")
 
     //AMP: '&';
-    fun AMP(): Unit = TODO()
+    fun AMP(): Unit = TODO("&")
 
 // SECTION: keywords
 
     //RETURN_AT: 'return@' Identifier;
-    fun RETURN_AT(): Unit = TODO()
+    fun RETURN_AT(): Unit = TODO("return@ Identifier")
 
     //CONTINUE_AT: 'continue@' Identifier;
-    fun CONTINUE_AT(): Unit = TODO()
+    fun CONTINUE_AT(): Unit = TODO("continue@ Identifier")
 
     //BREAK_AT: 'break@' Identifier;
-    fun BREAK_AT(): Unit = TODO()
+    fun BREAK_AT(): Unit = TODO("break@ Identifier")
 
     //THIS_AT: 'this@' Identifier;
-    fun THIS_AT(): Unit = TODO()
+    fun THIS_AT(): Unit = TODO("this@ Identifier")
 
     //SUPER_AT: 'super@' Identifier;
-    fun SUPER_AT(): Unit = TODO()
+    fun SUPER_AT(): Unit = TODO("super@' Identifier")
 
     //FILE: 'file';
-    fun FILE(): Unit = TODO()
+    fun FILE(): Unit = TODO("file")
 
     //FIELD: 'field';
-    fun FIELD(): Unit = TODO()
+    fun FIELD(): Unit = TODO("field")
 
     //PROPERTY: 'property';
     fun PROPERTY(): Unit = TODO()
@@ -467,10 +475,10 @@ interface KotlinLexer : UnicodeLexer {
     fun REIFIED(): Unit = TODO()
 
     //EXPECT: 'expect';
-    fun EXPECT(): Unit = TODO()
+    fun EXPECT(): Unit = TODO("expect")
 
     //ACTUAL: 'actual';
-    fun ACTUAL(): Unit = TODO()
+    fun ACTUAL(): Unit = TODO("actual")
 
 // SECTION: literals
 
@@ -487,51 +495,50 @@ interface KotlinLexer : UnicodeLexer {
     //    : DecDigit DecDigitOrSeparator* DecDigit
     //    | DecDigit
     //    ;
-    fun DecDigits() {
-        TODO()
-    }
+    fun DecDigits(): Unit = TODO("DecDigits")
 
     //fragment DoubleExponent: [eE] [+-]? DecDigits;
-    fun DoubleExponent() {
-        TODO()
-    }
+    fun DoubleExponent(): Unit = TODO("DoubleExponent")
 
     //RealLiteral
     //    : FloatLiteral
     //    | DoubleLiteral
     //    ;
-    fun RealLiteral() {
-        TODO()
-    }
+    fun RealLiteral(): Unit = TODO("RealLiteral")
 
     //FloatLiteral
     //    : DoubleLiteral [fF]
     //    | DecDigits [fF]
     //    ;
-    fun FloatLiteral() {
-        TODO()
-    }
+    fun FloatLiteral(): Unit = TODO("FloatLiteral")
 
     //DoubleLiteral
     //    : DecDigits? '.' DecDigits DoubleExponent?
     //    | DecDigits DoubleExponent
     //    ;
-    fun DoubleLiteral() {
-        TODO()
-    }
+    fun DoubleLiteral(): Unit = TODO("DoubleLiteral")
 
     //IntegerLiteral
     //    : DecDigitNoZero DecDigitOrSeparator* DecDigit
     //    | DecDigit
     //    ;
-    fun IntegerLiteral(): Int {
+    fun IntegerLiteral(): IntLiteralExpr? {
         println("TODO=IntegerLiteral")
-        if (DecDigit(peekChar())) {
-            val c = peekChar()
-            skip(1)
-            return "$c".toInt()
+        val c = peekChar()
+        if (c == '0') return IntLiteralExpr(0)
+        if (DecDigit(c)) {
+            var n = 0
+            while (hasMore) {
+                n++
+                if (!DecDigitOrSeparator(peekChar(n))) {
+                    break
+                }
+            }
+            val spos = pos
+            val str = read(n).replace("_", "").toInt()
+            return IntLiteralExpr(str).enrich(this, spos)
         }
-        TODO()
+        TODO("IntegerLiteral")
     }
 
     //fragment HexDigit: [0-9a-fA-F];
@@ -545,9 +552,7 @@ interface KotlinLexer : UnicodeLexer {
     //    : '0' [xX] HexDigit HexDigitOrSeparator* HexDigit
     //    | '0' [xX] HexDigit
     //    ;
-    fun HexLiteral() {
-
-    }
+    fun HexLiteral(c: Char): Unit = TODO("HexLiteral")
 
     //fragment BinDigit: [01];
     fun BinDigit(c: Char): Boolean = c in '0'..'1'
@@ -560,54 +565,104 @@ interface KotlinLexer : UnicodeLexer {
     //    | '0' [bB] BinDigit
     //    ;
     fun BinLiteral() {
-        TODO()
+        TODO("BinLiteral")
     }
 
     //UnsignedLiteral
     //    : (IntegerLiteral | HexLiteral | BinLiteral) [uU] [lL]?
     //    ;
     fun UnsignedLiteral() {
-        TODO()
+        TODO("UnsignedLiteral")
     }
 
     //LongLiteral
     //    : (IntegerLiteral | HexLiteral | BinLiteral) [lL]
     //    ;
     fun LongLiteral() {
-        TODO()
+        TODO("LongLiteral")
     }
 
     //BooleanLiteral: 'true'| 'false';
-    fun BooleanLiteral(): Boolean? {
+    fun BooleanLiteral(): BoolLiteralExpr? {
         val res = expectAnyOpt("true", "false") ?: return null
-        return res == "true"
+        return BoolLiteralExpr(res == "true")
     }
 
     //NullLiteral: 'null';
     fun NullLiteral() {
-        TODO()
+        TODO("NullLiteral")
     }
 
     //CharacterLiteral
     //    : '\'' (EscapeSeq | ~[\n\r'\\]) '\''
     //    ;
     fun CharacterLiteral() {
-        TODO()
+        TODO("CharacterLiteral")
     }
 
     // SECTION: lexicalIdentifiers
     //
     //fragment UnicodeDigit: UNICODE_CLASS_ND;
-    fun UnicodeDigit() {
-        TODO()
+    fun UnicodeDigit(c: Char): Boolean {
+        //'\u0030'..'\u0039' |
+        //'\u0660'..'\u0669' |
+        //'\u06F0'..'\u06F9' |
+        //'\u07C0'..'\u07C9' |
+        //'\u0966'..'\u096F' |
+        //'\u09E6'..'\u09EF' |
+        //'\u0A66'..'\u0A6F' |
+        //'\u0AE6'..'\u0AEF' |
+        //'\u0B66'..'\u0B6F' |
+        //'\u0BE6'..'\u0BEF' |
+        //'\u0C66'..'\u0C6F' |
+        //'\u0CE6'..'\u0CEF' |
+        //'\u0D66'..'\u0D6F' |
+        //'\u0E50'..'\u0E59' |
+        //'\u0ED0'..'\u0ED9' |
+        //'\u0F20'..'\u0F29' |
+        //'\u1040'..'\u1049' |
+        //'\u1090'..'\u1099' |
+        //'\u17E0'..'\u17E9' |
+        //'\u1810'..'\u1819' |
+        //'\u1946'..'\u194F' |
+        //'\u19D0'..'\u19D9' |
+        //'\u1A80'..'\u1A89' |
+        //'\u1A90'..'\u1A99' |
+        //'\u1B50'..'\u1B59' |
+        //'\u1BB0'..'\u1BB9' |
+        //'\u1C40'..'\u1C49' |
+        //'\u1C50'..'\u1C59' |
+        //'\uA620'..'\uA629' |
+        //'\uA8D0'..'\uA8D9' |
+        //'\uA900'..'\uA909' |
+        //'\uA9D0'..'\uA9D9' |
+        //'\uAA50'..'\uAA59' |
+        //'\uABF0'..'\uABF9' |
+        //'\uFF10'..'\uFF19';
+        return c in '0'..'9'
     }
 
     //Identifier
     //    : (Letter | '_') (Letter | '_' | UnicodeDigit)*
     //    | '`' ~([\r\n] | '`')+ '`'
     //    ;
-    fun Identifier() {
-        TODO()
+    fun Identifier(): String {
+        var n = 0
+        val c = peekChar()
+        if (c == '`') {
+            TODO("backticked identifier")
+        }
+        if (!(Letter(c) || c == '_')) {
+            TODO("Not a valid identifier starting with '$c'")
+        }
+        while (hasMore) {
+            n++
+            val c = peekChar(n)
+            if (!(Letter(c) || c == '_' || UnicodeDigit(c))) {
+                break
+            }
+        }
+        return read(n)
     }
 
     //IdentifierOrSoftKey
@@ -663,14 +718,14 @@ interface KotlinLexer : UnicodeLexer {
     //    | SUSPEND
     //    ;
     fun IdentifierOrSoftKey() {
-        TODO()
+        TODO("IdentifierOrSoftKey")
     }
 
     //FieldIdentifier
     //    : '$' IdentifierOrSoftKey
     //    ;
     fun FieldIdentifier() {
-        TODO()
+        TODO("FieldIdentifier")
     }
 
     //fragment UniCharacterLiteral
@@ -703,8 +758,8 @@ interface KotlinLexer : UnicodeLexer {
     //    | UNICODE_CLASS_LM
     //    | UNICODE_CLASS_LO
     //    ;
-    fun Letter() {
-        TODO()
+    fun Letter(c: Char): Boolean {
+        return c in 'a'..'z' || c in 'A'..'Z'
     }
 
     // SECTION: strings
