@@ -63,6 +63,7 @@ fun TypeNode.nullable(): TypeNode {
 
 open class DeclNode : Node()
 
+data class FunDecl(val name: String, val params: List<FuncValueParam>) : DeclNode()
 data class VariableDecl(val id: String, val type: TypeNode?) : DeclNode()
 data class VariableDecls(val decls: List<VariableDecl>) : DeclNode() {
     constructor(vararg decls: VariableDecl) : this(decls.toList())
@@ -80,8 +81,12 @@ data class Identifier(val parts: List<String>) : Expr() {
 
 open class Expr : Node()
 
+data class Parameter(val id: String, val type: TypeNode)
+data class FuncValueParam(val id: String, val type: TypeNode)
+data class TypeParameter(val id: String, val type: TypeNode?)
+
 data class CastExpr(val expr: Expr, val targetType: TypeNode, val kind: String) : Expr()
-data class CallExpr(val expr: Expr, val params: List<Expr>) : Expr()
+data class CallExpr(val expr: Expr, val params: List<Expr>, val lambdaArg: Expr? = null, val typeArgs: List<TypeNode>? = null) : Expr()
 data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : Expr()
 data class UnaryPostOpExpr(val expr: Expr, val op: String) : Expr()
 data class UnaryPreOpExpr(val op: String, val expr: Expr) : Expr()
@@ -97,6 +102,7 @@ data class BoolLiteralExpr(val value: Boolean) : LiteralExpr(value)
 data class IntLiteralExpr(val value: Long, val isLong: Boolean = false, val isUnsigned: Boolean = false) : LiteralExpr(value)
 data class StringLiteralExpr(val value: String) : LiteralExpr(value)
 
+open class IncompleteExpr(val message: String) : Expr()
 open class EmptyExpr : Expr()
 
 data class TypeTestExpr(val base: Expr, val kind: String, val type: TypeNode) : Expr()
@@ -124,8 +130,9 @@ data class Stms(val stms: List<Stm>) : Stm() {
 data class EmptyStm(val dummy: Unit = Unit) : Stm()
 
 data class ExprStm(val expr: Expr) : Stm()
+data class DeclStm(val decl: DeclNode) : Stm()
 
-abstract class LoopStm : Node() {
+abstract class LoopStm : Stm() {
 }
 
 /** Iterates over a collection */

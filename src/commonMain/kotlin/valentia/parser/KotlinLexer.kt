@@ -149,13 +149,13 @@ interface KotlinLexer : UnicodeLexer {
     fun EXCL_NO_WS(): Unit = TODO("!")
 
     //COLON: ':';
-    fun COLON(): Unit = TODO(":")
+    fun COLON(): Unit = expect(":")
 
     //SEMICOLON: ';';
     fun SEMICOLON(): Unit = TODO(";")
 
     //ASSIGNMENT: '=';
-    fun ASSIGNMENT(): Unit = TODO("=")
+    fun ASSIGNMENT(): Unit = expect("=")
 
     //ADD_ASSIGNMENT: '+=';
     fun ADD_ASSIGNMENT(): Unit = TODO("+=")
@@ -173,7 +173,7 @@ interface KotlinLexer : UnicodeLexer {
     fun MOD_ASSIGNMENT(): Unit = TODO("%=")
 
     //ARROW: '->';
-    fun ARROW(): Unit = TODO("->")
+    fun ARROW(): Unit = expect("->")
 
     //DOUBLE_ARROW: '=>';
     fun DOUBLE_ARROW(): Unit = TODO("=>")
@@ -337,7 +337,7 @@ interface KotlinLexer : UnicodeLexer {
     fun TYPEOF(): Unit = TODO()
 
     //WHERE: 'where';
-    fun WHERE(): Unit = TODO()
+    fun WHERE(): Unit = expect("where")
 
     //IF: 'if';
     fun IF(): Unit = TODO()
@@ -670,10 +670,10 @@ interface KotlinLexer : UnicodeLexer {
         var n = 0
         val c = peekChar()
         if (c == '`') {
-            TODO("backticked identifier")
+            error("backticked identifier")
         }
         if (!(Letter(c) || c == '_')) {
-            TODO("Not a valid identifier starting with '$c'")
+            error("Not a valid identifier starting with '$c'")
         }
         while (hasMore) {
             n++
@@ -784,11 +784,13 @@ interface KotlinLexer : UnicodeLexer {
 
     // SECTION: strings
     //QUOTE_OPEN: '"' -> pushMode(LineString);
+    val QUOTE: String get() = "\""
     fun QUOTE_OPEN() {
         TODO()
     }
 
     //TRIPLE_QUOTE_OPEN: '"""' -> pushMode(MultiLineString);
+    val TRIPLE_QUOTE: String get() = "\"\"\""
     fun TRIPLE_QUOTE_OPEN() {
         TODO()
     }

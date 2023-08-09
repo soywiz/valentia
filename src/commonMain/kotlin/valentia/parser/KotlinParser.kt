@@ -144,11 +144,12 @@ interface KotlinParser : KotlinLexer {
     //    | typeAlias
     //    ;
     fun declaration(): DeclNode {
+        println("TODO: declaration")
         return OR(
             { classDeclaration() },
             { objectDeclaration() },
             { functionDeclaration() },
-            { propertyDeclaration() },
+            //{ propertyDeclaration() },
             { typeAlias() },
         )
     }
@@ -248,21 +249,43 @@ interface KotlinParser : KotlinLexer {
     //typeParameters
     //    : LANGLE NL* typeParameter (NL* COMMA NL* typeParameter)* (NL* COMMA)? NL* RANGLE
     //    ;
-    fun typeParameters() {
-        TODO()
+    fun typeParameters(): List<TypeParameter> {
+        return parseListWithStartEnd("<", ">", oneOrMore = true, separator = { expectOpt(",") }) {
+            typeParameter()
+        }
     }
 
     //typeParameter
     //    : typeParameterModifiers? NL* simpleIdentifier (NL* COLON NL* type)?
     //    ;
-    fun typeParameter() {
-        TODO()
+    fun typeParameter(): TypeParameter {
+        println("TODO: typeParameter")
+        //opt { typeParameterModifiers() }
+        NLs()
+        val id = simpleIdentifier()
+        var type: TypeNode? = null
+        opt {
+            NLs()
+            COLON()
+            NLs()
+            type = type()
+        }
+        return TypeParameter(id, type)
     }
 
     //typeConstraints
     //    : WHERE NL* typeConstraint (NL* COMMA NL* typeConstraint)*
     //    ;
     fun typeConstraints() {
+        WHERE()
+        NLs()
+        typeConstraint()
+        zeroOrMore {
+            NLs()
+            COMMA()
+            NLs()
+            typeConstraint()
+        }
         TODO()
     }
 
@@ -312,15 +335,26 @@ interface KotlinParser : KotlinLexer {
     //functionValueParameters
     //    : LPAREN NL* (functionValueParameter (NL* COMMA NL* functionValueParameter)* (NL* COMMA)?)? NL* RPAREN
     //    ;
-    fun functionValueParameters() {
-        TODO()
+    fun functionValueParameters(): List<FuncValueParam> {
+        return parseListWithStartEnd("(", ")", oneOrMore = true) {
+            functionValueParameter()
+        }
     }
 
     //functionValueParameter
     //    : parameterModifiers? parameter (NL* ASSIGNMENT NL* expression)?
     //    ;
-    fun functionValueParameter() {
-        TODO()
+    fun functionValueParameter(): FuncValueParam {
+        parameterModifiers(atLeastOne = false)
+        val param = parameter()
+        opt {
+            NLs()
+            assignment()
+            NLs()
+            expression()
+        }
+        println("TODO: functionValueParameter")
+        return FuncValueParam(param.id, param.type)
     }
 
     //functionDeclaration
@@ -332,7 +366,37 @@ interface KotlinParser : KotlinLexer {
     //      (NL* functionBody)?
     //    ;
     fun functionDeclaration(): DeclNode {
-        TODO()
+        println("TODO: functionDeclaration")
+        expect("fun")
+        opt {
+            NLs()
+            typeParameters()
+        }
+        opt {
+            NLs()
+            receiverType()
+            NLs()
+            DOT()
+        }
+        NLs()
+        val funcName = simpleIdentifier()
+        NLs()
+        val params = functionValueParameters()
+        opt {
+            NLs()
+            COLON()
+            NLs()
+            type()
+        }
+        opt {
+            NLs()
+            typeConstraints()
+        }
+        opt {
+            NLs()
+            functionBody()
+        }
+        return FunDecl(funcName, params)
     }
 
     //functionBody
@@ -340,7 +404,11 @@ interface KotlinParser : KotlinLexer {
     //    | ASSIGNMENT NL* expression
     //    ;
     fun functionBody() {
-        TODO()
+        println("TODO: functionBody")
+        return OR(
+            { block() },
+            { ASSIGNMENT(); NLs(); expression() }
+        )
     }
 
     //variableDeclaration
@@ -446,8 +514,13 @@ interface KotlinParser : KotlinLexer {
     //parameter
     //    : simpleIdentifier NL* COLON NL* type
     //    ;
-    fun parameter() {
-        TODO()
+    fun parameter(): Parameter {
+        val id = simpleIdentifier()
+        NLs()
+        COLON()
+        NLs()
+        val type = type()
+        return Parameter(id, type)
     }
 
     //objectDeclaration
@@ -517,14 +590,14 @@ interface KotlinParser : KotlinLexer {
     fun type(): TypeNode {
         Hidden()
         println("TODO: type")
-        zeroOrMore { typeModifier() }
+        //zeroOrMore { typeModifier() }
         //return typeReference()
         return OR(
-            { functionType() },
+            //{ functionType() },
             { nullableType() },
             { parenthesizedType() },
             { typeReference() },
-            { definitelyNonNullableType() },
+            //{ definitelyNonNullableType() },
         )
     }
 
@@ -591,8 +664,17 @@ interface KotlinParser : KotlinLexer {
     //    : typeProjectionModifiers? type
     //    | MULT
     //    ;
-    fun typeProjection() {
-        TODO()
+    fun typeProjection(): TypeNode {
+        return OR(
+            {
+                opt { typeProjectionModifiers() }
+                type()
+            },
+            {
+                MULT()
+                SimpleType("*")
+            },
+        )
     }
 
     //typeProjectionModifiers
@@ -639,8 +721,15 @@ interface KotlinParser : KotlinLexer {
     //receiverType
     //    : typeModifiers? (parenthesizedType | nullableType | typeReference)
     //    ;
-    fun receiverType() {
-        TODO()
+    fun receiverType(): TypeNode {
+        println("TODO: receiverType")
+        val modifiers = zeroOrMore { typeModifier() }
+        val res = OR(
+            { parenthesizedType() },
+            { nullableType() },
+            { typeReference() },
+        )
+        return res
     }
 
     //parenthesizedUserType
@@ -681,8 +770,12 @@ interface KotlinParser : KotlinLexer {
         zeroOrMore {
             OR({ label() }, { annotation() })
         }
-        OR({ declaration() }, { assignment() }, { loopStatement() }, { expression() })
-        TODO()
+        return OR(
+            { DeclStm(declaration()) },
+            { assignment() },
+            { loopStatement() },
+            { ExprStm(expression()) }
+        )
     }
 
     //label
@@ -722,11 +815,11 @@ interface KotlinParser : KotlinLexer {
     //    | whileStatement
     //    | doWhileStatement
     //    ;
-    fun loopStatement(): LoopStm = when (peekIdentifier()) {
+    fun loopStatement(): LoopStm = when (expectAnyOpt("for", "while", "do")) {
         "for" -> forStatement()
         "while" -> whileStatement()
         "do" -> doWhileStatement()
-        else -> unexpected("loop")
+        else -> error("loop")
     }
 
     //forStatement
@@ -787,7 +880,19 @@ interface KotlinParser : KotlinLexer {
     //assignment
     //    : (directlyAssignableExpression ASSIGNMENT | assignableExpression assignmentAndOperator) NL* expression
     //    ;
-    fun assignment() {
+    fun assignment(): Stm {
+        OR(
+            {
+                directlyAssignableExpression()
+                ASSIGNMENT()
+            },
+            {
+                assignableExpression()
+                assignmentAndOperator()
+            }
+        )
+        NLs()
+        expression()
         TODO()
     }
 
@@ -796,16 +901,12 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun semi() {
         val c = peekChar()
-        if (c == ';') {
-            skip(1)
-        } else if (c == '\r' || c == '\n') {
-            NLs()
-        } else {
-            TODO("semi")
+        when (c) {
+            ';' -> skip(1)
+            '\r', '\n' -> NLs()
+            else -> error("semi")
         }
-        while (peekChar() == '\r' || peekChar() == '\n') {
-            NLs()
-        }
+        while (peekChar() == '\r' || peekChar() == '\n') NLs()
     }
 
     fun semiOpt() {
@@ -888,9 +989,11 @@ interface KotlinParser : KotlinLexer {
     //    : infixOperation callSuffix*
     //    ;
     fun genericCallLikeComparison(): Expr {
-        val res = infixOperation()
-        zeroOrMore { callSuffix() }
-        println("TODO: genericCallLikeComparison")
+        var res: Expr = infixOperation()
+        zeroOrMore {
+            callSuffix(res)?.also { res = it }
+        }
+        //println("TODO: genericCallLikeComparison")
         return res
     }
 
@@ -1004,9 +1107,15 @@ interface KotlinParser : KotlinLexer {
         println("TODO: postfixUnaryExpression")
         var res: Expr = primaryExpression()
         zeroOrMore {
-            res = postfixUnarySuffix(res)
+            postfixUnarySuffix(res)?.let { res = it }
         }
         return res
+    }
+
+    private fun <T> parseListWithStartEnd(start: String, end: String, oneOrMore: Boolean = false, separator: () -> Boolean = { expectOpt(",") }, node: () -> T): List<T> {
+        return expectAndRecoverSure(start, end) {
+            parseList(oneOrMore = oneOrMore, separator = separator, doBreak = { matches(end) }, node = node)
+        }
     }
 
     private fun <T> parseList(oneOrMore: Boolean = false, separator: () -> Boolean, doBreak: () -> Boolean, node: () -> T): List<T> {
@@ -1032,31 +1141,15 @@ interface KotlinParser : KotlinLexer {
     //    | indexingSuffix
     //    | navigationSuffix
     //    ;
-    fun postfixUnarySuffix(expr: Expr): Expr {
+    fun postfixUnarySuffix(expr: Expr): Expr? {
         expectAnyOpt("++", "--", "!!")?.let {
             return UnaryPostOpExpr(expr, it)
         }
-        if (peekChar() == '<') {
-            //return typeArguments()
-            TODO("postfixUnarySuffix.typeArguments")
-        }
         // valueArguments: LPAREN NL* (valueArgument (NL* COMMA NL* valueArgument)* (NL* COMMA)? NL*)? RPAREN
         // annotatedLambda: annotation* label? NL* lambdaLiteral
-        if (peekChar() == '(') {
-            val params = expectAndRecoverSure("(", ")") {
-                parseList(oneOrMore = false, separator = { expectOpt(",") }, doBreak = { matches(")") }) {
-                    valueArgument()
-                }
-            }
+        if (peekChar() == '<' || peekChar() == '(') {
             println("TODO: postfixUnarySuffix.callSuffix")
-            //opt {
-            //    annotations()
-            //    opt { label() }
-            //    NLs()
-            //    lambdaLiteral()
-            //}
-
-            return CallExpr(expr, params)
+            return callSuffix(expr)
         }
         if (peekChar() == '[') {
             val params = expectAndRecoverSure("[", "]") {
@@ -1070,7 +1163,7 @@ interface KotlinParser : KotlinLexer {
             //return navigationSuffix()
             TODO("postfixUnarySuffix.navigationSuffix")
         }
-        TODO("postfixUnarySuffix")
+        return null
     }
 
     //directlyAssignableExpression
@@ -1079,29 +1172,43 @@ interface KotlinParser : KotlinLexer {
     //    | parenthesizedDirectlyAssignableExpression
     //    ;
     fun directlyAssignableExpression() {
-        TODO()
+        println("TODO: directlyAssignableExpression")
+        return OR(
+            //{ postfixUnaryExpression(); assignableSuffix() },
+            { simpleIdentifier() },
+            { parenthesizedDirectlyAssignableExpression() }
+        )
     }
 
     //parenthesizedDirectlyAssignableExpression
     //    : LPAREN NL* directlyAssignableExpression NL* RPAREN
     //    ;
     fun parenthesizedDirectlyAssignableExpression() {
-        TODO()
+        return expectAndRecoverSure("(", ")") {
+            NLs()
+            directlyAssignableExpression()
+            NLs()
+        }
     }
 
     //assignableExpression
     //    : prefixUnaryExpression
     //    | parenthesizedAssignableExpression
     //    ;
-    fun assignableExpression() {
-        TODO()
+    fun assignableExpression(): Expr {
+        return OR({ prefixUnaryExpression() }, { parenthesizedAssignableExpression() })
     }
 
     //parenthesizedAssignableExpression
     //    : LPAREN NL* assignableExpression NL* RPAREN
     //    ;
-    fun parenthesizedAssignableExpression() {
-        TODO()
+    fun parenthesizedAssignableExpression(): Expr {
+        return expectAndRecover("(", ")") {
+            NLs()
+            assignableExpression().also {
+                NLs()
+            }
+        } ?: TODO("parenthesizedAssignableExpression.null")
     }
 
     //assignableSuffix
@@ -1127,32 +1234,64 @@ interface KotlinParser : KotlinLexer {
         TODO()
     }
 
+    data class CallSuffix(
+        val typeArgs: List<TypeNode>? = null,
+        val args: List<Expr> = emptyList(),
+        val lambdaArg: Expr? = null,
+    )
+
     //callSuffix
     //    : typeArguments? (valueArguments? annotatedLambda | valueArguments)
     //    ;
-    fun callSuffix() {
-        TODO()
+    fun callSuffix(expr: Expr): Expr? {
+        val typeArgs = opt { typeArguments() }
+        //val args = opt { valueArguments() }
+        val args = valueArguments()
+        val lambdaArg = if (args == null) {
+            annotatedLambda()
+        } else {
+            opt { annotatedLambda() }
+        }
+
+        return CallExpr(expr, args ?: emptyList(), lambdaArg, typeArgs)
     }
 
     //annotatedLambda
     //    : annotation* label? NL* lambdaLiteral
     //    ;
-    fun annotatedLambda() {
-        TODO()
+    fun annotatedLambda(): Expr {
+        zeroOrMore { annotation() }
+        opt { label() }
+        NLs()
+        return lambdaLiteral()
     }
 
     //typeArguments
     //    : LANGLE NL* typeProjection (NL* COMMA NL* typeProjection)* (NL* COMMA)? NL* RANGLE
     //    ;
-    fun typeArguments() {
-        TODO("typeArguments")
+    fun typeArguments(): List<TypeNode> {
+        return expectAndRecover("<", ">") {
+            NLs()
+            parseList(oneOrMore = true, separator = { expectOpt(",") }, doBreak = { matches(">") }) {
+                typeProjection()
+            }.also {
+                NLs()
+            }
+        } ?: error("")
     }
 
     //valueArguments
     //    : LPAREN NL* (valueArgument (NL* COMMA NL* valueArgument)* (NL* COMMA)? NL*)? RPAREN
     //    ;
-    fun valueArguments() {
-        TODO()
+    fun valueArguments(): List<Expr> {
+        println("valueArguments: $this")
+        return expectAndRecoverSure("(", ")") {
+            parseList(oneOrMore = false, separator = { expectOpt(",") }, doBreak = { matches(")") }) {
+                valueArgument()
+            }
+        }.also {
+            println("/valueArguments: $this")
+        }
     }
 
     //valueArgument
@@ -1188,17 +1327,17 @@ interface KotlinParser : KotlinLexer {
 
         return OR(
             { stringLiteral() },
-            { callableReference() },
+            //{ callableReference() },
             { IdentifierExpr(simpleIdentifier()) },
-            { functionLiteral() },
-            { objectLiteral() },
-            { collectionLiteral() },
+            //{ functionLiteral() },
+            //{ objectLiteral() },
+            //{ collectionLiteral() },
             { thisExpression() },
-            { superExpression() },
-            { ifExpression() },
-            { whenExpression() },
-            { tryExpression() },
-            { jumpExpression() },
+            //{ superExpression() },
+            //{ ifExpression() },
+            //{ whenExpression() },
+            //{ tryExpression() },
+            //{ jumpExpression() },
         )
     }
 
@@ -1258,21 +1397,39 @@ interface KotlinParser : KotlinLexer {
     //    : lineStringLiteral
     //    | multiLineStringLiteral
     //    ;
-    fun stringLiteral(): Expr {
-        TODO()
+    fun stringLiteral(): Expr = enrich {
+        when (expectAnyOpt(TRIPLE_QUOTE, QUOTE)) {
+            TRIPLE_QUOTE -> TODO()
+            QUOTE -> {
+                val str = StringBuilder()
+                while (hasMore) {
+                    val c = readChar()
+                    when (c) {
+                        '"' -> break
+                        '\\' -> TODO("Missing quoted strings")
+                        '\$' -> TODO("Missing dollar strings")
+                        else -> str.append(c)
+                    }
+                }
+                //println("str='$str', this=$this")
+                StringLiteralExpr(str.toString())
+            }
+            else -> error("Not a string literal")
+        }
     }
 
     //lineStringLiteral
     //    : QUOTE_OPEN (lineStringContent | lineStringExpression)* QUOTE_CLOSE
     //    ;
-    fun lineStringLiteral() {
+    fun lineStringLiteral(): Expr {
+        QUOTE_OPEN()
         TODO()
     }
 
     //multiLineStringLiteral
     //    : TRIPLE_QUOTE_OPEN (multiLineStringContent | multiLineStringExpression | MultiLineStringQuote)* TRIPLE_QUOTE_CLOSE
     //    ;
-    fun multiLineStringLiteral() {
+    fun multiLineStringLiteral(): Expr {
         TODO()
     }
 
@@ -1311,8 +1468,19 @@ interface KotlinParser : KotlinLexer {
     //lambdaLiteral
     //    : LCURL NL* (lambdaParameters? NL* ARROW NL*)? statements NL* RCURL
     //    ;
-    fun lambdaLiteral() {
-        TODO()
+    fun lambdaLiteral(): Expr {
+        expectAndRecover("{", "}") {
+            opt {
+                NLs()
+                opt { lambdaParameters() }
+                NLs()
+                ARROW()
+                NLs()
+            }
+            statements()
+            NLs()
+        }
+        return IncompleteExpr("lambdaLiteral")
     }
 
     //lambdaParameters
@@ -1588,15 +1756,17 @@ interface KotlinParser : KotlinLexer {
     //modifiers
     //    : (annotation | modifier)+
     //    ;
-    fun modifiers() {
-        TODO()
+    fun modifiers(atLeastOne: Boolean = true): List<Any> {
+        return multiple(atLeastOne = atLeastOne) {
+            OR({ annotation() }, { modifier() })
+        }
     }
 
     //parameterModifiers
     //    : (annotation | parameterModifier)+
     //    ;
-    fun parameterModifiers() {
-        TODO()
+    fun parameterModifiers(atLeastOne: Boolean = true): List<Any> {
+        return multiple(atLeastOne = atLeastOne) { OR({ annotation() }, { parameterModifier() }) }
     }
 
     //modifier
@@ -1609,23 +1779,37 @@ interface KotlinParser : KotlinLexer {
     //    | parameterModifier
     //    | platformModifier) NL*
     //    ;
-    fun modifier() {
-        TODO()
+    fun modifier(): String {
+        return OR(
+            { classModifier() },
+            { memberModifier() },
+            { visibilityModifier() },
+            { functionModifier() },
+            { propertyModifier() },
+            { inheritanceModifier() },
+            { parameterModifier() },
+            { platformModifier() },
+        ).also {
+            NLs()
+        }
     }
 
     //typeModifiers
     //    : typeModifier+
     //    ;
-    fun typeModifiers() {
-        oneOrMore { typeModifier() }
+    fun typeModifiers(): List<Any> {
+        return oneOrMore { typeModifier() }
     }
 
     //typeModifier
     //    : annotation
     //    | SUSPEND NL*
     //    ;
-    fun typeModifier() {
-        TODO("typeModifier")
+    fun typeModifier(): Any {
+        return OR(
+            { expect("suspend"); NLs(); "suspend" },
+            { annotation() },
+        )
     }
 
     //classModifier

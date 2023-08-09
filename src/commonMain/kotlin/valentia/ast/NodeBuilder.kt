@@ -18,10 +18,10 @@ interface StmBuilder {
     fun addStm(stm: Stm) {
     }
 
-    fun STM(expr: Expr): ExprStm {
-        TODO()
-    }
-    fun WHILE(expr: Expr, block: StmBuilder.() -> Unit): WhileLoopStm = WhileLoopStm(expr, buildStmCompact { block() })
+    fun STM(expr: Expr): ExprStm = ExprStm(expr).also(::addStm)
+    fun WHILE(expr: Expr, block: StmBuilder.() -> Unit): WhileLoopStm = WhileLoopStm(expr, buildStmCompact { block() }).also(::addStm)
+    fun FUN(name: String, ret: TypeNode, vararg params: Pair<String, TypeNode>, block: StmBuilder.() -> Unit = {}): FunDecl =
+        FunDecl(name, params.map { FuncValueParam(it.first, it.second) })
 }
 
 interface NodeBuilder {
@@ -29,18 +29,19 @@ interface NodeBuilder {
         operator fun <T> invoke(block: NodeBuilder.() -> T): T = block(NodeBuilder)
     }
 
+    val IntType: SimpleType get() = "Int".type
     val Boolean.lit: BoolLiteralExpr get() = BoolLiteralExpr(this)
     val Int.lit: IntLiteralExpr get() = IntLiteralExpr(this.toLong())
     val Long.lit: IntLiteralExpr get() = IntLiteralExpr(this, isLong = true)
     val String.lit: StringLiteralExpr get() = StringLiteralExpr(this)
     val String.id: IdentifierExpr get() = IdentifierExpr(this)
     val String.type: SimpleType get() = SimpleType(this)
-    operator fun Expr.invoke(vararg params: Expr): CallExpr = CallExpr(this, params.toList())
+    operator fun Expr.invoke(vararg params: Expr, lambdaArg: Expr? = null, typeArgs: List<TypeNode>? = null): CallExpr = CallExpr(this, params.toList(), lambdaArg, typeArgs)
     operator fun Expr.unaryMinus(): UnaryPreOpExpr = UnaryPreOpExpr("-", this)
     operator fun Expr.unaryPlus(): UnaryPreOpExpr = UnaryPreOpExpr("+", this)
-    fun Expr.castTo(targetType: SimpleType, safe: Boolean = false): Expr =
+    fun Expr.castTo(targetType: TypeNode, safe: Boolean = false): Expr =
         CastExpr(this, targetType, if (safe) "as?" else "as")
-    fun Expr.safeCastTo(targetType: SimpleType, safe: Boolean = true): Expr = castTo(targetType, safe)
+    fun Expr.safeCastTo(targetType: TypeNode, safe: Boolean = true): Expr = castTo(targetType, safe)
     operator fun Expr.plus(that: Expr): Expr = OpSeparatedExprs(listOf("+"), listOf(this, that))
     operator fun Expr.minus(that: Expr): Expr = OpSeparatedExprs(listOf("-"), listOf(this, that))
     operator fun Expr.times(that: Expr): Expr = OpSeparatedExprs(listOf("*"), listOf(this, that))

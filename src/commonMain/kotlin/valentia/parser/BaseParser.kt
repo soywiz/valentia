@@ -72,7 +72,7 @@ inline fun <T> BaseReader.resetOnException(block: () -> T): Boolean {
     try {
         block()
         return true
-    } catch (e: Throwable) {
+    } catch (e: IllegalStateException) {
         pos = oldPos
         return false
     }
@@ -120,15 +120,11 @@ interface BaseParser : BaseReader {
             val res = block()
             expect(end)
             return res
-        } catch (e: Throwable) {
+        } catch (e: IllegalStateException) {
             println("RECOVERING NOT IMPLEMENTED!")
             throw e
         }
         return null
-    }
-
-    fun peekIdentifier(): String {
-        TODO("peekIdentifier")
     }
 
     fun EOF() {
@@ -144,7 +140,7 @@ inline fun <T> BaseParser.OR(vararg funcs: () -> T): T {
         pos = rpos
         try {
             return func()
-        } catch (e: Throwable) {
+        } catch (e: IllegalStateException) {
             exceptions += e
         }
     }
@@ -169,7 +165,7 @@ inline fun <T> BaseParser.multiple(atLeastOne: Boolean, block: () -> T?): List<T
         val oldPos = pos
         try {
             out += block() ?: break
-        } catch (e: Throwable) {
+        } catch (e: IllegalStateException) {
             pos = oldPos
             break
         }
