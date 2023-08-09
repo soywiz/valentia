@@ -1,6 +1,7 @@
 package valentia.parser
 
 import valentia.ast.Node
+import valentia.ast.enrich
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
@@ -36,6 +37,21 @@ interface BaseReader {
         if (consume) skip(str.length)
         return true
     }
+}
+
+inline fun BaseReader.readWhile(block: (Char) -> Boolean): String = readUntil { !block(it) }
+
+inline fun BaseReader.readUntil(block: (Char) -> Boolean): String {
+    val spos = pos
+    while (hasMore) {
+        val c = peekChar()
+        if (block(c)) {
+            break
+        } else {
+            skip()
+        }
+    }
+    return readAbsoluteRange(spos, pos)
 }
 
 inline fun <T> BaseReader.keep(block: () -> T): T {
@@ -116,7 +132,7 @@ interface BaseParser : BaseReader {
     }
 
     fun EOF() {
-        TODO("EOF")
+        check(eof) { "Not EOF found" }
     }
 
 }
@@ -144,23 +160,36 @@ inline fun <T> BaseParser.opt(block: () -> T): T? {
     return res
 }
 
-inline fun <T> BaseParser.multiple(atLeastOne: Boolean, block: () -> T): List<T> {
+inline fun <T> BaseParser.multiple(atLeastOne: Boolean, block: () -> T?): List<T> {
     val out = arrayListOf<T>()
-    if (atLeastOne) out += block()
+    if (atLeastOne) {
+        out += block() ?: TODO("multiple")
+    }
     while (hasMore) {
-        if (!resetOnException { out += block() }) break
+        val oldPos = pos
+        try {
+            out += block() ?: break
+        } catch (e: Throwable) {
+            pos = oldPos
+            break
+        }
     }
     return out
 }
 
-inline fun <T> BaseParser.oneOrMore(block: () -> T): List<T> = multiple(atLeastOne = true, block)
-inline fun <T> BaseParser.zeroOrMore(block: () -> T): List<T> = multiple(atLeastOne = false, block)
+inline fun <T> BaseParser.oneOrMore(block: () -> T?): List<T> = multiple(atLeastOne = true, block)
+inline fun <T> BaseParser.zeroOrMore(block: () -> T?): List<T> = multiple(atLeastOne = false, block)
 
 inline fun BaseParser.recoverWithExpect(token: String, block: () -> Unit) {
     TODO("recoverWithExpect")
 }
 
-inline fun <T : Node> BaseParser.enrich(block: () -> T): T {
-    // @TODO: Put in the node all the tokens expected
-    return block()
+inline fun <T : Node> BaseParser.enrich(crossinline block: () -> T): T {
+    val spos = pos
+    return block().also { it.enrich(this@enrich, spos) }
+}
+
+inline fun <T : Node> BaseParser.enrichOpt(crossinline block: () -> T?): T? {
+    val spos = pos
+    return block()?.also { it.enrich(this@enrichOpt, spos) }
 }

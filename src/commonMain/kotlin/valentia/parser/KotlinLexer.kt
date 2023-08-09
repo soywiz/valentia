@@ -2,6 +2,7 @@ package valentia.parser
 
 import valentia.ast.BoolLiteralExpr
 import valentia.ast.IntLiteralExpr
+import valentia.ast.LongLiteralExpr
 import valentia.ast.enrich
 
 interface KotlinLexer : UnicodeLexer {
@@ -17,7 +18,10 @@ interface KotlinLexer : UnicodeLexer {
     //ShebangLine
     //    : '#!' ~[\r\n]*
     //    ;
-    fun ShebangLine(): Unit = TODO("ShebangLine")
+    fun ShebangLine(): String {
+        expect("#!")
+        return "#!" + readUntil { it == '\r' || it == '\n' }
+    }
 
     //DelimitedComment
     //    : '/*' ( DelimitedComment | . )*? '*/'
@@ -115,7 +119,7 @@ interface KotlinLexer : UnicodeLexer {
     fun RCURL(): Unit = TODO("}")
 
     //MULT: '*';
-    fun MULT(): Unit = TODO("*")
+    fun MULT(): Unit = expect("*")
 
     //MOD: '%';
     fun MOD(): Unit = TODO("%")
@@ -525,37 +529,46 @@ interface KotlinLexer : UnicodeLexer {
     //    : DecDigitNoZero DecDigitOrSeparator* DecDigit
     //    | DecDigit
     //    ;
-    fun IntegerLiteralOpt(): IntLiteralExpr? {
-        println("TODO=IntegerLiteral")
-        val c = peekChar()
-        if (c == '0') return IntLiteralExpr(0)
-        if (DecDigit(c)) {
-            var n = 0
-            while (hasMore) {
-                n++
-                if (!DecDigitOrSeparator(peekChar(n))) {
-                    break
-                }
-            }
-            val spos = pos
-            val str = read(n).replace("_", "").toInt()
-            return IntLiteralExpr(str).enrich(this, spos)
-        }
-        TODO("IntegerLiteral : $this")
+    fun IntegerLiteralOpt(): IntLiteralExpr? = enrichOpt {
+        numericLiteral(radix = 10) { DecDigit(it) }
     }
 
     //fragment HexDigit: [0-9a-fA-F];
     fun HexDigit(c: Char): Boolean = c in '0'..'9' || c in 'a'..'f' || c in 'A'..'F'
+    fun HexDigitValue(c: Char): Int = when (c) {
+        in '0'..'9' -> c - '0'
+        in 'a'..'f' -> (c - 'a') + 10
+        in 'A'..'F' -> (c - 'A') + 10
+        else -> -1
+    }
 
     //fragment HexDigitOrSeparator: HexDigit | '_';
     fun HexDigitOrSeparator(c: Char): Boolean = c == '_' || HexDigit(c)
 
-    //
+    private fun numericLiteral(radix: Int, isDigit: (Char) -> Boolean): IntLiteralExpr? {
+        var n = 0
+        val c = peekChar(n)
+        var lastC = c
+        if (!isDigit(c)) return null
+        while (hasMore) {
+            n++
+            val c = peekChar(n)
+            lastC = c
+            if (!(isDigit(c) || c == '_')) break
+        }
+        if (lastC == '_') return null
+        return IntLiteralExpr(read(n).replace("_", "").toLong(radix = radix))
+    }
+
     //HexLiteral
     //    : '0' [xX] HexDigit HexDigitOrSeparator* HexDigit
     //    | '0' [xX] HexDigit
     //    ;
     fun HexLiteral(c: Char): Unit = TODO("HexLiteral")
+    fun HexLiteralOpt(): IntLiteralExpr? = enrichOpt {
+        if (expectAnyOpt("0x", "0X") == null) return@enrichOpt null
+        numericLiteral(radix = 16) { HexDigit(it) }
+    }
 
     //fragment BinDigit: [01];
     fun BinDigit(c: Char): Boolean = c in '0'..'1'
@@ -567,8 +580,9 @@ interface KotlinLexer : UnicodeLexer {
     //    : '0' [bB] BinDigit BinDigitOrSeparator* BinDigit
     //    | '0' [bB] BinDigit
     //    ;
-    fun BinLiteral() {
-        TODO("BinLiteral")
+    fun BinLiteralOpt(): IntLiteralExpr? = enrichOpt {
+        if (expectAnyOpt("0x", "0X") == null) return@enrichOpt null
+        numericLiteral(radix = 2) { BinDigit(it) }
     }
 
     //UnsignedLiteral
@@ -581,8 +595,10 @@ interface KotlinLexer : UnicodeLexer {
     //LongLiteral
     //    : (IntegerLiteral | HexLiteral | BinLiteral) [lL]
     //    ;
-    fun LongLiteral() {
-        TODO("LongLiteral")
+    fun LongLiteral(): LongLiteralExpr? {
+        val res = IntegerLiteralOpt() ?: HexLiteralOpt() ?: BinLiteralOpt() ?: return null
+        if (expectAnyOpt("l", "L") == null) return null
+        return LongLiteralExpr(res.value).enrich(res)
     }
 
     //BooleanLiteral: 'true'| 'false';

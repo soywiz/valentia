@@ -16,14 +16,21 @@ interface KotlinParser : KotlinLexer {
     // kotlinFile
     //    : shebangLine? NL* fileAnnotation* packageHeader importList topLevelObject* EOF
     //    ;
-    fun kotlinFile() {
-        opt { shebangLine() }
+    fun kotlinFile(): FileNode {
+        val shebang = opt { shebangLine() }
         NLs()
-        zeroOrMore { fileAnnotation() }
-        packageHeader()
-        importList()
-        zeroOrMore { topLevelObject() }
+        val fileAnnotations = zeroOrMore { fileAnnotation() }
+        val _package = packageHeader()
+        val imports = importList()
+        val topLevelDecls = zeroOrMore { topLevelObject() }
         EOF()
+        return FileNode(
+            shebang = shebang,
+            _package = _package,
+            fileAnnotations = fileAnnotations,
+            imports = imports,
+            topLevelDecls = topLevelDecls,
+        )
     }
 
     // script
@@ -45,85 +52,88 @@ interface KotlinParser : KotlinLexer {
     // shebangLine
     //    : ShebangLine NL+
     //    ;
-    fun shebangLine() {
-        ShebangLine()
-        NLs()
+    fun shebangLine(): String? {
+        return ShebangLine().also { NLs() }
     }
 
     // fileAnnotation
     //    : (AT_NO_WS | AT_PRE_WS) FILE NL* COLON NL* (LSQUARE unescapedAnnotation+ RSQUARE | unescapedAnnotation) NL*
     //    ;
-    fun fileAnnotation() {
-        OR({ AT_NO_WS() }, { AT_PRE_WS() })
-        FILE()
-        NLs()
-        COLON()
-        NLs()
-        if (peekIdentifier() == "[") {
-            expectAndRecover("[", "]") {
-                oneOrMore { unescapedAnnotation() }
-            }
-        } else {
-            unescapedAnnotation()
-        }
-        NLs()
+    fun fileAnnotation(): AnnotationNodes {
+        return annotation()
     }
 
     // packageHeader
     //    : (PACKAGE identifier semi?)?
     //    ;
-    fun packageHeader() {
-        if (peekIdentifier() == "package") {
-            expect("package")
-            identifier()
-            semiOpt()
-        }
+    fun packageHeader(): Identifier? = when {
+        expectOpt("package") -> identifier().also { semiOpt() }
+        else -> null
     }
 
     // importList
     //    : importHeader*
     //    ;
-    fun importList() {
-        zeroOrMore { importHeader() }
+    fun importList(): List<ImportNode> {
+        return zeroOrMore { importHeader() }
     }
 
     // importHeader
     //    : IMPORT identifier (DOT MULT | importAlias)? semi?
     //    ;
-    fun importHeader() {
+    fun importHeader(): ImportNode {
         expect("import")
-        identifier()
+        val id = identifier()
+        var all = false
+        var alias: String? = null
         opt {
             OR({
-                DOT()
-                MULT()
+                expect(".*")
+                all = true
             }, {
-                importAlias()
+                alias = importAlias()
             })
         }
         semiOpt()
+        return ImportNode(id, alias, all)
     }
 
     // importAlias
     //    : AS simpleIdentifier
     //    ;
-    fun importAlias() {
-        AS()
-        simpleIdentifier()
+    fun importAlias(): String {
+        Hidden()
+        expect("as")
+        Hidden()
+        return simpleIdentifier()
     }
 
     // topLevelObject
     //    : declaration semis?
     //    ;
-    fun topLevelObject() {
-        TODO("topLevelObject")
+    fun topLevelObject(): DeclNode {
+        return declaration().also {
+            semis(atLeastOne = false)
+        }
     }
 
     // typeAlias
     //    : modifiers? TYPE_ALIAS NL* simpleIdentifier (NL* typeParameters)? NL* ASSIGNMENT NL* type
     //    ;
-    fun typeAlias() {
-        TODO("typeAlias")
+    fun typeAlias(): DeclNode {
+        opt { modifiers() }
+        expect("typealias")
+        NLs()
+        simpleIdentifier()
+        opt {
+            NLs()
+            typeParameters()
+        }
+        NLs()
+        assignment()
+        NLs()
+        type()
+        TODO()
     }
 
     // declaration
@@ -133,8 +143,14 @@ interface KotlinParser : KotlinLexer {
     //    | propertyDeclaration
     //    | typeAlias
     //    ;
-    fun declaration() {
-        TODO("declaration")
+    fun declaration(): DeclNode {
+        return OR(
+            { classDeclaration() },
+            { objectDeclaration() },
+            { functionDeclaration() },
+            { propertyDeclaration() },
+            { typeAlias() },
+        )
     }
 
 // SECTION: classes
@@ -146,7 +162,18 @@ interface KotlinParser : KotlinLexer {
     //      (NL* typeConstraints)?
     //      (NL* classBody | NL* enumClassBody)?
     //    ;
-    fun classDeclaration() {
+    fun classDeclaration(): DeclNode {
+        opt { modifiers() }
+        OR(
+            { expect("class") },
+            {
+                val isFun = expectOpt("fun")
+                NLs()
+                expect("interface")
+            },
+        )
+        NLs()
+        val className = simpleIdentifier()
         TODO("classDeclaration")
     }
 
@@ -304,7 +331,7 @@ interface KotlinParser : KotlinLexer {
     //      (NL* typeConstraints)?
     //      (NL* functionBody)?
     //    ;
-    fun functionDeclaration() {
+    fun functionDeclaration(): DeclNode {
         TODO()
     }
 
@@ -319,20 +346,44 @@ interface KotlinParser : KotlinLexer {
     //variableDeclaration
     //    : annotation* NL* simpleIdentifier (NL* COLON NL* type)?
     //    ;
-    fun variableDeclaration() {
-        TODO()
+    fun variableDeclaration(): VariableDecl {
+        zeroOrMore { annotation() }
+        val id = simpleIdentifier()
+        var type: TypeNode? = null
+        opt {
+            NLs()
+            COLON()
+            NLs()
+            type = type()
+        }
+        return VariableDecl(id, type)
     }
 
     //multiVariableDeclaration
     //    : LPAREN NL* variableDeclaration (NL* COMMA NL* variableDeclaration)* (NL* COMMA)? NL* RPAREN
     //    ;
-    fun multiVariableDeclaration() {
-        TODO()
+    fun multiVariableDeclaration(): VariableDecls {
+        val vars = arrayListOf<VariableDecl>()
+        expectAndRecover("(", ")") {
+            NLs()
+            vars += variableDeclaration()
+            while (hasMore) {
+                NLs()
+                if (expectOpt(",")) {
+                    NLs()
+                    if (expectOpt(")")) {
+                        skip(-1)
+                        break
+                    }
+                    vars += variableDeclaration()
+                }
+            }
+        }
+        return VariableDecls(vars)
     }
 
-    fun variableDeclarationOrMultiVariableDeclaration(): Node {
-        //OR({ variableDeclaration() }, { multiVariableDeclaration() })
-        TODO()
+    fun variableDeclarationOrMultiVariableDeclaration(): VariableDecls {
+        return OR({ VariableDecls(variableDeclaration()) }, { multiVariableDeclaration() })
     }
 
     //propertyDeclaration
@@ -344,7 +395,7 @@ interface KotlinParser : KotlinLexer {
     //      (NL* (ASSIGNMENT NL* expression | propertyDelegate))?
     //      (NL* SEMICOLON)? NL* (getter? (NL* semi? setter)? | setter? (NL* semi? getter)?)
     //    ;
-    fun propertyDeclaration() {
+    fun propertyDeclaration(): DeclNode {
         TODO()
     }
 
@@ -405,7 +456,21 @@ interface KotlinParser : KotlinLexer {
     //      (NL* COLON NL* delegationSpecifiers)?
     //      (NL* classBody)?
     //    ;
-    fun objectDeclaration() {
+    fun objectDeclaration(): DeclNode {
+        opt { modifiers() }
+        expect("object")
+        NLs()
+        simpleIdentifier()
+        opt {
+            NLs()
+            COLON()
+            NLs()
+            delegationSpecifiers()
+        }
+        opt {
+            NLs()
+            classBody()
+        }
         TODO()
     }
 
@@ -605,6 +670,11 @@ interface KotlinParser : KotlinLexer {
     //    : (label | annotation)* ( declaration | assignment | loopStatement | expression)
     //    ;
     fun statement(): Stm {
+        println("TODO: statement")
+        zeroOrMore {
+            OR({ label() }, { annotation() })
+        }
+        OR({ declaration() }, { assignment() }, { loopStatement() }, { expression() })
         TODO()
     }
 
@@ -623,7 +693,11 @@ interface KotlinParser : KotlinLexer {
     //    | statement
     //    ;
     fun controlStructureBody(): Stm {
-        TODO()
+        Hidden()
+        return when {
+            peekChar() == '{' -> block()
+            else -> statement()
+        }
     }
 
     //block
@@ -632,9 +706,7 @@ interface KotlinParser : KotlinLexer {
     fun block(): Stm {
         return expectAndRecoverSure("{", "}") {
             NLs()
-            val res = Stms(statements())
-            NLs()
-            res
+            Stms(statements()).also { NLs() }
         }
     }
 
@@ -659,15 +731,16 @@ interface KotlinParser : KotlinLexer {
         NLs()
         var annotations: List<Node> = emptyList()
         var expr: Expr? = null
-        var vardecl: Node? = null
+        var vardecl: VariableDecls? = null
         expectAndRecover("(", ")") {
             annotations = annotations()
             vardecl = variableDeclarationOrMultiVariableDeclaration()
             expect("in")
-            expression()
+            expr = expression()
         }
         NLs()
         val body = opt { controlStructureBody() }
+        //val body = controlStructureBody()
         ForLoopStm(expr, vardecl, body, annotations)
     }
 
@@ -715,7 +788,17 @@ interface KotlinParser : KotlinLexer {
     //    : (SEMICOLON | NL) NL*
     //    ;
     fun semi() {
-        TODO()
+        val c = peekChar()
+        if (c == ';') {
+            skip(1)
+        } else if (c == '\r' || c == '\n') {
+            NLs()
+        } else {
+            TODO("semi")
+        }
+        while (peekChar() == '\r' || peekChar() == '\n') {
+            NLs()
+        }
     }
 
     fun semiOpt() {
@@ -1538,26 +1621,26 @@ interface KotlinParser : KotlinLexer {
     //annotation
     //    : (singleAnnotation | multiAnnotation) NL*
     //    ;
-    fun annotation(): Node {
+    fun annotation(): AnnotationNodes {
         Hidden()
         NLs()
         expect("@")
-        val useSite = expectAnyOpt("field", "property", "get", "set", "receiver", "param", "setparam", "delegate")
+        val useSite = expectAnyOpt("field", "property", "get", "set", "receiver", "param", "setparam", "delegate", "file")
         if (useSite != null) {
             NLs()
             expect(":")
         }
-        if (peekChar() == '[') {
-            expectAndRecover("[", "]") {
-                oneOrMore { unescapedAnnotation() }
+        val nodes = if (peekChar() == '[') {
+            expectAndRecoverSure("[", "]") {
+                AnnotationNodes(oneOrMore { unescapedAnnotation() })
             }
         } else {
-            unescapedAnnotation()
+            AnnotationNodes(listOf(unescapedAnnotation()))
         }
-        return DummyNode()
+        return AnnotationNodes(nodes.annotations.map { it.copy(useSite = useSite) })
     }
 
-    fun annotations(): List<Node> {
+    fun annotations(): List<AnnotationNodes> {
         return zeroOrMore { annotation() }
     }
 
@@ -1590,7 +1673,7 @@ interface KotlinParser : KotlinLexer {
     //    : constructorInvocation
     //    | userType
     //    ;
-    fun unescapedAnnotation() {
+    fun unescapedAnnotation(): AnnotationNode {
         TODO()
     }
 
@@ -1662,13 +1745,15 @@ interface KotlinParser : KotlinLexer {
     //    : simpleIdentifier (NL* DOT simpleIdentifier)*
     //    ;
     fun identifier(): Identifier {
-        simpleIdentifier()
+        val ids = arrayListOf<String>()
+
+        ids += simpleIdentifier()
         zeroOrMore {
             NLs()
             DOT()
-            simpleIdentifier()
+            ids += simpleIdentifier()
         }
-        TODO("identifier")
+        return valentia.ast.Identifier(ids)
     }
 }
 

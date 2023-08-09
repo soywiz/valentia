@@ -7,10 +7,64 @@ import kotlin.test.assertEquals
 
 class ValentiaParserTest {
     @Test
+    fun testShebang() {
+        assertEquals(FileNode(shebang = "#!/bin/sh -x"), ValentiaParser("#!/bin/sh -x\n").valentiaFile())
+        assertEquals(FileNode(shebang = "#!/bin/sh -x"), ValentiaParser("#!/bin/sh -x").valentiaFile())
+    }
+
+    @Test
+    fun testPackage() {
+        assertEquals(
+            FileNode(_package = Identifier("hello.world")),
+            ValentiaParser("  \npackage hello.world").valentiaFile()
+        )
+    }
+
+    @Test
+    fun testImports() {
+        assertEquals(
+            listOf(
+                ImportNode(Identifier("a.b")),
+                ImportNode(Identifier("c.d")),
+            ),
+            ValentiaParser("import a.b\nimport c.d").importList()
+        )
+    }
+
+    @Test
+    fun testImportAll() {
+        assertEquals(
+            listOf(
+                ImportNode(Identifier("a.b"), all = true),
+                ImportNode(Identifier("c.d")),
+            ),
+            ValentiaParser("import a.b.*\nimport c.d").importList()
+        )
+    }
+
+    @Test
+    fun testImportAlias() {
+        assertEquals(
+            listOf(
+                ImportNode(Identifier("a.b.Test"), all = false, alias = "demo"),
+            ),
+            ValentiaParser("import a.b.Test as demo").importList()
+        )
+    }
+
+    @Test
     fun testSimplestWhile() {
         assertEquals(
             WhileLoopStm(IntLiteralExpr(1), EmptyStm()),
             ValentiaParser("while (1) ;").whileStatement()
+        )
+    }
+
+    @Test
+    fun testSimplestFor() {
+        assertEquals(
+            ForLoopStm(IntLiteralExpr(1), null, null),
+            ValentiaParser("for (n in 1) ;").forStatement()
         )
     }
 
