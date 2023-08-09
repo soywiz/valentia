@@ -54,6 +54,10 @@ open class TypeNode : Node()
 object UnknownType : TypeNode()
 object DynamicType : TypeNode()
 data class SimpleType(val name: String) : TypeNode()
+fun TypeNode.nullable(): TypeNode {
+    println("TODO: TypeNode.nullable")
+    return this
+}
 
 // Decl
 
@@ -66,7 +70,7 @@ data class VariableDecls(val decls: List<VariableDecl>) : DeclNode() {
 
 // ID
 
-data class Identifier(val parts: List<String>) : Node() {
+data class Identifier(val parts: List<String>) : Expr() {
     constructor(str: String) : this(str.split("."))
     val fqname: String = parts.joinToString(".")
     override fun toString(): String = "Identifier($fqname)"
@@ -74,16 +78,24 @@ data class Identifier(val parts: List<String>) : Node() {
 
 // Expressions
 
-open class Expr : Node() {
-}
+open class Expr : Node()
+
+data class CastExpr(val expr: Expr, val targetType: TypeNode, val kind: String) : Expr()
+data class CallExpr(val expr: Expr, val params: List<Expr>) : Expr()
+data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : Expr()
+data class UnaryPostOpExpr(val expr: Expr, val op: String) : Expr()
+data class UnaryPreOpExpr(val op: String, val expr: Expr) : Expr()
+
+data class IdentifierExpr(val id: String) : Expr()
 
 data class OpSeparatedExprs(val ops: List<String>, val exprs: List<Expr>) : Expr()
 
 open class LiteralExpr(val literal: Any?) : Expr()
 
+data class NullLiteralExpr(val dummy: Unit = Unit) : LiteralExpr(null)
 data class BoolLiteralExpr(val value: Boolean) : LiteralExpr(value)
-data class IntLiteralExpr(val value: Long) : LiteralExpr(value)
-data class LongLiteralExpr(val value: Long) : LiteralExpr(value)
+data class IntLiteralExpr(val value: Long, val isLong: Boolean = false, val isUnsigned: Boolean = false) : LiteralExpr(value)
+data class StringLiteralExpr(val value: String) : LiteralExpr(value)
 
 open class EmptyExpr : Expr()
 
@@ -99,17 +111,25 @@ data class ThisExpr(val id: Identifier?) : Expr() {
 open class Stm : Node() {
 }
 
+fun List<Stm>.compact(): Stm = when {
+    this.isEmpty() -> EmptyStm()
+    this.size == 1 -> this.first()
+    else -> Stms(this)
+}
+
 data class Stms(val stms: List<Stm>) : Stm() {
     constructor(vararg stms: Stm) : this(stms.toList())
 }
 
 data class EmptyStm(val dummy: Unit = Unit) : Stm()
 
+data class ExprStm(val expr: Expr) : Stm()
+
 abstract class LoopStm : Node() {
 }
 
 /** Iterates over a collection */
-data class ForLoopStm(val expr: Expr?, val vardecl: VariableDecls?, val body: Stm?, val annotations: List<Node> = emptyList()) : LoopStm() {
+data class ForLoopStm(val expr: Expr?, val vardecl: VariableDecls?, val body: Stm? = null, val annotations: List<Node> = emptyList()) : LoopStm() {
 }
 
 /** Executes 0 or more times */

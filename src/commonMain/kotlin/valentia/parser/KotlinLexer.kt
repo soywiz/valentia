@@ -1,9 +1,6 @@
 package valentia.parser
 
-import valentia.ast.BoolLiteralExpr
-import valentia.ast.IntLiteralExpr
-import valentia.ast.LongLiteralExpr
-import valentia.ast.enrich
+import valentia.ast.*
 
 interface KotlinLexer : UnicodeLexer {
     /**
@@ -529,9 +526,9 @@ interface KotlinLexer : UnicodeLexer {
     //    : DecDigitNoZero DecDigitOrSeparator* DecDigit
     //    | DecDigit
     //    ;
-    fun IntegerLiteralOpt(): IntLiteralExpr? = enrichOpt {
-        numericLiteral(radix = 10) { DecDigit(it) }
-    }
+    //fun IntegerLiteralOpt(): IntLiteralExpr? = enrichOpt {
+    //    numericLiteral(radix = 10) { DecDigit(it) }
+    //}
 
     //fragment HexDigit: [0-9a-fA-F];
     fun HexDigit(c: Char): Boolean = c in '0'..'9' || c in 'a'..'f' || c in 'A'..'F'
@@ -545,7 +542,11 @@ interface KotlinLexer : UnicodeLexer {
     //fragment HexDigitOrSeparator: HexDigit | '_';
     fun HexDigitOrSeparator(c: Char): Boolean = c == '_' || HexDigit(c)
 
-    private fun numericLiteral(radix: Int, isDigit: (Char) -> Boolean): IntLiteralExpr? {
+    fun numericLiteralSure(radix: Int, isDigit: (Char) -> Boolean): IntLiteralExpr {
+        return numericLiteral(radix, isDigit) ?: error("Not a base-$radix literal in $this")
+    }
+
+    fun numericLiteral(radix: Int, isDigit: (Char) -> Boolean): IntLiteralExpr? {
         var n = 0
         val c = peekChar(n)
         var lastC = c
@@ -565,10 +566,10 @@ interface KotlinLexer : UnicodeLexer {
     //    | '0' [xX] HexDigit
     //    ;
     fun HexLiteral(c: Char): Unit = TODO("HexLiteral")
-    fun HexLiteralOpt(): IntLiteralExpr? = enrichOpt {
-        if (expectAnyOpt("0x", "0X") == null) return@enrichOpt null
-        numericLiteral(radix = 16) { HexDigit(it) }
-    }
+    //fun HexLiteralOpt(): IntLiteralExpr? = enrichOpt {
+    //    if (expectAnyOpt("0x", "0X") == null) return@enrichOpt null
+    //    numericLiteral(radix = 16) { HexDigit(it) }
+    //}
 
     //fragment BinDigit: [01];
     fun BinDigit(c: Char): Boolean = c in '0'..'1'
@@ -580,42 +581,42 @@ interface KotlinLexer : UnicodeLexer {
     //    : '0' [bB] BinDigit BinDigitOrSeparator* BinDigit
     //    | '0' [bB] BinDigit
     //    ;
-    fun BinLiteralOpt(): IntLiteralExpr? = enrichOpt {
-        if (expectAnyOpt("0x", "0X") == null) return@enrichOpt null
-        numericLiteral(radix = 2) { BinDigit(it) }
-    }
+    //fun BinLiteralOpt(): IntLiteralExpr? = enrichOpt {
+    //    if (expectAnyOpt("0b", "0B") == null) return@enrichOpt null
+    //    numericLiteral(radix = 2) { BinDigit(it) }
+    //}
 
     //UnsignedLiteral
     //    : (IntegerLiteral | HexLiteral | BinLiteral) [uU] [lL]?
     //    ;
-    fun UnsignedLiteral() {
-        TODO("UnsignedLiteral")
-    }
+    //fun UnsignedLiteral() {
+    //    TODO("UnsignedLiteral")
+    //}
 
     //LongLiteral
     //    : (IntegerLiteral | HexLiteral | BinLiteral) [lL]
     //    ;
-    fun LongLiteral(): LongLiteralExpr? {
-        val res = IntegerLiteralOpt() ?: HexLiteralOpt() ?: BinLiteralOpt() ?: return null
-        if (expectAnyOpt("l", "L") == null) return null
-        return LongLiteralExpr(res.value).enrich(res)
-    }
+    //fun LongLiteral(): IntLiteralExpr? {
+    //    val res = IntegerLiteralOpt() ?: HexLiteralOpt() ?: BinLiteralOpt() ?: return null
+    //    if (expectAnyOpt("l", "L") == null) return null
+    //    return LongLiteralExpr(res.value).enrich(res)
+    //}
 
     //BooleanLiteral: 'true'| 'false';
-    fun BooleanLiteralOpt(): BoolLiteralExpr? {
-        val res = expectAnyOpt("true", "false") ?: return null
-        return BoolLiteralExpr(res == "true")
-    }
+    //fun BooleanLiteralOpt(): BoolLiteralExpr? {
+    //    val res = expectAnyOpt("true", "false") ?: return null
+    //    return BoolLiteralExpr(res == "true")
+    //}
 
     //NullLiteral: 'null';
-    fun NullLiteral() {
-        TODO("NullLiteral")
-    }
+    //fun NullLiteral() {
+    //    TODO("NullLiteral")
+    //}
 
     //CharacterLiteral
     //    : '\'' (EscapeSeq | ~[\n\r'\\]) '\''
     //    ;
-    fun CharacterLiteral() {
+    fun CharacterLiteral(): LiteralExpr {
         TODO("CharacterLiteral")
     }
 

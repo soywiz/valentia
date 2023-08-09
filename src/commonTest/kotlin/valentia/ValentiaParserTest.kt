@@ -1,11 +1,37 @@
 package valentia
 
 import valentia.ast.*
+import valentia.ast.NodeBuilder.Companion.id
+import valentia.ast.NodeBuilder.Companion.lit
 import valentia.parser.ValentiaParser
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class ValentiaParserTest {
+class ValentiaParserTest : NodeBuilder, StmBuilder {
+    @Test
+    fun testSimplestFunctionCall() {
+        assertEquals(
+            "exit".id(),
+            ValentiaParser("exit()").expression()
+        )
+    }
+
+    @Test
+    fun testSimplerFunctionCall() {
+        assertEquals(
+            "exit".id(-(1).lit),
+            ValentiaParser("exit(-1)").expression()
+        )
+    }
+
+    @Test
+    fun testSimpleFunctionCall() {
+        assertEquals(
+            "max".id(12.lit, 34.lit),
+            ValentiaParser("max(12, 34)").expression()
+        )
+    }
+
     @Test
     fun testShebang() {
         assertEquals(FileNode(shebang = "#!/bin/sh -x"), ValentiaParser("#!/bin/sh -x\n").valentiaFile())
@@ -55,7 +81,7 @@ class ValentiaParserTest {
     @Test
     fun testSimplestWhile() {
         assertEquals(
-            WhileLoopStm(IntLiteralExpr(1), EmptyStm()),
+            WHILE(1.lit) { },
             ValentiaParser("while (1) ;").whileStatement()
         )
     }
@@ -63,7 +89,7 @@ class ValentiaParserTest {
     @Test
     fun testSimplestFor() {
         assertEquals(
-            ForLoopStm(IntLiteralExpr(1), null, null),
+            ForLoopStm(IntLiteralExpr(1), vardecl = VariableDecls(VariableDecl(id = "n", type = null)), body = null),
             ValentiaParser("for (n in 1) ;").forStatement()
         )
     }
@@ -78,8 +104,6 @@ class ValentiaParserTest {
 
     @Test
     fun testSimpleExpr() {
-        val expr = ValentiaParser("1_000 * 2_0_0").expression()
-
         assertEquals(
             OpSeparatedExprs(listOf("*"), listOf(IntLiteralExpr(1000), IntLiteralExpr(200))),
             ValentiaParser("1_000 * 2_0_0").expression()
@@ -89,9 +113,7 @@ class ValentiaParserTest {
     @Test
     fun testExpr() {
         assertEquals(
-            OpSeparatedExprs(listOf("*"), listOf(IntLiteralExpr(2),
-                OpSeparatedExprs(listOf("+"), listOf(IntLiteralExpr(3), IntLiteralExpr(4)))
-            )),
+            2.lit * (3.lit + 4.lit),
             ValentiaParser("2 * (3 + 4)").expression()
         )
     }
@@ -99,7 +121,7 @@ class ValentiaParserTest {
     @Test
     fun testInfix() {
         assertEquals(
-            OpSeparatedExprs(listOf("shl"), listOf(IntLiteralExpr(1), IntLiteralExpr(5))),
+            1.lit shl 5.lit,
             ValentiaParser("1 shl 5").expression()
         )
     }
@@ -107,7 +129,7 @@ class ValentiaParserTest {
     @Test
     fun testIn() {
         assertEquals(
-            RangeTestExpr(IntLiteralExpr(1), "in", IntLiteralExpr(5)),
+            1.lit _in 5.lit,
             ValentiaParser("1 in 5").expression()
         )
     }
@@ -115,7 +137,7 @@ class ValentiaParserTest {
     @Test
     fun testNotIn() {
         assertEquals(
-            RangeTestExpr(IntLiteralExpr(1), "!in", IntLiteralExpr(5)),
+            1.lit _notIn 5.lit,
             ValentiaParser("1 !in 5").expression()
         )
     }
@@ -123,7 +145,7 @@ class ValentiaParserTest {
     @Test
     fun testIs() {
         assertEquals(
-            TypeTestExpr(IntLiteralExpr(1), "is", SimpleType("Int")),
+            1.lit _is "Int".type,
             ValentiaParser("1 is Int").expression()
         )
     }
@@ -131,8 +153,20 @@ class ValentiaParserTest {
     @Test
     fun testNotIs() {
         assertEquals(
-            TypeTestExpr(IntLiteralExpr(1), "!is", SimpleType("Int")),
+            1.lit _notIs "Int".type,
             ValentiaParser("1 !is Int").expression()
+        )
+    }
+
+    @Test
+    fun testAs() {
+        assertEquals(
+            1.lit.safeCastTo(SimpleType("Float")),
+            ValentiaParser("1 as? Float").expression()
+        )
+        assertEquals(
+            1.lit.castTo(SimpleType("Float")),
+            ValentiaParser("1 as Float").expression()
         )
     }
 }

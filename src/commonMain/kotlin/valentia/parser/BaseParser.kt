@@ -13,7 +13,7 @@ open class StrReader(val str: String) : BaseReader {
     override fun peek(count: Int): String = str.substring(pos, (pos + count).coerceAtMost(len))
     override fun readAbsoluteRange(start: Int, end: Int): String = str.substring(start, end)
 
-    override fun toString(): String = "StrReader(pos=$pos, len=$len, current='${peek(8)}')"
+    override fun toString(): String = "StrReader(pos=$pos, len=$len, peek='${peek(8)}')"
 }
 
 interface BaseReader {

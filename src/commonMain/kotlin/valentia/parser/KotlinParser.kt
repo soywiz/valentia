@@ -518,14 +518,14 @@ interface KotlinParser : KotlinLexer {
         Hidden()
         println("TODO: type")
         zeroOrMore { typeModifier() }
-        return typeReference()
-        //return OR(
-        //    { functionType() },
-        //    { parenthesizedType() },
-        //    { nullableType() },
-        //    { typeReference() },
-        //    { definitelyNonNullableType() },
-        //)
+        //return typeReference()
+        return OR(
+            { functionType() },
+            { nullableType() },
+            { parenthesizedType() },
+            { typeReference() },
+            { definitelyNonNullableType() },
+        )
     }
 
     //typeReference
@@ -541,7 +541,13 @@ interface KotlinParser : KotlinLexer {
     //    : (typeReference | parenthesizedType) NL* quest+
     //    ;
     fun nullableType(): TypeNode {
-        TODO("nullableType")
+        val type = OR({ typeReference() }, { parenthesizedType() })
+        NLs()
+        expect("?")
+        do {
+            Hidden()
+        } while (expectOpt("?"))
+        return type.nullable()
     }
 
     //quest
@@ -549,6 +555,7 @@ interface KotlinParser : KotlinLexer {
     //    | QUEST_WS
     //    ;
     fun quest() {
+        QUEST_WS()
         TODO()
     }
 
@@ -946,13 +953,17 @@ interface KotlinParser : KotlinLexer {
     //    : prefixUnaryExpression (NL* asOperator NL* type)*
     //    ;
     fun asExpression(): Expr {
-        println("TODO: asExpression")
-        val res = prefixUnaryExpression()
-        zeroOrMore {
+        var res: Expr = prefixUnaryExpression()
+        val asTypes = zeroOrMore {
             NLs()
-            asOperator()
+            val kind = asOperator()
             NLs()
-            type()
+            kind to type()
+        }
+        if (asTypes.isNotEmpty()) {
+            for (type in asTypes) {
+                res = CastExpr(res, type.second, type.first)
+            }
         }
         return res
     }
@@ -961,9 +972,15 @@ interface KotlinParser : KotlinLexer {
     //    : unaryPrefix* postfixUnaryExpression
     //    ;
     fun prefixUnaryExpression(): Expr {
-        println("TODO: prefixUnaryExpression")
         val prefixes = zeroOrMore { unaryPrefix() }
-        val res = postfixUnaryExpression()
+        println("TODO: prefixUnaryExpression : $prefixes")
+        var res: Expr = postfixUnaryExpression()
+        for (prefix in prefixes.reversed()) {
+            res = when (prefix) {
+                is String -> UnaryPreOpExpr(prefix, res)
+                else -> TODO()
+            }
+        }
         return res
     }
 
@@ -972,9 +989,9 @@ interface KotlinParser : KotlinLexer {
     //    | label
     //    | prefixUnaryOperator NL*
     //    ;
-    fun unaryPrefix() {
-        OR(
-            { prefixUnaryOperator(); NLs() },
+    fun unaryPrefix(): Any {
+        return OR(
+            { prefixUnaryOperator().also { NLs() } },
             { annotation() },
             { label() },
         )
@@ -992,6 +1009,22 @@ interface KotlinParser : KotlinLexer {
         return res
     }
 
+    private fun <T> parseList(oneOrMore: Boolean = false, separator: () -> Boolean, doBreak: () -> Boolean, node: () -> T): List<T> {
+        val nodes = arrayListOf<T>()
+        loop@while (hasMore) {
+            NLs()
+            if (doBreak()) break@loop
+            NLs()
+            nodes += node()
+            NLs()
+            if (doBreak()) break@loop
+            separator()
+            NLs()
+        }
+        if (oneOrMore && nodes.isEmpty()) error("parseList nodes=${nodes.size}")
+        return nodes
+    }
+
     //postfixUnarySuffix
     //    : postfixUnaryOperator
     //    | typeArguments
@@ -1000,7 +1033,44 @@ interface KotlinParser : KotlinLexer {
     //    | navigationSuffix
     //    ;
     fun postfixUnarySuffix(expr: Expr): Expr {
-        TODO()
+        expectAnyOpt("++", "--", "!!")?.let {
+            return UnaryPostOpExpr(expr, it)
+        }
+        if (peekChar() == '<') {
+            //return typeArguments()
+            TODO("postfixUnarySuffix.typeArguments")
+        }
+        // valueArguments: LPAREN NL* (valueArgument (NL* COMMA NL* valueArgument)* (NL* COMMA)? NL*)? RPAREN
+        // annotatedLambda: annotation* label? NL* lambdaLiteral
+        if (peekChar() == '(') {
+            val params = expectAndRecoverSure("(", ")") {
+                parseList(oneOrMore = false, separator = { expectOpt(",") }, doBreak = { matches(")") }) {
+                    valueArgument()
+                }
+            }
+            println("TODO: postfixUnarySuffix.callSuffix")
+            //opt {
+            //    annotations()
+            //    opt { label() }
+            //    NLs()
+            //    lambdaLiteral()
+            //}
+
+            return CallExpr(expr, params)
+        }
+        if (peekChar() == '[') {
+            val params = expectAndRecoverSure("[", "]") {
+                parseList(separator = { expectOpt(",") }, doBreak = { matches("]") }) {
+                    expression()
+                }
+            }
+            return IndexedExpr(expr, params)
+        }
+        if (expectAnyOpt(".", "?.", "::") != null) {
+            //return navigationSuffix()
+            TODO("postfixUnarySuffix.navigationSuffix")
+        }
+        TODO("postfixUnarySuffix")
     }
 
     //directlyAssignableExpression
@@ -1088,8 +1158,9 @@ interface KotlinParser : KotlinLexer {
     //valueArgument
     //    : annotation? NL* (simpleIdentifier NL* ASSIGNMENT NL*)? MULT? NL* expression
     //    ;
-    fun valueArgument() {
-        TODO()
+    fun valueArgument(): Expr {
+        println("TODO: valueArgument")
+        return expression()
     }
 
     //primaryExpression
@@ -1110,11 +1181,25 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun primaryExpression(): Expr {
         Hidden()
-        if (peekChar() == '(') {
-            return parenthesizedExpression()
-        }
+        if (peekChar() == '(') return parenthesizedExpression()
+        literalConstantOpt()?.let { return it }
+
         println("TODO: primaryExpression")
-        return literalConstant()
+
+        return OR(
+            { stringLiteral() },
+            { callableReference() },
+            { IdentifierExpr(simpleIdentifier()) },
+            { functionLiteral() },
+            { objectLiteral() },
+            { collectionLiteral() },
+            { thisExpression() },
+            { superExpression() },
+            { ifExpression() },
+            { whenExpression() },
+            { tryExpression() },
+            { jumpExpression() },
+        )
     }
 
     //parenthesizedExpression
@@ -1137,7 +1222,7 @@ interface KotlinParser : KotlinLexer {
     //collectionLiteral
     //    : LSQUARE NL* (expression (NL* COMMA NL* expression)* (NL* COMMA)? NL*)? RSQUARE
     //    ;
-    fun collectionLiteral() {
+    fun collectionLiteral(): Expr {
         TODO()
     }
 
@@ -1152,16 +1237,28 @@ interface KotlinParser : KotlinLexer {
     //    | LongLiteral
     //    | UnsignedLiteral
     //    ;
-    fun literalConstant(): LiteralExpr {
-        println("TODO: literalConstant")
-        return BooleanLiteralOpt() ?: IntegerLiteralOpt() ?: error("Can't find a literal at $this")
+    fun literalConstantOpt(): LiteralExpr? {
+        if (matches("'", consume = false)) {
+            return CharacterLiteral()
+        }
+        expectAnyOpt("false", "true")?.let { return BoolLiteralExpr(it == "true") }
+        if (expectOpt("null")) return NullLiteralExpr()
+        val numLit = when {
+            expectOpt("0x") || expectOpt("0X") -> numericLiteral(radix = 16) { HexDigit(it) }
+            expectOpt("0o") || expectOpt("0O") -> numericLiteral(radix = 8) { it in '0'..'7' }
+            expectOpt("0b") || expectOpt("0B") -> numericLiteral(radix = 2) { it in '0'..'1' }
+            else -> numericLiteral(radix = 10) { DecDigit(it) }
+        } ?: return null
+        val isUnsigned = expectAnyOpt("u", "U")
+        val isLong = expectAnyOpt("l", "L")
+        return numLit.copy(isLong = isLong != null, isUnsigned = isUnsigned != null)
     }
 
     //stringLiteral
     //    : lineStringLiteral
     //    | multiLineStringLiteral
     //    ;
-    fun stringLiteral() {
+    fun stringLiteral(): Expr {
         TODO()
     }
 
@@ -1251,14 +1348,14 @@ interface KotlinParser : KotlinLexer {
     //    : lambdaLiteral
     //    | anonymousFunction
     //    ;
-    fun functionLiteral() {
+    fun functionLiteral(): Expr {
         TODO()
     }
 
     //objectLiteral
     //    : DATA? NL* OBJECT (NL* COLON NL* delegationSpecifiers NL*)? (NL* classBody)?
     //    ;
-    fun objectLiteral() {
+    fun objectLiteral(): Expr {
         expectOpt("data")
         NLs()
         expect("object")
@@ -1279,7 +1376,7 @@ interface KotlinParser : KotlinLexer {
     //    : SUPER (LANGLE NL* type NL* RANGLE)? (AT_NO_WS simpleIdentifier)?
     //    | SUPER_AT
     //    ;
-    fun superExpression() {
+    fun superExpression(): Expr {
         TODO()
     }
 
@@ -1289,7 +1386,7 @@ interface KotlinParser : KotlinLexer {
     //      | controlStructureBody? NL* SEMICOLON? NL* ELSE NL* (controlStructureBody | SEMICOLON)
     //      | SEMICOLON)
     //    ;
-    fun ifExpression() {
+    fun ifExpression(): Expr {
         TODO()
     }
 
@@ -1303,7 +1400,7 @@ interface KotlinParser : KotlinLexer {
     //whenExpression
     //    : WHEN NL* whenSubject? NL* LCURL NL* (whenEntry NL*)* NL* RCURL
     //    ;
-    fun whenExpression() {
+    fun whenExpression(): Expr {
         TODO()
     }
 
@@ -1347,7 +1444,7 @@ interface KotlinParser : KotlinLexer {
     //tryExpression
     //    : TRY NL* block ((NL* catchBlock)+ (NL* finallyBlock)? | NL* finallyBlock)
     //    ;
-    fun tryExpression() {
+    fun tryExpression(): Expr {
         TODO()
     }
 
@@ -1373,14 +1470,14 @@ interface KotlinParser : KotlinLexer {
     //    | BREAK
     //    | BREAK_AT
     //    ;
-    fun jumpExpression() {
+    fun jumpExpression(): Expr {
         TODO()
     }
 
     //callableReference
     //    : receiverType? COLONCOLON NL* (simpleIdentifier | CLASS)
     //    ;
-    fun callableReference() {
+    fun callableReference(): Expr {
         TODO()
     }
 
