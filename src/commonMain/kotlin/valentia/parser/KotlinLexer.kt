@@ -316,10 +316,10 @@ interface KotlinLexer : UnicodeLexer {
     fun VAR(): Unit = TODO()
 
     //TYPE_ALIAS: 'typealias';
-    fun TYPE_ALIAS(): Unit = TODO()
+    fun TYPE_ALIAS(): Unit = expect("typealias")
 
     //CONSTRUCTOR: 'constructor';
-    fun CONSTRUCTOR(): Unit = TODO()
+    fun CONSTRUCTOR(): Unit = expect("constructor")
 
     //BY: 'by';
     fun BY(): Unit = TODO()
