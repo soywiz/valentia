@@ -343,18 +343,21 @@ open class KotlinParser : KotlinLexer() {
     fun functionValueParameterWithOptionalType() {
         TODO()
     }
+
     //parameterWithOptionalType
     //    : simpleIdentifier NL* (COLON NL* type)?
     //    ;
     fun parameterWithOptionalType() {
         TODO()
     }
+
     //parameter
     //    : simpleIdentifier NL* COLON NL* type
     //    ;
     fun parameter() {
         TODO()
     }
+
     //objectDeclaration
     //    : modifiers? OBJECT
     //      NL* simpleIdentifier
@@ -364,12 +367,14 @@ open class KotlinParser : KotlinLexer() {
     fun objectDeclaration() {
         TODO()
     }
+
     //secondaryConstructor
     //    : modifiers? CONSTRUCTOR NL* functionValueParameters (NL* COLON NL* constructorDelegationCall)? NL* block?
     //    ;
     fun secondaryConstructor() {
         TODO()
     }
+
     //constructorDelegationCall
     //    : (THIS | SUPER) NL* valueArguments
     //    ;
@@ -377,19 +382,21 @@ open class KotlinParser : KotlinLexer() {
         TODO()
     }
 
-// SECTION: enumClasses
+    // SECTION: enumClasses
     //enumClassBody
     //    : LCURL NL* enumEntries? (NL* SEMICOLON NL* classMemberDeclarations)? NL* RCURL
     //    ;
     fun enumClassBody() {
         TODO()
     }
+
     //enumEntries
     //    : enumEntry (NL* COMMA NL* enumEntry)* NL* COMMA?
     //    ;
     fun enumEntries() {
         TODO()
     }
+
     //enumEntry
     //    : (modifiers NL*)? simpleIdentifier (NL* valueArguments)? (NL* classBody)?
     //    ;
@@ -397,13 +404,14 @@ open class KotlinParser : KotlinLexer() {
         TODO()
     }
 
-// SECTION: types
+    // SECTION: types
     //type
     //    : typeModifiers? (functionType | parenthesizedType | nullableType | typeReference | definitelyNonNullableType)
     //    ;
     fun type() {
         TODO()
     }
+
     //typeReference
     //    : userType
     //    | DYNAMIC
@@ -411,12 +419,14 @@ open class KotlinParser : KotlinLexer() {
     fun typeReference() {
         TODO()
     }
+
     //nullableType
     //    : (typeReference | parenthesizedType) NL* quest+
     //    ;
     fun nullableType() {
         TODO()
     }
+
     //quest
     //    : QUEST_NO_WS
     //    | QUEST_WS
@@ -424,18 +434,21 @@ open class KotlinParser : KotlinLexer() {
     fun quest() {
         TODO()
     }
+
     //userType
     //    : simpleUserType (NL* DOT NL* simpleUserType)*
     //    ;
     fun userType() {
         TODO()
     }
+
     //simpleUserType
     //    : simpleIdentifier (NL* typeArguments)?
     //    ;
     fun simpleUserType() {
         TODO()
     }
+
     //typeProjection
     //    : typeProjectionModifiers? type
     //    | MULT
@@ -443,12 +456,14 @@ open class KotlinParser : KotlinLexer() {
     fun typeProjection() {
         TODO()
     }
+
     //typeProjectionModifiers
     //    : typeProjectionModifier+
     //    ;
     fun typeProjectionModifiers() {
         TODO()
     }
+
     //typeProjectionModifier
     //    : varianceModifier NL*
     //    | annotation
@@ -456,36 +471,42 @@ open class KotlinParser : KotlinLexer() {
     fun typeProjectionModifier() {
         TODO()
     }
+
     //functionType
     //    : (receiverType NL* DOT NL*)? functionTypeParameters NL* ARROW NL* type
     //    ;
     fun functionType() {
         TODO()
     }
+
     //functionTypeParameters
     //    : LPAREN NL* (parameter | type)? (NL* COMMA NL* (parameter | type))* (NL* COMMA)? NL* RPAREN
     //    ;
     fun functionTypeParameters() {
         TODO()
     }
+
     //parenthesizedType
     //    : LPAREN NL* type NL* RPAREN
     //    ;
     fun parenthesizedType() {
         TODO()
     }
+
     //receiverType
     //    : typeModifiers? (parenthesizedType | nullableType | typeReference)
     //    ;
     fun receiverType() {
         TODO()
     }
+
     //parenthesizedUserType
     //    : LPAREN NL* (userType | parenthesizedUserType) NL* RPAREN
     //    ;
     fun parenthesizedUserType() {
         TODO()
     }
+
     //definitelyNonNullableType
     //    : typeModifiers? (userType | parenthesizedUserType) NL* AMP NL* typeModifiers? (userType | parenthesizedUserType)
     //    ;
@@ -508,12 +529,14 @@ open class KotlinParser : KotlinLexer() {
     fun statement() {
         TODO()
     }
+
     //label
     //    : simpleIdentifier (AT_NO_WS | AT_POST_WS) NL*
     //    ;
     fun label() {
         TODO()
     }
+
     //controlStructureBody
     //    : block
     //    | statement
@@ -521,12 +544,14 @@ open class KotlinParser : KotlinLexer() {
     fun controlStructureBody(): Stm {
         TODO()
     }
+
     //block
     //    : LCURL NL* statements NL* RCURL
     //    ;
     fun block() {
         TODO()
     }
+
     // loopStatement
     //    : forStatement
     //    | whileStatement
@@ -538,6 +563,7 @@ open class KotlinParser : KotlinLexer() {
         "do" -> doWhileStatement()
         else -> unexpected("loop")
     }
+
     //forStatement
     //    : FOR NL* LPAREN annotation* (variableDeclaration | multiVariableDeclaration)
     //    IN expression RPAREN NL* controlStructureBody?
@@ -558,6 +584,7 @@ open class KotlinParser : KotlinLexer() {
         val body = opt { controlStructureBody() }
         ForLoopStm(expr, vardecl, body, annotations)
     }
+
     // whileStatement
     //    : WHILE NL* LPAREN expression RPAREN NL* (controlStructureBody | SEMICOLON)
     //    ;
@@ -569,6 +596,7 @@ open class KotlinParser : KotlinLexer() {
         val body = OR({ expect(";") }, { controlStructureBody() })
         WhileLoopStm(cond, body)
     }
+
     // doWhileStatement
     //    : DO NL* controlStructureBody? NL* WHILE NL* LPAREN expression RPAREN
     //    ;
@@ -584,18 +612,21 @@ open class KotlinParser : KotlinLexer() {
         }
         DoWhileLoopStm(body, cond)
     }
+
     //assignment
     //    : (directlyAssignableExpression ASSIGNMENT | assignableExpression assignmentAndOperator) NL* expression
     //    ;
     fun assignment() {
         TODO()
     }
+
     //semi
     //    : (SEMICOLON | NL) NL*
     //    ;
     fun semi() {
         TODO()
     }
+
     //semis
     //    : (SEMICOLON | NL)+
     //    ;
@@ -611,90 +642,105 @@ open class KotlinParser : KotlinLexer() {
     fun expression(): Expr {
         TODO()
     }
+
     //disjunction
     //    : conjunction (NL* DISJ NL* conjunction)*
     //    ;
     fun disjunction() {
         TODO()
     }
+
     //conjunction
     //    : equality (NL* CONJ NL* equality)*
     //    ;
     fun conjunction() {
         TODO()
     }
+
     //equality
     //    : comparison (equalityOperator NL* comparison)*
     //    ;
     fun equality() {
         TODO()
     }
+
     //comparison
     //    : genericCallLikeComparison (comparisonOperator NL* genericCallLikeComparison)*
     //    ;
     fun comparison() {
         TODO()
     }
+
     //genericCallLikeComparison
     //    : infixOperation callSuffix*
     //    ;
     fun genericCallLikeComparison() {
         TODO()
     }
+
     //infixOperation
     //    : elvisExpression (inOperator NL* elvisExpression | isOperator NL* type)*
     //    ;
     fun infixOperation() {
         TODO()
     }
+
     //elvisExpression
     //    : infixFunctionCall (NL* elvis NL* infixFunctionCall)*
     //    ;
     fun elvisExpression() {
         TODO()
     }
+
     //elvis
     //    : QUEST_NO_WS COLON
     //    ;
     fun elvis() {
         TODO()
     }
+
     //infixFunctionCall
     //    : rangeExpression (simpleIdentifier NL* rangeExpression)*
     //    ;
     fun infixFunctionCall() {
         TODO()
     }
+
     //rangeExpression
     //    : additiveExpression ((RANGE | RANGE_UNTIL) NL* additiveExpression)*
     //    ;
     fun rangeExpression() {
         TODO()
     }
+
     //additiveExpression
     //    : multiplicativeExpression (additiveOperator NL* multiplicativeExpression)*
     //    ;
     fun additiveExpression() {
         TODO()
     }
+
     //multiplicativeExpression
     //    : asExpression (multiplicativeOperator NL* asExpression)*
     //    ;
     fun multiplicativeExpression() {
         TODO()
     }
+
     //asExpression
     //    : prefixUnaryExpression (NL* asOperator NL* type)*
     //    ;
     fun asExpression() {
         TODO()
     }
+
     //prefixUnaryExpression
     //    : unaryPrefix* postfixUnaryExpression
     //    ;
     fun prefixUnaryExpression() {
         TODO()
     }
+
     //unaryPrefix
     //    : annotation
     //    | label
@@ -703,12 +749,14 @@ open class KotlinParser : KotlinLexer() {
     fun unaryPrefix() {
         TODO()
     }
+
     //postfixUnaryExpression
     //    : primaryExpression postfixUnarySuffix*
     //    ;
     fun postfixUnaryExpression() {
         TODO()
     }
+
     //postfixUnarySuffix
     //    : postfixUnaryOperator
     //    | typeArguments
@@ -719,6 +767,7 @@ open class KotlinParser : KotlinLexer() {
     fun postfixUnarySuffix() {
         TODO()
     }
+
     //directlyAssignableExpression
     //    : postfixUnaryExpression assignableSuffix
     //    | simpleIdentifier
@@ -727,12 +776,14 @@ open class KotlinParser : KotlinLexer() {
     fun directlyAssignableExpression() {
         TODO()
     }
+
     //parenthesizedDirectlyAssignableExpression
     //    : LPAREN NL* directlyAssignableExpression NL* RPAREN
     //    ;
     fun parenthesizedDirectlyAssignableExpression() {
         TODO()
     }
+
     //assignableExpression
     //    : prefixUnaryExpression
     //    | parenthesizedAssignableExpression
@@ -740,12 +791,14 @@ open class KotlinParser : KotlinLexer() {
     fun assignableExpression() {
         TODO()
     }
+
     //parenthesizedAssignableExpression
     //    : LPAREN NL* assignableExpression NL* RPAREN
     //    ;
     fun parenthesizedAssignableExpression() {
         TODO()
     }
+
     //assignableSuffix
     //    : typeArguments
     //    | indexingSuffix
@@ -754,48 +807,56 @@ open class KotlinParser : KotlinLexer() {
     fun assignableSuffix() {
         TODO()
     }
+
     //indexingSuffix
     //    : LSQUARE NL* expression (NL* COMMA NL* expression)* (NL* COMMA)? NL* RSQUARE
     //    ;
     fun indexingSuffix() {
         TODO()
     }
+
     //navigationSuffix
     //    : memberAccessOperator NL* (simpleIdentifier | parenthesizedExpression | CLASS)
     //    ;
     fun navigationSuffix() {
         TODO()
     }
+
     //callSuffix
     //    : typeArguments? (valueArguments? annotatedLambda | valueArguments)
     //    ;
     fun callSuffix() {
         TODO()
     }
+
     //annotatedLambda
     //    : annotation* label? NL* lambdaLiteral
     //    ;
     fun annotatedLambda() {
         TODO()
     }
+
     //typeArguments
     //    : LANGLE NL* typeProjection (NL* COMMA NL* typeProjection)* (NL* COMMA)? NL* RANGLE
     //    ;
     fun typeArguments() {
         TODO()
     }
+
     //valueArguments
     //    : LPAREN NL* (valueArgument (NL* COMMA NL* valueArgument)* (NL* COMMA)? NL*)? RPAREN
     //    ;
     fun valueArguments() {
         TODO()
     }
+
     //valueArgument
     //    : annotation? NL* (simpleIdentifier NL* ASSIGNMENT NL*)? MULT? NL* expression
     //    ;
     fun valueArgument() {
         TODO()
     }
+
     //primaryExpression
     //    : parenthesizedExpression
     //    | simpleIdentifier
@@ -815,18 +876,21 @@ open class KotlinParser : KotlinLexer() {
     fun primaryExpression() {
         TODO()
     }
+
     //parenthesizedExpression
     //    : LPAREN NL* expression NL* RPAREN
     //    ;
     fun parenthesizedExpression() {
         TODO()
     }
+
     //collectionLiteral
     //    : LSQUARE NL* (expression (NL* COMMA NL* expression)* (NL* COMMA)? NL*)? RSQUARE
     //    ;
     fun collectionLiteral() {
         TODO()
     }
+
     //literalConstant
     //    : BooleanLiteral
     //    | IntegerLiteral
@@ -841,6 +905,7 @@ open class KotlinParser : KotlinLexer() {
     fun literalConstant() {
         TODO()
     }
+
     //stringLiteral
     //    : lineStringLiteral
     //    | multiLineStringLiteral
@@ -848,18 +913,21 @@ open class KotlinParser : KotlinLexer() {
     fun stringLiteral() {
         TODO()
     }
+
     //lineStringLiteral
     //    : QUOTE_OPEN (lineStringContent | lineStringExpression)* QUOTE_CLOSE
     //    ;
     fun lineStringLiteral() {
         TODO()
     }
+
     //multiLineStringLiteral
     //    : TRIPLE_QUOTE_OPEN (multiLineStringContent | multiLineStringExpression | MultiLineStringQuote)* TRIPLE_QUOTE_CLOSE
     //    ;
     fun multiLineStringLiteral() {
         TODO()
     }
+
     //lineStringContent
     //    : LineStrText
     //    | LineStrEscapedChar
@@ -868,12 +936,14 @@ open class KotlinParser : KotlinLexer() {
     fun lineStringContent() {
         TODO()
     }
+
     //lineStringExpression
     //    : LineStrExprStart NL* expression NL* RCURL
     //    ;
     fun lineStringExpression() {
         TODO()
     }
+
     //multiLineStringContent
     //    : MultiLineStrText
     //    | MultiLineStringQuote
@@ -882,24 +952,28 @@ open class KotlinParser : KotlinLexer() {
     fun multiLineStringContent() {
         TODO()
     }
+
     //multiLineStringExpression
     //    : MultiLineStrExprStart NL* expression NL* RCURL
     //    ;
     fun multiLineStringExpression() {
         TODO()
     }
+
     //lambdaLiteral
     //    : LCURL NL* (lambdaParameters? NL* ARROW NL*)? statements NL* RCURL
     //    ;
     fun lambdaLiteral() {
         TODO()
     }
+
     //lambdaParameters
     //    : lambdaParameter (NL* COMMA NL* lambdaParameter)* (NL* COMMA)?
     //    ;
     fun lambdaParameters() {
         TODO()
     }
+
     //lambdaParameter
     //    : variableDeclaration
     //    | multiVariableDeclaration (NL* COLON NL* type)?
@@ -907,6 +981,7 @@ open class KotlinParser : KotlinLexer() {
     fun lambdaParameter() {
         TODO()
     }
+
     //anonymousFunction
     //    : SUSPEND?
     //      NL*
@@ -920,6 +995,7 @@ open class KotlinParser : KotlinLexer() {
     fun anonymousFunction() {
         TODO()
     }
+
     //functionLiteral
     //    : lambdaLiteral
     //    | anonymousFunction
@@ -927,12 +1003,14 @@ open class KotlinParser : KotlinLexer() {
     fun functionLiteral() {
         TODO()
     }
+
     //objectLiteral
     //    : DATA? NL* OBJECT (NL* COLON NL* delegationSpecifiers NL*)? (NL* classBody)?
     //    ;
     fun objectLiteral() {
         TODO()
     }
+
     //thisExpression
     //    : THIS
     //    | THIS_AT
@@ -940,6 +1018,7 @@ open class KotlinParser : KotlinLexer() {
     fun thisExpression() {
         TODO()
     }
+
     //superExpression
     //    : SUPER (LANGLE NL* type NL* RANGLE)? (AT_NO_WS simpleIdentifier)?
     //    | SUPER_AT
@@ -947,6 +1026,7 @@ open class KotlinParser : KotlinLexer() {
     fun superExpression() {
         TODO()
     }
+
     //ifExpression
     //    : IF NL* LPAREN NL* expression NL* RPAREN NL*
     //      ( controlStructureBody
@@ -956,18 +1036,21 @@ open class KotlinParser : KotlinLexer() {
     fun ifExpression() {
         TODO()
     }
+
     //whenSubject
     //    : LPAREN (annotation* NL* VAL NL* variableDeclaration NL* ASSIGNMENT NL*)? expression RPAREN
     //    ;
     fun whenSubject() {
         TODO()
     }
+
     //whenExpression
     //    : WHEN NL* whenSubject? NL* LCURL NL* (whenEntry NL*)* NL* RCURL
     //    ;
     fun whenExpression() {
         TODO()
     }
+
     //whenEntry
     //    : whenCondition (NL* COMMA NL* whenCondition)* (NL* COMMA)? NL* ARROW NL* controlStructureBody semi?
     //    | ELSE NL* ARROW NL* controlStructureBody semi?
@@ -975,6 +1058,7 @@ open class KotlinParser : KotlinLexer() {
     fun whenEntry() {
         TODO()
     }
+
     //whenCondition
     //    : expression
     //    | rangeTest
@@ -983,36 +1067,42 @@ open class KotlinParser : KotlinLexer() {
     fun whenCondition() {
         TODO()
     }
+
     //rangeTest
     //    : inOperator NL* expression
     //    ;
     fun rangeTest() {
         TODO()
     }
+
     //typeTest
     //    : isOperator NL* type
     //    ;
     fun typeTest() {
         TODO()
     }
+
     //tryExpression
     //    : TRY NL* block ((NL* catchBlock)+ (NL* finallyBlock)? | NL* finallyBlock)
     //    ;
     fun tryExpression() {
         TODO()
     }
+
     //catchBlock
     //    : CATCH NL* LPAREN annotation* simpleIdentifier COLON type (NL* COMMA)? RPAREN NL* block
     //    ;
     fun catchBlock() {
         TODO()
     }
+
     //finallyBlock
     //    : FINALLY NL* block
     //    ;
     fun finallyBlock() {
         TODO()
     }
+
     //jumpExpression
     //    : THROW NL* expression
     //    | (RETURN | RETURN_AT) expression?
@@ -1024,12 +1114,14 @@ open class KotlinParser : KotlinLexer() {
     fun jumpExpression() {
         TODO()
     }
+
     //callableReference
     //    : receiverType? COLONCOLON NL* (simpleIdentifier | CLASS)
     //    ;
     fun callableReference() {
         TODO()
     }
+
     //assignmentAndOperator
     //    : ADD_ASSIGNMENT
     //    | SUB_ASSIGNMENT
@@ -1040,6 +1132,7 @@ open class KotlinParser : KotlinLexer() {
     fun assignmentAndOperator() {
         TODO()
     }
+
     //equalityOperator
     //    : EXCL_EQ
     //    | EXCL_EQEQ
@@ -1049,6 +1142,7 @@ open class KotlinParser : KotlinLexer() {
     fun equalityOperator() {
         TODO()
     }
+
     //comparisonOperator
     //    : LANGLE
     //    | RANGLE
@@ -1058,6 +1152,7 @@ open class KotlinParser : KotlinLexer() {
     fun comparisonOperator() {
         TODO()
     }
+
     //inOperator
     //    : IN
     //    | NOT_IN
@@ -1065,6 +1160,7 @@ open class KotlinParser : KotlinLexer() {
     fun inOperator() {
         TODO()
     }
+
     //isOperator
     //    : IS
     //    | NOT_IS
@@ -1072,6 +1168,7 @@ open class KotlinParser : KotlinLexer() {
     fun isOperator() {
         TODO()
     }
+
     //additiveOperator
     //    : ADD
     //    | SUB
@@ -1079,6 +1176,7 @@ open class KotlinParser : KotlinLexer() {
     fun additiveOperator() {
         TODO()
     }
+
     //multiplicativeOperator
     //    : MULT
     //    | DIV
@@ -1087,6 +1185,7 @@ open class KotlinParser : KotlinLexer() {
     fun multiplicativeOperator() {
         TODO()
     }
+
     //asOperator
     //    : AS
     //    | AS_SAFE
@@ -1094,6 +1193,7 @@ open class KotlinParser : KotlinLexer() {
     fun asOperator() {
         TODO()
     }
+
     //prefixUnaryOperator
     //    : INCR
     //    | DECR
@@ -1104,6 +1204,7 @@ open class KotlinParser : KotlinLexer() {
     fun prefixUnaryOperator() {
         TODO()
     }
+
     //postfixUnaryOperator
     //    : INCR
     //    | DECR
@@ -1112,6 +1213,7 @@ open class KotlinParser : KotlinLexer() {
     fun postfixUnaryOperator() {
         TODO()
     }
+
     //excl
     //    : EXCL_NO_WS
     //    | EXCL_WS
@@ -1119,6 +1221,7 @@ open class KotlinParser : KotlinLexer() {
     fun excl() {
         TODO()
     }
+
     //memberAccessOperator
     //    : NL* DOT
     //    | NL* safeNav
@@ -1127,6 +1230,7 @@ open class KotlinParser : KotlinLexer() {
     fun memberAccessOperator() {
         TODO()
     }
+
     //safeNav
     //    : QUEST_NO_WS DOT
     //    ;
@@ -1134,19 +1238,21 @@ open class KotlinParser : KotlinLexer() {
         TODO()
     }
 
-// SECTION: modifiers
+    // SECTION: modifiers
     //modifiers
     //    : (annotation | modifier)+
     //    ;
     fun modifiers() {
         TODO()
     }
+
     //parameterModifiers
     //    : (annotation | parameterModifier)+
     //    ;
     fun parameterModifiers() {
         TODO()
     }
+
     //modifier
     //    : (classModifier
     //    | memberModifier
@@ -1160,12 +1266,14 @@ open class KotlinParser : KotlinLexer() {
     fun modifier() {
         TODO()
     }
+
     //typeModifiers
     //    : typeModifier+
     //    ;
     fun typeModifiers() {
         TODO()
     }
+
     //typeModifier
     //    : annotation
     //    | SUSPEND NL*
@@ -1173,6 +1281,7 @@ open class KotlinParser : KotlinLexer() {
     fun typeModifier() {
         TODO()
     }
+
     //classModifier
     //    : ENUM
     //    | SEALED
@@ -1184,6 +1293,7 @@ open class KotlinParser : KotlinLexer() {
     fun classModifier() {
         TODO()
     }
+
     //memberModifier
     //    : OVERRIDE
     //    | LATEINIT
@@ -1191,6 +1301,7 @@ open class KotlinParser : KotlinLexer() {
     fun memberModifier() {
         TODO()
     }
+
     //visibilityModifier
     //    : PUBLIC
     //    | PRIVATE
@@ -1200,6 +1311,7 @@ open class KotlinParser : KotlinLexer() {
     fun visibilityModifier() {
         TODO()
     }
+
     //varianceModifier
     //    : IN
     //    | OUT
@@ -1207,12 +1319,14 @@ open class KotlinParser : KotlinLexer() {
     fun varianceModifier() {
         TODO()
     }
+
     //typeParameterModifiers
     //    : typeParameterModifier+
     //    ;
     fun typeParameterModifiers() {
         TODO()
     }
+
     //typeParameterModifier
     //    : reificationModifier NL*
     //    | varianceModifier NL*
@@ -1221,6 +1335,7 @@ open class KotlinParser : KotlinLexer() {
     fun typeParameterModifier() {
         TODO()
     }
+
     //functionModifier
     //    : TAILREC
     //    | OPERATOR
@@ -1232,12 +1347,14 @@ open class KotlinParser : KotlinLexer() {
     fun functionModifier() {
         TODO()
     }
+
     //propertyModifier
     //    : CONST
     //    ;
     fun propertyModifier() {
         TODO()
     }
+
     //inheritanceModifier
     //    : ABSTRACT
     //    | FINAL
@@ -1246,6 +1363,7 @@ open class KotlinParser : KotlinLexer() {
     fun inheritanceModifier() {
         TODO()
     }
+
     //parameterModifier
     //    : VARARG
     //    | NOINLINE
@@ -1254,12 +1372,14 @@ open class KotlinParser : KotlinLexer() {
     fun parameterModifier() {
         TODO()
     }
+
     //reificationModifier
     //    : REIFIED
     //    ;
     fun reificationModifier() {
         TODO()
     }
+
     //platformModifier
     //    : EXPECT
     //    | ACTUAL
@@ -1268,34 +1388,39 @@ open class KotlinParser : KotlinLexer() {
         TODO()
     }
 
-// SECTION: annotations
+    // SECTION: annotations
     //annotation
     //    : (singleAnnotation | multiAnnotation) NL*
     //    ;
     fun annotation(): Node {
         TODO()
     }
+
     fun annotations(): List<Node> {
         return zeroOrMore { annotation() }
     }
+
     //singleAnnotation
     //    : (annotationUseSiteTarget NL* | AT_NO_WS | AT_PRE_WS) unescapedAnnotation
     //    ;
     fun singleAnnotation() {
         TODO()
     }
+
     //multiAnnotation
     //    : (annotationUseSiteTarget NL* | AT_NO_WS | AT_PRE_WS) LSQUARE unescapedAnnotation+ RSQUARE
     //    ;
     fun multiAnnotation() {
         TODO()
     }
+
     //annotationUseSiteTarget
     //    : (AT_NO_WS | AT_PRE_WS) (FIELD | PROPERTY | GET | SET | RECEIVER | PARAM | SETPARAM | DELEGATE) NL* COLON
     //    ;
     fun annotationUseSiteTarget() {
         TODO()
     }
+
     //unescapedAnnotation
     //    : constructorInvocation
     //    | userType
@@ -1304,7 +1429,7 @@ open class KotlinParser : KotlinLexer() {
         TODO()
     }
 
-// SECTION: identifiers
+    // SECTION: identifiers
     //simpleIdentifier
     //    : Identifier
     //    | ABSTRACT
@@ -1383,6 +1508,7 @@ open class KotlinLexer : UnicodeLexer() {
     fun ShebangLine() {
         TODO()
     }
+
     //DelimitedComment
     //    : '/*' ( DelimitedComment | . )*? '*/'
     //      -> channel(HIDDEN)
@@ -1398,6 +1524,7 @@ open class KotlinLexer : UnicodeLexer() {
     fun LineComment() {
         TODO()
     }
+
     //WS
     //    : [\u0020\u0009\u000C]
     //      -> channel(HIDDEN)
@@ -1405,10 +1532,12 @@ open class KotlinLexer : UnicodeLexer() {
     fun WS() {
         TODO()
     }
+
     //NL: '\n' | '\r' '\n'?;
     fun NL() {
         TODO()
     }
+
     fun NLs() { // NL*
         zeroOrMore { NL() }
     }
@@ -1418,57 +1547,125 @@ open class KotlinLexer : UnicodeLexer() {
         TODO()
     }
 
-// SECTION: separatorsAndOperations
+    // SECTION: separatorsAndOperations
     //RESERVED: '...';
-    fun RESERVED() { TODO() }
+    fun RESERVED() {
+        TODO()
+    }
+
     //DOT: '.';
-    fun DOT() { TODO() }
+    fun DOT() {
+        TODO()
+    }
+
     //COMMA: ',';
-    fun COMMA() { TODO() }
+    fun COMMA() {
+        TODO()
+    }
+
     //LPAREN: '(' -> pushMode(Inside);
-    fun LPAREN() { TODO() }
+    fun LPAREN() {
+        TODO()
+    }
+
     //RPAREN: ')';
-    fun RPAREN() { TODO() }
+    fun RPAREN() {
+        TODO()
+    }
+
     //LSQUARE: '[' -> pushMode(Inside);
-    fun LSQUARE() { TODO() }
+    fun LSQUARE() {
+        TODO()
+    }
+
     //RSQUARE: ']';
-    fun RSQUARE() { TODO() }
+    fun RSQUARE() {
+        TODO()
+    }
+
     //LCURL: '{' -> pushMode(DEFAULT_MODE);
-    fun LCURL() { TODO() }
+    fun LCURL() {
+        TODO()
+    }
+
     ///*
     // * When using another programming language (not Java) to generate a parser,
     // * please replace this code with the corresponding code of a programming language you are using.
     // */
     //RCURL: '}' { if (!_modeStack.isEmpty()) { popMode(); } };
-    fun RCURL() { TODO() }
+    fun RCURL() {
+        TODO()
+    }
+
     //MULT: '*';
-    fun MULT() { TODO() }
+    fun MULT() {
+        TODO()
+    }
+
     //MOD: '%';
-    fun MOD() { TODO() }
+    fun MOD() {
+        TODO()
+    }
+
     //DIV: '/';
-    fun DIV() { TODO() }
+    fun DIV() {
+        TODO()
+    }
+
     //ADD: '+';
-    fun ADD() { TODO() }
+    fun ADD() {
+        TODO()
+    }
+
     //SUB: '-';
-    fun SUB() { TODO() }
+    fun SUB() {
+        TODO()
+    }
+
     //INCR: '++';
-    fun INCR() { TODO() }
+    fun INCR() {
+        TODO()
+    }
+
     //DECR: '--';
-    fun DECR() { TODO() }
+    fun DECR() {
+        TODO()
+    }
+
     //CONJ: '&&';
-    fun CONJ() { TODO() }
+    fun CONJ() {
+        TODO()
+    }
+
     //DISJ: '||';
-    fun DISJ() { TODO() }
+    fun DISJ() {
+        TODO()
+    }
+
     //EXCL_WS: '!' Hidden;
-    fun EXCL_WS() { TODO() }
+    fun EXCL_WS() {
+        TODO()
+    }
+
     //EXCL_NO_WS: '!';
-    fun EXCL_NO_WS() { TODO() }
+    fun EXCL_NO_WS() {
+        TODO()
+    }
+
     //COLON: ':';
-    fun COLON() { TODO() }
+    fun COLON() {
+        TODO()
+    }
+
     //SEMICOLON: ';';
-    fun SEMICOLON() { TODO() }
+    fun SEMICOLON() {
+        TODO()
+    }
+
     //ASSIGNMENT: '=';
-    fun ASSIGNMENT() { TODO() }
+    fun ASSIGNMENT() {
+        TODO()
+    }
     //ADD_ASSIGNMENT: '+=';
     //SUB_ASSIGNMENT: '-=';
     //MULT_ASSIGNMENT: '*=';
@@ -3595,31 +3792,39 @@ open class BaseParser {
     fun OR(vararg func: () -> Unit) {
 
     }
+
     fun expect(str: String) {
         TODO()
     }
+
     //@OptIn(ExperimentalContracts::class)
     fun <T> expectAndRecover(start: String, end: String, block: () -> T): T? {
         //contract { callsInPlace(block, InvocationKind.EXACTLY_ONCE) }
         TODO()
     }
+
     @OptIn(ExperimentalContracts::class)
     inline fun <T> opt(block: () -> T): T? {
         contract { callsInPlace(block, InvocationKind.EXACTLY_ONCE) }
         TODO()
     }
+
     inline fun <T> oneOrMore(block: () -> T): List<T> {
         TODO()
     }
+
     inline fun <T> zeroOrMore(block: () -> T): List<T> {
         TODO()
     }
+
     inline fun recoverWithExpect(token: String, block: () -> Unit) {
         TODO()
     }
+
     fun peekIdentifier(): String {
         TODO()
     }
+
     inline fun <T : Node> enrich(block: () -> T): T {
         // @TODO: Put in the node all the tokens expected
         return block()
