@@ -590,14 +590,21 @@ interface KotlinParser : KotlinLexer {
     //statements
     //    : (statement (semis statement)*)? semis?
     //    ;
-    fun statements() {
-        TODO()
+    fun statements(): List<Stm> {
+        val out = arrayListOf<Stm>()
+        out += statement()
+        zeroOrMore {
+            semis()
+            out += statement()
+        }
+        semis(atLeastOne = false)
+        return out
     }
 
     //statement
     //    : (label | annotation)* ( declaration | assignment | loopStatement | expression)
     //    ;
-    fun statement() {
+    fun statement(): Stm {
         TODO()
     }
 
@@ -619,8 +626,13 @@ interface KotlinParser : KotlinLexer {
     //block
     //    : LCURL NL* statements NL* RCURL
     //    ;
-    fun block() {
-        TODO()
+    fun block(): Stm {
+        return expectAndRecoverSure("{", "}") {
+            NLs()
+            val res = Stms(statements())
+            NLs()
+            res
+        }
     }
 
     // loopStatement
@@ -661,10 +673,15 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun whileStatement(): WhileLoopStm = enrich {
         expect("while")
+        Hidden()
         NLs()
+        Hidden()
         val cond = expectAndRecover("(", ")") { expression() }
+        Hidden()
         NLs()
+        Hidden()
         val body: Stm = OR({ expect(";"); EmptyStm }, { controlStructureBody() })
+        Hidden()
         WhileLoopStm(cond, body)
     }
 
@@ -705,8 +722,19 @@ interface KotlinParser : KotlinLexer {
     //semis
     //    : (SEMICOLON | NL)+
     //    ;
-    fun semis() {
-        TODO()
+    fun semis(atLeastOne: Boolean = true) {
+        var count = 0
+        while (true) {
+            Hidden()
+            when (peekChar()) {
+                ';' -> expectChar(';')
+                '\n', '\r' -> NL()
+                else -> break
+            }
+            count++
+            Hidden()
+        }
+        if (count == 0 && atLeastOne) error("Expected at least one semicolon or new line")
     }
 
 // SECTION: expressions

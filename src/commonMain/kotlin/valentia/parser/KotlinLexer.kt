@@ -61,6 +61,7 @@ interface KotlinLexer : UnicodeLexer {
     }
 
     //fragment Hidden: DelimitedComment | LineComment | WS;
+    //override
     fun Hidden(): Unit {
         loop@while (hasMore) {
             val c = peekChar()
@@ -538,7 +539,7 @@ interface KotlinLexer : UnicodeLexer {
             val str = read(n).replace("_", "").toInt()
             return IntLiteralExpr(str).enrich(this, spos)
         }
-        TODO("IntegerLiteral")
+        TODO("IntegerLiteral : $this")
     }
 
     //fragment HexDigit: [0-9a-fA-F];

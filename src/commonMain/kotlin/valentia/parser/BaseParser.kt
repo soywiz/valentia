@@ -65,6 +65,9 @@ inline fun <T> BaseReader.resetOnException(block: () -> T): Boolean {
 interface BaseParser : BaseReader {
     fun unexpected(reason: String? = null): Nothing = TODO("reason=$reason")
 
+    //open fun Hidden() {
+    //}
+
     fun expect(str: String) {
         if (!matches(str, consume = true)) error("Expected '$str' but found $this")
     }

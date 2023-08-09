@@ -52,6 +52,10 @@ data class ThisExpr(val id: Identifier?) : Expr() {
 open class Stm : Node() {
 }
 
+data class Stms(val stms: List<Stm>) : Stm() {
+    constructor(vararg stms: Stm) : this(stms.toList())
+}
+
 object EmptyStm : Stm()
 
 abstract class LoopStm : Node() {

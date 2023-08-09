@@ -7,6 +7,14 @@ import kotlin.test.assertEquals
 
 class ValentiaParserTest {
     @Test
+    fun testSimplestWhile() {
+        assertEquals(
+            WhileLoopStm(IntLiteralExpr(1), EmptyStm),
+            ValentiaParser("while (1) ;").whileStatement()
+        )
+    }
+
+    @Test
     fun testSimplestExpr() {
         assertEquals(
             OpSeparatedExprs(listOf("+"), listOf(IntLiteralExpr(1), IntLiteralExpr(5))),
