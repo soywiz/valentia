@@ -2,10 +2,12 @@ package valentia
 
 import valentia.parser.ValentiaParser
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class ValentiaParserTest {
     @Test
     fun test() {
-        ValentiaParser().valentiaFile()
+        //assertEquals('1', ValentiaParser("1 + 2").context.peekChar())
+        println(ValentiaParser("1 + 2").expression())
     }
 }

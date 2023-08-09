@@ -2,7 +2,7 @@ package valentia.parser
 
 import valentia.ast.*
 
-open class KotlinParser : KotlinLexer() {
+interface KotlinParser : KotlinLexer {
     /**
      * Kotlin syntax grammar in ANTLR4 notation
      */
@@ -54,35 +54,62 @@ open class KotlinParser : KotlinLexer() {
     //    : (AT_NO_WS | AT_PRE_WS) FILE NL* COLON NL* (LSQUARE unescapedAnnotation+ RSQUARE | unescapedAnnotation) NL*
     //    ;
     fun fileAnnotation() {
-        TODO()
+        OR({ AT_NO_WS() }, { AT_PRE_WS() })
+        FILE()
+        NLs()
+        COLON()
+        NLs()
+        if (peekIdentifier() == "[") {
+            expectAndRecover("[", "]") {
+                oneOrMore { unescapedAnnotation() }
+            }
+        } else {
+            unescapedAnnotation()
+        }
+        NLs()
     }
 
     // packageHeader
     //    : (PACKAGE identifier semi?)?
     //    ;
     fun packageHeader() {
-        TODO()
+        if (peekIdentifier() == "package") {
+            expect("package")
+            identifier()
+            semiOpt()
+        }
     }
 
     // importList
     //    : importHeader*
     //    ;
     fun importList() {
-        TODO()
+        zeroOrMore { importHeader() }
     }
 
     // importHeader
     //    : IMPORT identifier (DOT MULT | importAlias)? semi?
     //    ;
     fun importHeader() {
-        TODO()
+        expect("import")
+        identifier()
+        opt {
+            OR({
+                DOT()
+                MULT()
+            }, {
+                importAlias()
+            })
+        }
+        semiOpt()
     }
 
     // importAlias
     //    : AS simpleIdentifier
     //    ;
     fun importAlias() {
-        TODO()
+        AS()
+        simpleIdentifier()
     }
 
     // topLevelObject
@@ -641,6 +668,10 @@ open class KotlinParser : KotlinLexer() {
         TODO()
     }
 
+    fun semiOpt() {
+        opt { semi() }
+    }
+
     //semis
     //    : (SEMICOLON | NL)+
     //    ;
@@ -650,109 +681,155 @@ open class KotlinParser : KotlinLexer() {
 
 // SECTION: expressions
 
+    private inline fun binop(op: () -> String, next: () -> Expr, initialNLs: Boolean = true): Expr {
+        val ops = arrayListOf<String>()
+        val exprs = arrayListOf<Expr>()
+        exprs += next()
+        zeroOrMore {
+            if (initialNLs) NLs()
+            ops += op()
+            NLs()
+            exprs += next()
+        }
+        if (ops.isEmpty()) {
+            check(exprs.size == 1)
+            return exprs.first()
+        }
+        return OpSeparatedExprs(ops, exprs)
+    }
+
     //expression
     //    : disjunction
     //    ;
     fun expression(): Expr {
-        TODO()
+        return disjunction()
     }
 
     //disjunction
     //    : conjunction (NL* DISJ NL* conjunction)*
     //    ;
-    fun disjunction() {
-        TODO()
+    fun disjunction(): Expr {
+        return binop({ DISJ() }, { conjunction() })
     }
 
     //conjunction
     //    : equality (NL* CONJ NL* equality)*
     //    ;
-    fun conjunction() {
-        TODO()
+    fun conjunction(): Expr {
+        return binop({ CONJ() }, { equality() })
     }
 
     //equality
     //    : comparison (equalityOperator NL* comparison)*
     //    ;
-    fun equality() {
-        TODO()
+    fun equality(): Expr {
+        return binop({ equalityOperator() }, { comparison() }, initialNLs = false)
+        //comparison()
+        //zeroOrMore {
+        //    equalityOperator()
+        //    NLs()
+        //    comparison()
+        //}
     }
 
     //comparison
     //    : genericCallLikeComparison (comparisonOperator NL* genericCallLikeComparison)*
     //    ;
-    fun comparison() {
-        TODO()
+    fun comparison(): Expr {
+        return binop({ comparisonOperator() }, { genericCallLikeComparison() }, initialNLs = false)
     }
 
     //genericCallLikeComparison
     //    : infixOperation callSuffix*
     //    ;
-    fun genericCallLikeComparison() {
-        TODO()
+    fun genericCallLikeComparison(): Expr {
+        val res = infixOperation()
+        zeroOrMore { callSuffix() }
+        println("TODO: genericCallLikeComparison")
+        return res
     }
 
     //infixOperation
     //    : elvisExpression (inOperator NL* elvisExpression | isOperator NL* type)*
     //    ;
-    fun infixOperation() {
-        TODO()
+    fun infixOperation(): Expr {
+        println("TODO: infixOperation")
+        val res = elvisExpression()
+        loop@while (true) {
+            when {
+                expectOpt("!in") || expectOpt("in") -> elvisExpression()
+                expectOpt("!is") || expectOpt("is") -> type()
+                else -> break@loop
+            }
+        }
+        return res
     }
 
     //elvisExpression
     //    : infixFunctionCall (NL* elvis NL* infixFunctionCall)*
     //    ;
-    fun elvisExpression() {
-        TODO()
+    fun elvisExpression(): Expr {
+        return binop({ expectAny("?:") }, { infixFunctionCall() })
     }
 
     //elvis
     //    : QUEST_NO_WS COLON
     //    ;
     fun elvis() {
-        TODO()
+        expect("?:")
     }
 
     //infixFunctionCall
     //    : rangeExpression (simpleIdentifier NL* rangeExpression)*
     //    ;
-    fun infixFunctionCall() {
-        TODO()
+    fun infixFunctionCall(): Expr {
+        return binop({ simpleIdentifier() }, { rangeExpression() })
     }
 
     //rangeExpression
     //    : additiveExpression ((RANGE | RANGE_UNTIL) NL* additiveExpression)*
     //    ;
-    fun rangeExpression() {
-        TODO()
+    fun rangeExpression(): Expr {
+        return binop({ expectAny("..<", "..") }, { additiveExpression() })
     }
 
     //additiveExpression
     //    : multiplicativeExpression (additiveOperator NL* multiplicativeExpression)*
     //    ;
-    fun additiveExpression() {
-        TODO()
+    fun additiveExpression(): Expr {
+        return binop({ additiveOperator() }, { multiplicativeExpression() })
     }
 
     //multiplicativeExpression
     //    : asExpression (multiplicativeOperator NL* asExpression)*
     //    ;
-    fun multiplicativeExpression() {
-        TODO()
+    fun multiplicativeExpression(): Expr {
+        return binop({ multiplicativeOperator() }, { asExpression() })
     }
 
     //asExpression
     //    : prefixUnaryExpression (NL* asOperator NL* type)*
     //    ;
-    fun asExpression() {
-        TODO()
+    fun asExpression(): Expr {
+        println("TODO: asExpression")
+        val res = prefixUnaryExpression()
+        zeroOrMore {
+            NLs()
+            asOperator()
+            NLs()
+            type()
+        }
+        return res
     }
 
     //prefixUnaryExpression
     //    : unaryPrefix* postfixUnaryExpression
     //    ;
-    fun prefixUnaryExpression() {
-        TODO()
+    fun prefixUnaryExpression(): Expr {
+        println("TODO: prefixUnaryExpression")
+        zeroOrMore { unaryPrefix() }
+        val res = postfixUnaryExpression()
+        return res
     }
 
     //unaryPrefix
@@ -761,14 +838,23 @@ open class KotlinParser : KotlinLexer() {
     //    | prefixUnaryOperator NL*
     //    ;
     fun unaryPrefix() {
-        TODO()
+        OR(
+            { annotation() },
+            { label() },
+            { prefixUnaryOperator(); NLs() },
+        )
     }
 
     //postfixUnaryExpression
     //    : primaryExpression postfixUnarySuffix*
     //    ;
-    fun postfixUnaryExpression() {
-        TODO()
+    fun postfixUnaryExpression(): Expr {
+        println("TODO: postfixUnaryExpression")
+        val res = primaryExpression()
+        zeroOrMore {
+            postfixUnarySuffix()
+        }
+        return res
     }
 
     //postfixUnarySuffix
@@ -887,8 +973,9 @@ open class KotlinParser : KotlinLexer() {
     //    | tryExpression
     //    | jumpExpression
     //    ;
-    fun primaryExpression() {
-        TODO()
+    fun primaryExpression(): Expr {
+        println("TODO: primaryExpression")
+        return LiteralExpr(literalConstant())
     }
 
     //parenthesizedExpression
@@ -916,8 +1003,9 @@ open class KotlinParser : KotlinLexer() {
     //    | LongLiteral
     //    | UnsignedLiteral
     //    ;
-    fun literalConstant() {
-        TODO()
+    fun literalConstant(): Any? {
+        println("TODO: literalConstant")
+        return BooleanLiteral() ?: IntegerLiteral()
     }
 
     //stringLiteral
@@ -1022,6 +1110,9 @@ open class KotlinParser : KotlinLexer() {
     //    : DATA? NL* OBJECT (NL* COLON NL* delegationSpecifiers NL*)? (NL* classBody)?
     //    ;
     fun objectLiteral() {
+        expectOpt("data")
+        NLs()
+        expect("object")
         TODO()
     }
 
@@ -1029,8 +1120,10 @@ open class KotlinParser : KotlinLexer() {
     //    : THIS
     //    | THIS_AT
     //    ;
-    fun thisExpression() {
-        TODO()
+    fun thisExpression(): ThisExpr = enrich {
+        expect("this")
+        val id = if (expectOpt("@")) identifier() else null
+        ThisExpr(id)
     }
 
     //superExpression
@@ -1085,15 +1178,21 @@ open class KotlinParser : KotlinLexer() {
     //rangeTest
     //    : inOperator NL* expression
     //    ;
-    fun rangeTest() {
-        TODO()
+    fun rangeTest(): RangeTestExpr = enrich {
+        val kind = inOperator()
+        NLs()
+        val expr = expression()
+        RangeTestExpr(kind, expr)
     }
 
     //typeTest
     //    : isOperator NL* type
     //    ;
-    fun typeTest() {
-        TODO()
+    fun typeTest(): TypeTestExpr = enrich {
+        val kind = isOperator()
+        NLs()
+        val expr = expression()
+        TypeTestExpr(kind, expr)
     }
 
     //tryExpression
@@ -1153,8 +1252,8 @@ open class KotlinParser : KotlinLexer() {
     //    | EQEQ
     //    | EQEQEQ
     //    ;
-    fun equalityOperator() {
-        TODO()
+    fun equalityOperator(): String {
+        return expectAny("!==", "===", "!=", "==")
     }
 
     //comparisonOperator
@@ -1163,32 +1262,32 @@ open class KotlinParser : KotlinLexer() {
     //    | LE
     //    | GE
     //    ;
-    fun comparisonOperator() {
-        TODO()
+    fun comparisonOperator(): String {
+        return expectAny("<", ">", ">=", "<=")
     }
 
     //inOperator
     //    : IN
     //    | NOT_IN
     //    ;
-    fun inOperator() {
-        TODO()
+    fun inOperator(): String {
+        return expectAny("!in", "in")
     }
 
     //isOperator
     //    : IS
     //    | NOT_IS
     //    ;
-    fun isOperator() {
-        TODO()
+    fun isOperator(): String {
+        return expectAny("!is", "is")
     }
 
     //additiveOperator
     //    : ADD
     //    | SUB
     //    ;
-    fun additiveOperator() {
-        TODO()
+    fun additiveOperator(): String {
+        return expectAny("+", "-")
     }
 
     //multiplicativeOperator
@@ -1196,16 +1295,16 @@ open class KotlinParser : KotlinLexer() {
     //    | DIV
     //    | MOD
     //    ;
-    fun multiplicativeOperator() {
-        TODO()
+    fun multiplicativeOperator(): String {
+        return expectAny("*", "/", "%")
     }
 
     //asOperator
     //    : AS
     //    | AS_SAFE
     //    ;
-    fun asOperator() {
-        TODO()
+    fun asOperator(): String {
+        return expectAny("as?", "as")
     }
 
     //prefixUnaryOperator
@@ -1215,8 +1314,8 @@ open class KotlinParser : KotlinLexer() {
     //    | ADD
     //    | excl
     //    ;
-    fun prefixUnaryOperator() {
-        TODO()
+    fun prefixUnaryOperator(): String {
+        return expectAny("++", "--", "-", "+", "!")
     }
 
     //postfixUnaryOperator
@@ -1304,17 +1403,13 @@ open class KotlinParser : KotlinLexer() {
     //    | INNER
     //    | VALUE
     //    ;
-    fun classModifier() {
-        TODO()
-    }
+    fun classModifier(): String = expectAny("enum", "sealed", "annotation", "data", "inner", "value")
 
     //memberModifier
     //    : OVERRIDE
     //    | LATEINIT
     //    ;
-    fun memberModifier() {
-        TODO()
-    }
+    fun memberModifier(): String = expectAny("override", "lateinit")
 
     //visibilityModifier
     //    : PUBLIC
@@ -1322,17 +1417,13 @@ open class KotlinParser : KotlinLexer() {
     //    | INTERNAL
     //    | PROTECTED
     //    ;
-    fun visibilityModifier() {
-        TODO()
-    }
+    fun visibilityModifier(): String = expectAny("public", "private", "internal", "protected")
 
     //varianceModifier
     //    : IN
     //    | OUT
     //    ;
-    fun varianceModifier() {
-        TODO()
-    }
+    fun varianceModifier(): String = expectAny("in", "out")
 
     //typeParameterModifiers
     //    : typeParameterModifier+
@@ -1358,49 +1449,37 @@ open class KotlinParser : KotlinLexer() {
     //    | EXTERNAL
     //    | SUSPEND
     //    ;
-    fun functionModifier() {
-        TODO()
-    }
+    fun functionModifier(): String = expectAny("tailrec", "operator", "infix", "inline", "external", "suspend")
 
     //propertyModifier
     //    : CONST
     //    ;
-    fun propertyModifier() {
-        TODO()
-    }
+    fun propertyModifier(): String = expectAny("const")
 
     //inheritanceModifier
     //    : ABSTRACT
     //    | FINAL
     //    | OPEN
     //    ;
-    fun inheritanceModifier() {
-        TODO()
-    }
+    fun inheritanceModifier(): String = expectAny("abstract", "final", "open")
 
     //parameterModifier
     //    : VARARG
     //    | NOINLINE
     //    | CROSSINLINE
     //    ;
-    fun parameterModifier() {
-        TODO()
-    }
+    fun parameterModifier(): String = expectAny("vararg", "noinline", "crossinline")
 
     //reificationModifier
     //    : REIFIED
     //    ;
-    fun reificationModifier() {
-        TODO()
-    }
+    fun reificationModifier(): String = expectAny("reified")
 
     //platformModifier
     //    : EXPECT
     //    | ACTUAL
     //    ;
-    fun platformModifier() {
-        TODO()
-    }
+    fun platformModifier() = expectAny("expect", "actual")
 
     // SECTION: annotations
     //annotation
@@ -1494,14 +1573,20 @@ open class KotlinParser : KotlinLexer() {
     //    | SUSPEND
     //    | VALUE
     //    ;
-    fun simpleIdentifier() {
+    fun simpleIdentifier(): String {
         TODO()
     }
 
     //identifier
     //    : simpleIdentifier (NL* DOT simpleIdentifier)*
     //    ;
-    fun identifier() {
+    fun identifier(): Identifier {
+        simpleIdentifier()
+        zeroOrMore {
+            NLs()
+            DOT()
+            simpleIdentifier()
+        }
         TODO()
     }
 }

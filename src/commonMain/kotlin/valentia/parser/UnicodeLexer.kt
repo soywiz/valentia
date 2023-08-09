@@ -1,6 +1,6 @@
 package valentia.parser
 
-open class UnicodeLexer : BaseParser() {
+interface UnicodeLexer : BaseParser {
     /**
      * Kotlin lexical grammar in ANTLR4 notation (Unicode classes)
      *
