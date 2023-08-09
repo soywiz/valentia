@@ -682,7 +682,12 @@ interface KotlinLexer : UnicodeLexer {
                 break
             }
         }
-        return read(n)
+        val str = peek(n)
+        when (str) {
+            "return" -> error("not an identifier")
+        }
+        skip(n)
+        return str
     }
 
     //IdentifierOrSoftKey

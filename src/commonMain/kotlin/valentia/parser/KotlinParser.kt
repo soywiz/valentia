@@ -175,7 +175,7 @@ interface KotlinParser : KotlinLexer {
         )
         NLs()
         val className = simpleIdentifier()
-        TODO("classDeclaration")
+        TODO("classDeclaration: $className")
     }
 
     // primaryConstructor
@@ -392,22 +392,22 @@ interface KotlinParser : KotlinLexer {
             NLs()
             typeConstraints()
         }
-        opt {
+        val body = opt {
             NLs()
             functionBody()
         }
-        return FunDecl(funcName, params)
+        return FunDecl(funcName, params, body = body)
     }
 
     //functionBody
     //    : block
     //    | ASSIGNMENT NL* expression
     //    ;
-    fun functionBody() {
+    fun functionBody(): Stm {
         println("TODO: functionBody")
         return OR(
             { block() },
-            { ASSIGNMENT(); NLs(); expression() }
+            { ASSIGNMENT(); NLs(); ExprStm(expression()) }
         )
     }
 
@@ -572,15 +572,25 @@ interface KotlinParser : KotlinLexer {
     //enumEntries
     //    : enumEntry (NL* COMMA NL* enumEntry)* NL* COMMA?
     //    ;
-    fun enumEntries() {
-        TODO()
+    fun enumEntries(): List<EnumEntry> {
+        return parseList(oneOrMore = true, separator = { expectOpt(",") }, doBreak = { false }) {
+            enumEntry()
+        }
     }
 
     //enumEntry
     //    : (modifiers NL*)? simpleIdentifier (NL* valueArguments)? (NL* classBody)?
     //    ;
-    fun enumEntry() {
-        TODO()
+    fun enumEntry(): EnumEntry {
+        println("TODO: enumEntry")
+        val modifiers = opt { modifiers() }
+        NLs()
+        val id = simpleIdentifier()
+        NLs()
+        val arguments = opt { valueArguments() }
+        NLs()
+        val body = opt { classBody() }
+        return EnumEntry(id)
     }
 
     // SECTION: types
@@ -1325,10 +1335,21 @@ interface KotlinParser : KotlinLexer {
 
         println("TODO: primaryExpression")
 
+        if (matches("\"")) {
+            return stringLiteral()
+        }
+
+        if (matches("this")) {
+            return thisExpression()
+        }
+
+        if (matches("throw") || matches("return") || matches("continue") || matches("break")) {
+            return jumpExpression()
+        }
+
         return OR(
             { stringLiteral() },
             //{ callableReference() },
-            { IdentifierExpr(simpleIdentifier()) },
             //{ functionLiteral() },
             //{ objectLiteral() },
             //{ collectionLiteral() },
@@ -1337,7 +1358,8 @@ interface KotlinParser : KotlinLexer {
             //{ ifExpression() },
             //{ whenExpression() },
             //{ tryExpression() },
-            //{ jumpExpression() },
+            { jumpExpression() },
+            { IdentifierExpr(simpleIdentifier()) },
         )
     }
 
@@ -1627,7 +1649,9 @@ interface KotlinParser : KotlinLexer {
     //    : FINALLY NL* block
     //    ;
     fun finallyBlock() {
-        TODO()
+        expect("finally")
+        NLs()
+        block()
     }
 
     //jumpExpression
@@ -1639,7 +1663,27 @@ interface KotlinParser : KotlinLexer {
     //    | BREAK_AT
     //    ;
     fun jumpExpression(): Expr {
-        TODO()
+        //println("TODO: jumpExpression")
+        return when {
+            expectOpt("throw") -> {
+                NLs()
+                ThrowExpr(expression())
+            }
+            expectOpt("return") -> {
+                val label = if (expectOpt("@")) Identifier() else null
+                val expr = opt { expression() }
+                ReturnExpr(expr, label)
+            }
+            expectOpt("continue") -> {
+                val label = if (expectOpt("@")) Identifier() else null
+                ContinueExpr(label)
+            }
+            expectOpt("break") -> {
+                val label = if (expectOpt("@")) Identifier() else null
+                BreakExpr(label)
+            }
+            else -> error("Unknown jump expression")
+        }
     }
 
     //callableReference
@@ -1846,7 +1890,7 @@ interface KotlinParser : KotlinLexer {
     //    : typeParameterModifier+
     //    ;
     fun typeParameterModifiers() {
-        TODO()
+        multiple(atLeastOne = true) { typeParameterModifier() }
     }
 
     //typeParameterModifier

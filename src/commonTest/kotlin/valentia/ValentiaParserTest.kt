@@ -9,10 +9,39 @@ import kotlin.test.assertEquals
 
 class ValentiaParserTest : NodeBuilder, StmBuilder {
     @Test
+    fun testSimpleClass() {
+        assertEquals(
+            null,
+            ValentiaParser("""
+                class Test {
+                    fun demo() { println("1") }
+                }
+            """.trimIndent()).topLevelObject() as? Any?
+        )
+    }
+
+    @Test
+    fun testReturn() {
+        assertEquals(
+            RETURN(1.lit),
+            ValentiaParser("return 1").expression() as? Any?
+        )
+    }
+
+    @Test
+    fun testReturnAt() {
+        assertEquals(
+            RETURN(1.lit, label = "test"),
+            ValentiaParser("return@test 1").expression() as? Any?
+        )
+    }
+
+    @Test
     fun testSimpleFunction() {
         assertEquals(
             //"println".id("Hello World!".lit),
             FUN("sum", IntType, "a" to IntType, "b" to IntType) {
+                RETURN("a".id + "b".id)
             },
             ValentiaParser("fun sum(a: Int, b: Int): Int { return a + b }").functionDeclaration() as? Any?
         )

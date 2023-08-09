@@ -37,6 +37,8 @@ data class FileNode(
 
 }
 
+data class EnumEntry(val id: String) : Node()
+
 data class DummyNode(val dummy: Unit = Unit) : Node()
 
 fun <T : Node> T.enrich(node: Node): T = enrich(node.reader, node.spos, node.epos)
@@ -63,7 +65,7 @@ fun TypeNode.nullable(): TypeNode {
 
 open class DeclNode : Node()
 
-data class FunDecl(val name: String, val params: List<FuncValueParam>) : DeclNode()
+data class FunDecl(val name: String, val params: List<FuncValueParam> = emptyList(), val body: Stm? = null) : DeclNode()
 data class VariableDecl(val id: String, val type: TypeNode?) : DeclNode()
 data class VariableDecls(val decls: List<VariableDecl>) : DeclNode() {
     constructor(vararg decls: VariableDecl) : this(decls.toList())
@@ -81,6 +83,10 @@ data class Identifier(val parts: List<String>) : Expr() {
 
 open class Expr : Node()
 
+data class BreakExpr(val label: String? = null) : Expr()
+data class ContinueExpr(val label: String? = null) : Expr()
+data class ReturnExpr(val expr: Expr?, val label: String? = null) : Expr()
+data class ThrowExpr(val expr: Expr) : Expr()
 data class Parameter(val id: String, val type: TypeNode)
 data class FuncValueParam(val id: String, val type: TypeNode)
 data class TypeParameter(val id: String, val type: TypeNode?)
