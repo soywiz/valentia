@@ -24,13 +24,23 @@ interface KotlinLexer : UnicodeLexer {
     //    : '/*' ( DelimitedComment | . )*? '*/'
     //      -> channel(HIDDEN)
     //    ;
-    fun DelimitedComment(): Unit = TODO("DelimitedComment")
+    fun DelimitedComment(): Unit {
+        expect("/*")
+        while (hasMore) {
+            if (matches("/*")) DelimitedComment()
+            if (expectOpt("*/")) break
+            skip(1)
+        }
+    }
 
     //LineComment
     //    : '//' ~[\r\n]*
     //      -> channel(HIDDEN)
     //    ;
-    fun LineComment(): Unit = TODO("LineComment")
+    fun LineComment(): Unit {
+        expect("//")
+        readUntil { it == '\r' || it == '\n' }
+    }
 
     //WS
     //    : [\u0020\u0009\u000C]
@@ -91,11 +101,11 @@ interface KotlinLexer : UnicodeLexer {
 
     //LPAREN: '(' -> pushMode(Inside);
     //val _LPAREN = "("
-    fun LPAREN(): Unit = TODO("(")
+    fun LPAREN(): Unit = expect("(")
 
     //RPAREN: ')';
     //val _RPAREN = ")"
-    fun RPAREN(): Unit = TODO(")")
+    fun RPAREN(): Unit = expect(")")
 
     //LSQUARE: '[' -> pushMode(Inside);
     //val _LSQUARE = "["
@@ -152,7 +162,7 @@ interface KotlinLexer : UnicodeLexer {
     fun COLON(): Unit = expect(":")
 
     //SEMICOLON: ';';
-    fun SEMICOLON(): Unit = TODO(";")
+    fun SEMICOLON(): Unit = expect(";")
 
     //ASSIGNMENT: '=';
     fun ASSIGNMENT(): Unit = expect("=")
@@ -271,10 +281,10 @@ interface KotlinLexer : UnicodeLexer {
     fun PROPERTY(): Unit = TODO()
 
     //GET: 'get';
-    fun GET(): Unit = TODO()
+    fun GET(): Unit = expect("get")
 
     //SET: 'set';
-    fun SET(): Unit = TODO()
+    fun SET(): Unit = expect("set")
 
     //RECEIVER: 'receiver';
     fun RECEIVER(): Unit = TODO()
@@ -684,7 +694,7 @@ interface KotlinLexer : UnicodeLexer {
         }
         val str = peek(n)
         when (str) {
-            "return" -> error("not an identifier")
+            "return", "for", "while", "do" -> error("not an identifier")
         }
         skip(n)
         return str

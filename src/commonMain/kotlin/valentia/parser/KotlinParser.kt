@@ -146,10 +146,10 @@ interface KotlinParser : KotlinLexer {
     fun declaration(): DeclNode {
         println("TODO: declaration")
         return OR(
+            { functionDeclaration() },
             { classDeclaration() },
             { objectDeclaration() },
-            { functionDeclaration() },
-            //{ propertyDeclaration() },
+            { propertyDeclaration() },
             { typeAlias() },
         )
     }
@@ -163,7 +163,7 @@ interface KotlinParser : KotlinLexer {
     //      (NL* typeConstraints)?
     //      (NL* classBody | NL* enumClassBody)?
     //    ;
-    fun classDeclaration(): DeclNode {
+    fun classDeclaration(): ClassDecl {
         opt { modifiers() }
         OR(
             { expect("class") },
@@ -175,36 +175,63 @@ interface KotlinParser : KotlinLexer {
         )
         NLs()
         val className = simpleIdentifier()
-        TODO("classDeclaration: $className")
+        opt { NLs(); typeParameters() }
+        opt { NLs(); primaryConstructor() }
+        opt { NLs(); COLON(); NLs(); delegationSpecifiers() }
+        opt { NLs(); typeConstraints() }
+        opt { NLs(); OR({ classBody() }, { enumClassBody() }) }
+        return ClassDecl(className)
     }
 
     // primaryConstructor
     //    : (modifiers? CONSTRUCTOR NL*)? classParameters
     //    ;
     fun primaryConstructor() {
-        TODO("primaryConstructor")
+        println("TODO: primaryConstructor")
+        opt {
+            opt { modifiers() }
+            CONSTRUCTOR()
+            NLs()
+        }
+        classParameters()
+        return
     }
 
     //classBody
     //    : LCURL NL* classMemberDeclarations NL* RCURL
     //    ;
     fun classBody() {
-        TODO("classBody")
+        expect("{")
+        NLs()
+        classMemberDeclarations()
+        NLs()
+        expect("}")
     }
 
     //classParameters
     //    : LPAREN NL* (classParameter (NL* COMMA NL* classParameter)* (NL* COMMA)?)? NL* RPAREN
     //    ;
     //
-    fun classParameters() {
-        TODO("classParameters")
+    fun classParameters(): List<ClassParameter> {
+        return parseListWithStartEnd("(", ")", oneOrMore = true, separator = { expectOpt(",") }) {
+            classParameter()
+        }
     }
 
     //classParameter
     //    : modifiers? (VAL | VAR)? NL* simpleIdentifier COLON NL* type (NL* ASSIGNMENT NL* expression)?
     //    ;
-    fun classParameter() {
-        TODO("classParameter")
+    fun classParameter(): ClassParameter {
+        println("TODO: classParameter")
+        opt { modifiers() }
+        opt { expectAnyOpt("val", "var") }
+        NLs()
+        val id = simpleIdentifier()
+        COLON()
+        NLs()
+        val type = type()
+        opt { NLs(); ASSIGNMENT(); NLs(); expression() }
+        return ClassParameter(id)
     }
 
     //delegationSpecifiers
@@ -302,7 +329,10 @@ interface KotlinParser : KotlinLexer {
     //    : (classMemberDeclaration semis?)*
     //    ;
     fun classMemberDeclarations() {
-        TODO()
+        opt {
+            classMemberDeclaration()
+            semis(atLeastOne = false)
+        }
     }
 
     //classMemberDeclaration
@@ -312,14 +342,21 @@ interface KotlinParser : KotlinLexer {
     //    | secondaryConstructor
     //    ;
     fun classMemberDeclaration() {
-        TODO()
+        OR(
+            { declaration() },
+            { companionObject() },
+            { anonymousInitializer() },
+            { secondaryConstructor() },
+        )
     }
 
     //anonymousInitializer
     //    : INIT NL* block
     //    ;
     fun anonymousInitializer() {
-        TODO()
+        expect("init")
+        NLs()
+        block()
     }
 
     //companionObject
@@ -328,15 +365,25 @@ interface KotlinParser : KotlinLexer {
     //      (NL* COLON NL* delegationSpecifiers)?
     //      (NL* classBody)?
     //    ;
-    fun companionObject() {
-        TODO()
+    fun companionObject(): CompanionObjectDecl {
+        println("TODO: companionObject")
+        modifiers(atLeastOne = false)
+        expect("companion")
+        NLs()
+        val isData = expectOpt("data")
+        NLs()
+        expect("object")
+        val name = opt { NLs(); simpleIdentifier() }
+        opt { NLs(); COLON(); NLs(); delegationSpecifiers() }
+        opt { NLs(); classBody() }
+        return CompanionObjectDecl(name)
     }
 
     //functionValueParameters
     //    : LPAREN NL* (functionValueParameter (NL* COMMA NL* functionValueParameter)* (NL* COMMA)?)? NL* RPAREN
     //    ;
     fun functionValueParameters(): List<FuncValueParam> {
-        return parseListWithStartEnd("(", ")", oneOrMore = true) {
+        return parseListWithStartEnd("(", ")", oneOrMore = false) {
             functionValueParameter()
         }
     }
@@ -461,17 +508,42 @@ interface KotlinParser : KotlinLexer {
     //      (NL* (multiVariableDeclaration | variableDeclaration))
     //      (NL* typeConstraints)?
     //      (NL* (ASSIGNMENT NL* expression | propertyDelegate))?
-    //      (NL* SEMICOLON)? NL* (getter? (NL* semi? setter)? | setter? (NL* semi? getter)?)
+    //      (NL* SEMICOLON)? NL* (
+    //      getter? (NL* semi? setter)?
+    //      | setter? (NL* semi? getter)?
+    //      )
     //    ;
-    fun propertyDeclaration(): DeclNode {
-        TODO()
+    fun propertyDeclaration(): VariableDecls {
+        println("TODO: propertyDeclaration")
+        modifiers(atLeastOne = false)
+        expectAny("val", "var")
+        opt { NLs(); typeParameters() }
+        opt { NLs(); receiverType(); NLs(); DOT() }
+        val decls = opt { NLs(); OR({ multiVariableDeclaration() }, { VariableDecls(variableDeclaration()) }) }
+        opt { typeConstraints() }
+        opt { NLs(); OR({ ASSIGNMENT(); NLs(); expression() }, { propertyDelegate() }) }
+        opt { NLs(); SEMICOLON() }
+        NLs()
+        OR(
+            {
+                opt { getter() }
+                opt { NLs(); semiOpt(); setter() }
+            },
+            {
+                opt { setter() }
+                opt { NLs(); semiOpt(); getter() }
+            },
+        )
+        return decls ?: VariableDecls()
     }
 
     //propertyDelegate
     //    : BY NL* expression
     //    ;
-    fun propertyDelegate() {
-        TODO()
+    fun propertyDelegate(): Expr {
+        expect("by")
+        NLs()
+        return expression()
     }
 
     //getter
@@ -479,7 +551,22 @@ interface KotlinParser : KotlinLexer {
     //      (NL* LPAREN NL* RPAREN (NL* COLON NL* type)? NL* functionBody)?
     //    ;
     fun getter() {
-        TODO()
+        modifiers(atLeastOne = false)
+        GET()
+        opt {
+            NLs()
+            LPAREN()
+            NLs()
+            RPAREN()
+            opt {
+                NLs()
+                COLON()
+                NLs()
+                type()
+            }
+            NLs()
+            functionBody()
+        }
     }
 
     //setter
@@ -487,7 +574,27 @@ interface KotlinParser : KotlinLexer {
     //      (NL* LPAREN NL* functionValueParameterWithOptionalType (NL* COMMA)? NL* RPAREN (NL* COLON NL* type)? NL* functionBody)?
     //    ;
     fun setter() {
-        TODO()
+        modifiers(atLeastOne = false)
+        SET()
+        opt {
+            NLs()
+            LPAREN()
+            NLs()
+            functionValueParameterWithOptionalType()
+            opt {
+                NLs()
+                COMMA()
+            }
+            RPAREN()
+            opt {
+                NLs()
+                COLON()
+                NLs()
+                type()
+            }
+            NLs()
+            functionBody()
+        }
     }
 
     //parametersWithOptionalType
@@ -530,10 +637,11 @@ interface KotlinParser : KotlinLexer {
     //      (NL* classBody)?
     //    ;
     fun objectDeclaration(): DeclNode {
+        println("TODO: objectDeclaration")
         opt { modifiers() }
         expect("object")
         NLs()
-        simpleIdentifier()
+        val name = simpleIdentifier()
         opt {
             NLs()
             COLON()
@@ -544,21 +652,33 @@ interface KotlinParser : KotlinLexer {
             NLs()
             classBody()
         }
-        TODO()
+        return ObjectDecl(name)
     }
 
     //secondaryConstructor
     //    : modifiers? CONSTRUCTOR NL* functionValueParameters (NL* COLON NL* constructorDelegationCall)? NL* block?
     //    ;
     fun secondaryConstructor() {
-        TODO()
+        println("TODO: secondaryConstructor")
+        modifiers(atLeastOne = false)
+        CONSTRUCTOR()
+        NLs()
+        functionValueParameters()
+        opt {
+            NLs()
+            COLON()
+            NLs()
+            constructorDelegationCall()
+        }
+        NLs()
+        opt { block() }
     }
 
     //constructorDelegationCall
     //    : (THIS | SUPER) NL* valueArguments
     //    ;
     fun constructorDelegationCall() {
-        TODO()
+        TODO("constructorDelegationCall")
     }
 
     // SECTION: enumClasses
@@ -566,14 +686,25 @@ interface KotlinParser : KotlinLexer {
     //    : LCURL NL* enumEntries? (NL* SEMICOLON NL* classMemberDeclarations)? NL* RCURL
     //    ;
     fun enumClassBody() {
-        TODO()
+        println("TODO: enumClassBody")
+        expect("{")
+        NLs()
+        enumEntries(oneOrMore = false)
+        opt {
+            NLs()
+            SEMICOLON()
+            NLs()
+            classMemberDeclarations()
+        }
+        NLs()
+        expect("}")
     }
 
     //enumEntries
     //    : enumEntry (NL* COMMA NL* enumEntry)* NL* COMMA?
     //    ;
-    fun enumEntries(): List<EnumEntry> {
-        return parseList(oneOrMore = true, separator = { expectOpt(",") }, doBreak = { false }) {
+    fun enumEntries(oneOrMore: Boolean = true): List<EnumEntry> {
+        return parseList(oneOrMore = oneOrMore, separator = { expectOpt(",") }, doBreak = { false }) {
             enumEntry()
         }
     }
@@ -761,12 +892,16 @@ interface KotlinParser : KotlinLexer {
     //statements
     //    : (statement (semis statement)*)? semis?
     //    ;
-    fun statements(): List<Stm> {
-        val out = arrayListOf<Stm>()
-        out += statement()
-        zeroOrMore {
-            semis()
-            out += statement()
+    fun statements(oneOrMore: Boolean = true): List<Stm> {
+        val out = parseList(oneOrMore = oneOrMore, separator = {
+            try {
+                semis()
+                true
+            } catch (e: IllegalStateException) {
+                false
+            }
+        }, doBreak = { matches("}") }) {
+            statement()
         }
         semis(atLeastOne = false)
         return out
@@ -781,9 +916,9 @@ interface KotlinParser : KotlinLexer {
             OR({ label() }, { annotation() })
         }
         return OR(
+            { loopStatement() },
             { DeclStm(declaration()) },
             { assignment() },
-            { loopStatement() },
             { ExprStm(expression()) }
         )
     }
@@ -816,7 +951,11 @@ interface KotlinParser : KotlinLexer {
     fun block(): Stm {
         return expectAndRecoverSure("{", "}") {
             NLs()
-            Stms(statements()).also { NLs() }
+            if (!matches("}")) {
+                Stms(statements()).also { NLs() }
+            } else {
+                Stms()
+            }
         }
     }
 
@@ -825,7 +964,7 @@ interface KotlinParser : KotlinLexer {
     //    | whileStatement
     //    | doWhileStatement
     //    ;
-    fun loopStatement(): LoopStm = when (expectAnyOpt("for", "while", "do")) {
+    fun loopStatement(): LoopStm = when (expectAnyOpt("for", "while", "do", consume = false)) {
         "for" -> forStatement()
         "while" -> whileStatement()
         "do" -> doWhileStatement()

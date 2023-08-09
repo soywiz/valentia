@@ -96,11 +96,11 @@ interface BaseParser : BaseReader {
     }
 
     fun expectAny(vararg strs: String): String {
-        return expectAnyOpt(*strs) ?: error("Couldn't find ${strs.toList()}")
+        return expectAnyOpt(*strs) ?: error("Couldn't find ${strs.toList()} in $this")
     }
 
-    fun expectAnyOpt(vararg strs: String): String? {
-        for (str in strs) if (matches(str, consume = true)) return str
+    fun expectAnyOpt(vararg strs: String, consume: Boolean = true): String? {
+        for (str in strs) if (matches(str, consume = consume)) return str
         return null
     }
 

@@ -9,14 +9,45 @@ import kotlin.test.assertEquals
 
 class ValentiaParserTest : NodeBuilder, StmBuilder {
     @Test
+    fun testSimpleFile() {
+        val file = ValentiaParser.file(
+            """
+            package test
+            
+            import a.b.Test3
+            import a.b.c.*
+            import a.b.Test4 as MyTest
+            
+            fun test(a: Int, b: Int) { 1 + 2; return 3 }
+            class Test
+            class Demo {
+                companion object {
+                    fun demo() {
+                    }
+                }
+            }
+            class Test2
+            object Test5
+            // test
+            /*
+            /**/
+            fun test() { }
+            fun demo() = 10
+            val value = 10
+            val value2: Int = 10
+            */
+        """.trimIndent())
+    }
+
+    @Test
     fun testSimpleClass() {
         assertEquals(
-            null,
+            ClassDecl(name = "Test"),
             ValentiaParser("""
                 class Test {
                     fun demo() { println("1") }
                 }
-            """.trimIndent()).topLevelObject() as? Any?
+            """.trimIndent()).topLevelObject()
         )
     }
 
@@ -24,7 +55,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testReturn() {
         assertEquals(
             RETURN(1.lit),
-            ValentiaParser("return 1").expression() as? Any?
+            ValentiaParser.expression("return 1")
         )
     }
 
@@ -32,7 +63,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testReturnAt() {
         assertEquals(
             RETURN(1.lit, label = "test"),
-            ValentiaParser("return@test 1").expression() as? Any?
+            ValentiaParser.expression("return@test 1")
         )
     }
 
@@ -43,7 +74,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
             FUN("sum", IntType, "a" to IntType, "b" to IntType) {
                 RETURN("a".id + "b".id)
             },
-            ValentiaParser("fun sum(a: Int, b: Int): Int { return a + b }").functionDeclaration() as? Any?
+            ValentiaParser.topLevelDecl("fun sum(a: Int, b: Int): Int { return a + b }")
         )
     }
 
@@ -51,7 +82,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testPrintHelloWorld() {
         assertEquals(
             "println".id("Hello World!".lit),
-            ValentiaParser("println(\"Hello World!\")").expression()
+            ValentiaParser.expression("println(\"Hello World!\")")
         )
     }
 
@@ -59,7 +90,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testSimplestFunctionCall() {
         assertEquals(
             "exit".id(),
-            ValentiaParser("exit()").expression()
+            ValentiaParser.expression("exit()")
         )
     }
 
@@ -67,7 +98,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testSimplerFunctionCall() {
         assertEquals(
             "exit".id(-(1).lit),
-            ValentiaParser("exit(-1)").expression()
+            ValentiaParser.expression("exit(-1)")
         )
     }
 
@@ -75,21 +106,21 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testSimpleFunctionCall() {
         assertEquals(
             "max".id(12.lit, 34.lit),
-            ValentiaParser("max(12, 34)").expression()
+            ValentiaParser.expression("max(12, 34)")
         )
     }
 
     @Test
     fun testShebang() {
-        assertEquals(FileNode(shebang = "#!/bin/sh -x"), ValentiaParser("#!/bin/sh -x\n").valentiaFile())
-        assertEquals(FileNode(shebang = "#!/bin/sh -x"), ValentiaParser("#!/bin/sh -x").valentiaFile())
+        assertEquals(FileNode(shebang = "#!/bin/sh -x"), ValentiaParser.file("#!/bin/sh -x\n"))
+        assertEquals(FileNode(shebang = "#!/bin/sh -x"), ValentiaParser.file("#!/bin/sh -x"))
     }
 
     @Test
     fun testPackage() {
         assertEquals(
             FileNode(_package = Identifier("hello.world")),
-            ValentiaParser("  \npackage hello.world").valentiaFile()
+            ValentiaParser.file("  \npackage hello.world")
         )
     }
 
@@ -129,7 +160,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testSimplestWhile() {
         assertEquals(
             WHILE(1.lit) { },
-            ValentiaParser("while (1) ;").whileStatement()
+            ValentiaParser.statement("while (1) ;")
         )
     }
 
@@ -137,7 +168,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testSimplestFor() {
         assertEquals(
             ForLoopStm(IntLiteralExpr(1), vardecl = VariableDecls(VariableDecl(id = "n", type = null)), body = null),
-            ValentiaParser("for (n in 1) ;").forStatement()
+            ValentiaParser.statement("for (n in 1) ;")
         )
     }
 
@@ -145,7 +176,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testSimplestExpr() {
         assertEquals(
             OpSeparatedExprs(listOf("+"), listOf(IntLiteralExpr(1), IntLiteralExpr(5))),
-            ValentiaParser("1 \n + 5").expression()
+            ValentiaParser.expression("1 \n + 5")
         )
     }
 
@@ -153,7 +184,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testSimpleExpr() {
         assertEquals(
             OpSeparatedExprs(listOf("*"), listOf(IntLiteralExpr(1000), IntLiteralExpr(200))),
-            ValentiaParser("1_000 * 2_0_0").expression()
+            ValentiaParser.expression("1_000 * 2_0_0")
         )
     }
 
@@ -161,7 +192,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testExpr() {
         assertEquals(
             2.lit * (3.lit + 4.lit),
-            ValentiaParser("2 * (3 + 4)").expression()
+            ValentiaParser.expression("2 * (3 + 4)")
         )
     }
 
@@ -169,7 +200,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testInfix() {
         assertEquals(
             1.lit shl 5.lit,
-            ValentiaParser("1 shl 5").expression()
+            ValentiaParser.expression("1 shl 5")
         )
     }
 
@@ -177,7 +208,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testIn() {
         assertEquals(
             1.lit _in 5.lit,
-            ValentiaParser("1 in 5").expression()
+            ValentiaParser.expression("1 in 5")
         )
     }
 
@@ -185,7 +216,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testNotIn() {
         assertEquals(
             1.lit _notIn 5.lit,
-            ValentiaParser("1 !in 5").expression()
+            ValentiaParser.expression("1 !in 5")
         )
     }
 
@@ -193,7 +224,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testIs() {
         assertEquals(
             1.lit _is "Int".type,
-            ValentiaParser("1 is Int").expression()
+            ValentiaParser.expression("1 is Int")
         )
     }
 
@@ -201,7 +232,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testNotIs() {
         assertEquals(
             1.lit _notIs "Int".type,
-            ValentiaParser("1 !is Int").expression()
+            ValentiaParser.expression("1 !is Int")
         )
     }
 
@@ -209,11 +240,11 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     fun testAs() {
         assertEquals(
             1.lit.safeCastTo(SimpleType("Float")),
-            ValentiaParser("1 as? Float").expression()
+            ValentiaParser.expression("1 as? Float")
         )
         assertEquals(
             1.lit.castTo(SimpleType("Float")),
-            ValentiaParser("1 as Float").expression()
+            ValentiaParser.expression("1 as Float")
         )
     }
 }
