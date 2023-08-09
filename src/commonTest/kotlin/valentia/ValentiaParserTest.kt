@@ -9,6 +9,21 @@ import kotlin.test.assertEquals
 
 class ValentiaParserTest : NodeBuilder, StmBuilder {
     @Test
+    fun testStatements() {
+        assertEquals(
+            listOf(
+                WHILE(true.lit) { STM("println".id(2.lit)) }
+            ),
+            ValentiaParser.statements("""
+                //for (n in 0 until 10) println(1)
+                while (true) {
+                    println(2)
+                }
+        """)
+        )
+    }
+
+    @Test
     fun testSimpleFile() {
         val file = ValentiaParser.file(
             """
@@ -36,6 +51,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
             val value = 10
             val value2: Int = 10
             */
+            data class Demo2(val a: Int, val b: String)
         """.trimIndent())
     }
 

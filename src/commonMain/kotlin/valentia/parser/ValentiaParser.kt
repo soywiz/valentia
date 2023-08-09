@@ -19,5 +19,7 @@ open class ValentiaParser(
             ValentiaParser(str).expression()
         fun statement(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Stm =
             ValentiaParser(str).statement()
+        fun statements(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): List<Stm> =
+            ValentiaParser(str).statements()
     }
 }

@@ -912,9 +912,11 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun statement(): Stm {
         println("TODO: statement")
+        NLs()
         zeroOrMore {
             OR({ label() }, { annotation() })
         }
+        NLs()
         return OR(
             { loopStatement() },
             { DeclStm(declaration()) },
