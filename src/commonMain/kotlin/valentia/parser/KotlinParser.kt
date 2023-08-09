@@ -611,8 +611,11 @@ interface KotlinParser : KotlinLexer {
     //label
     //    : simpleIdentifier (AT_NO_WS | AT_POST_WS) NL*
     //    ;
-    fun label() {
-        TODO()
+    fun label(): String {
+        val id = simpleIdentifier()
+        expect("@")
+        NLs()
+        return id
     }
 
     //controlStructureBody
@@ -680,7 +683,7 @@ interface KotlinParser : KotlinLexer {
         Hidden()
         NLs()
         Hidden()
-        val body: Stm = OR({ expect(";"); EmptyStm }, { controlStructureBody() })
+        val body: Stm = OR({ expect(";"); EmptyStm() }, { controlStructureBody() })
         Hidden()
         WhileLoopStm(cond, body)
     }
@@ -876,7 +879,7 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun prefixUnaryExpression(): Expr {
         println("TODO: prefixUnaryExpression")
-        zeroOrMore { unaryPrefix() }
+        val prefixes = zeroOrMore { unaryPrefix() }
         val res = postfixUnaryExpression()
         return res
     }
@@ -888,9 +891,9 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun unaryPrefix() {
         OR(
+            { prefixUnaryOperator(); NLs() },
             { annotation() },
             { label() },
-            { prefixUnaryOperator(); NLs() },
         )
     }
 
@@ -899,9 +902,9 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun postfixUnaryExpression(): Expr {
         println("TODO: postfixUnaryExpression")
-        val res = primaryExpression()
+        var res: Expr = primaryExpression()
         zeroOrMore {
-            postfixUnarySuffix()
+            res = postfixUnarySuffix(res)
         }
         return res
     }
@@ -913,7 +916,7 @@ interface KotlinParser : KotlinLexer {
     //    | indexingSuffix
     //    | navigationSuffix
     //    ;
-    fun postfixUnarySuffix() {
+    fun postfixUnarySuffix(expr: Expr): Expr {
         TODO()
     }
 
@@ -1068,7 +1071,7 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun literalConstant(): LiteralExpr {
         println("TODO: literalConstant")
-        return BooleanLiteral() ?: IntegerLiteral() ?: error("Can't find a literal at $this")
+        return BooleanLiteralOpt() ?: IntegerLiteralOpt() ?: error("Can't find a literal at $this")
     }
 
     //stringLiteral
@@ -1536,7 +1539,22 @@ interface KotlinParser : KotlinLexer {
     //    : (singleAnnotation | multiAnnotation) NL*
     //    ;
     fun annotation(): Node {
-        TODO("annotation")
+        Hidden()
+        NLs()
+        expect("@")
+        val useSite = expectAnyOpt("field", "property", "get", "set", "receiver", "param", "setparam", "delegate")
+        if (useSite != null) {
+            NLs()
+            expect(":")
+        }
+        if (peekChar() == '[') {
+            expectAndRecover("[", "]") {
+                oneOrMore { unescapedAnnotation() }
+            }
+        } else {
+            unescapedAnnotation()
+        }
+        return DummyNode()
     }
 
     fun annotations(): List<Node> {
@@ -1546,16 +1564,20 @@ interface KotlinParser : KotlinLexer {
     //singleAnnotation
     //    : (annotationUseSiteTarget NL* | AT_NO_WS | AT_PRE_WS) unescapedAnnotation
     //    ;
-    fun singleAnnotation() {
-        TODO("singleAnnotation")
-    }
+    //fun singleAnnotation(): Node {
+    //    annotationUseSiteTarget()
+    //    TODO("singleAnnotation")
+    //}
 
     //multiAnnotation
     //    : (annotationUseSiteTarget NL* | AT_NO_WS | AT_PRE_WS) LSQUARE unescapedAnnotation+ RSQUARE
     //    ;
-    fun multiAnnotation() {
-        TODO()
-    }
+    //fun multiAnnotation(): Node {
+    //    expectAndRecover("[", "]") {
+    //        oneOrMore { unescapedAnnotation() }
+    //    }
+    //    TODO()
+    //}
 
     //annotationUseSiteTarget
     //    : (AT_NO_WS | AT_PRE_WS) (FIELD | PROPERTY | GET | SET | RECEIVER | PARAM | SETPARAM | DELEGATE) NL* COLON

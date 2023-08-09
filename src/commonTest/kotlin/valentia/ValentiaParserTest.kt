@@ -9,7 +9,7 @@ class ValentiaParserTest {
     @Test
     fun testSimplestWhile() {
         assertEquals(
-            WhileLoopStm(IntLiteralExpr(1), EmptyStm),
+            WhileLoopStm(IntLiteralExpr(1), EmptyStm()),
             ValentiaParser("while (1) ;").whileStatement()
         )
     }

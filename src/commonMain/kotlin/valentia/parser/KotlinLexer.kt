@@ -53,11 +53,13 @@ interface KotlinLexer : UnicodeLexer {
     // NL*
     fun NLs(): Unit {
         loop@while (!eof) {
+            Hidden()
             when (peekChar()) {
                 '\r', '\n' -> NL()
                 else -> break@loop
             }
         }
+        Hidden()
     }
 
     //fragment Hidden: DelimitedComment | LineComment | WS;
@@ -194,16 +196,16 @@ interface KotlinLexer : UnicodeLexer {
     fun AT_NO_WS(): Unit = TODO("@")
 
     //AT_POST_WS: '@' (Hidden | NL);
-    fun AT_POST_WS(): Unit = TODO("@ (Hidden | NL)")
+    fun AT_POST_WS(): Unit = TODO("'@' (Hidden | NL)")
 
     //AT_PRE_WS: (Hidden | NL) '@' ;
-    fun AT_PRE_WS(): Unit = TODO()
+    fun AT_PRE_WS(): Unit = TODO("(Hidden | NL) '@'")
 
     //AT_BOTH_WS: (Hidden | NL) '@' (Hidden | NL);
-    fun AT_BOTH_WS(): Unit = TODO()
+    fun AT_BOTH_WS(): Unit = TODO("(Hidden | NL) '@' (Hidden | NL)")
 
     //QUEST_WS: '?' Hidden;
-    fun QUEST_WS(): Unit = TODO()
+    fun QUEST_WS(): Unit = TODO("'?' Hidden")
 
     //QUEST_NO_WS: '?';
     fun QUEST_NO_WS(): Unit = TODO("?")
@@ -523,7 +525,7 @@ interface KotlinLexer : UnicodeLexer {
     //    : DecDigitNoZero DecDigitOrSeparator* DecDigit
     //    | DecDigit
     //    ;
-    fun IntegerLiteral(): IntLiteralExpr? {
+    fun IntegerLiteralOpt(): IntLiteralExpr? {
         println("TODO=IntegerLiteral")
         val c = peekChar()
         if (c == '0') return IntLiteralExpr(0)
@@ -584,7 +586,7 @@ interface KotlinLexer : UnicodeLexer {
     }
 
     //BooleanLiteral: 'true'| 'false';
-    fun BooleanLiteral(): BoolLiteralExpr? {
+    fun BooleanLiteralOpt(): BoolLiteralExpr? {
         val res = expectAnyOpt("true", "false") ?: return null
         return BoolLiteralExpr(res == "true")
     }

@@ -8,6 +8,9 @@ open class Node {
     var epos: Int = -1
     val rangeStr: String? get() = reader?.readAbsoluteRange(spos, epos)
 }
+
+data class DummyNode(val dummy: Unit = Unit) : Node()
+
 fun <T : Node> T.enrich(reader: BaseReader, spos: Int, epos: Int = reader.pos): T {
     this.reader = reader
     this.spos = spos
@@ -56,7 +59,7 @@ data class Stms(val stms: List<Stm>) : Stm() {
     constructor(vararg stms: Stm) : this(stms.toList())
 }
 
-object EmptyStm : Stm()
+data class EmptyStm(val dummy: Unit = Unit) : Stm()
 
 abstract class LoopStm : Node() {
 }
