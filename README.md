@@ -2,6 +2,8 @@
 
 * Step 1: Parsing
 * Step 2: Compilation into modern JS: classes, generators for coroutines, etc.
+* Step 2a: Be able to compile itself and to run in Node.JS and the Browser
 * Step 3: Compilation into WASM or C++? If WASM 2 C already exists we could skip C++
-* Step 4: LSP?
-* Step 5: New features
+* Step 4: Recovery, LSP?
+* Step 5: New features: static if, Numeric coercion, etc.
+

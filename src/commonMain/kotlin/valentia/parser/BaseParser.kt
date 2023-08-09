@@ -44,6 +44,10 @@ open class BaseParser {
         TODO()
     }
 
+    fun EOF() {
+        TODO()
+    }
+
     inline fun <T : Node> enrich(block: () -> T): T {
         // @TODO: Put in the node all the tokens expected
         return block()
