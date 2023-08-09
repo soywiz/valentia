@@ -1,10 +1,15 @@
-package valentia
+package valentia.ast
 
 open class Node {
 }
 
+// Expressions
+
 open class Expr : Node() {
 }
+
+// Statements
+
 
 open class Stm : Node() {
 }
