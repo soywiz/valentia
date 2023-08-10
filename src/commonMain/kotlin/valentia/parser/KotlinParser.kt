@@ -200,12 +200,11 @@ interface KotlinParser : KotlinLexer {
     //classBody
     //    : LCURL NL* classMemberDeclarations NL* RCURL
     //    ;
-    fun classBody() {
-        expect("{")
-        NLs()
-        classMemberDeclarations()
-        NLs()
-        expect("}")
+    fun classBody(): List<DeclNode> {
+        return expectAndRecover("{", "}") {
+            NLs()
+            classMemberDeclarations().also { NLs() }
+        } ?: emptyList()
     }
 
     //classParameters
@@ -237,8 +236,10 @@ interface KotlinParser : KotlinLexer {
     //delegationSpecifiers
     //    : annotatedDelegationSpecifier (NL* COMMA NL* annotatedDelegationSpecifier)*
     //    ;
-    fun delegationSpecifiers() {
-        TODO("delegationSpecifiers")
+    fun delegationSpecifiers(): List<Unit> {
+        return parseList(oneOrMore = true, separator = { expectOpt(",") }) {
+            annotatedDelegationSpecifier()
+        }
     }
 
     //delegationSpecifier
@@ -263,7 +264,9 @@ interface KotlinParser : KotlinLexer {
     //    : annotation* NL* delegationSpecifier
     //    ;
     fun annotatedDelegationSpecifier() {
-        TODO()
+        annotations(atLeastOne = false)
+        NLs()
+        return delegationSpecifier()
     }
 
     //explicitDelegation
@@ -328,10 +331,11 @@ interface KotlinParser : KotlinLexer {
     //classMemberDeclarations
     //    : (classMemberDeclaration semis?)*
     //    ;
-    fun classMemberDeclarations() {
-        opt {
-            classMemberDeclaration()
-            semis(atLeastOne = false)
+    fun classMemberDeclarations(): List<DeclNode> {
+        return zeroOrMore {
+            classMemberDeclaration().also {
+                semis(atLeastOne = false)
+            }
         }
     }
 
@@ -341,8 +345,8 @@ interface KotlinParser : KotlinLexer {
     //    | anonymousInitializer
     //    | secondaryConstructor
     //    ;
-    fun classMemberDeclaration() {
-        OR(
+    fun classMemberDeclaration(): DeclNode {
+        return OR(
             { declaration() },
             { companionObject() },
             { anonymousInitializer() },
@@ -353,10 +357,11 @@ interface KotlinParser : KotlinLexer {
     //anonymousInitializer
     //    : INIT NL* block
     //    ;
-    fun anonymousInitializer() {
+    fun anonymousInitializer(): InitDecl {
         expect("init")
         NLs()
-        block()
+        val block = block()
+        return InitDecl(block)
     }
 
     //companionObject
@@ -658,12 +663,12 @@ interface KotlinParser : KotlinLexer {
     //secondaryConstructor
     //    : modifiers? CONSTRUCTOR NL* functionValueParameters (NL* COLON NL* constructorDelegationCall)? NL* block?
     //    ;
-    fun secondaryConstructor() {
+    fun secondaryConstructor(): ConstructorDecl {
         println("TODO: secondaryConstructor")
         modifiers(atLeastOne = false)
         CONSTRUCTOR()
         NLs()
-        functionValueParameters()
+        val params = functionValueParameters()
         opt {
             NLs()
             COLON()
@@ -671,7 +676,8 @@ interface KotlinParser : KotlinLexer {
             constructorDelegationCall()
         }
         NLs()
-        opt { block() }
+        val body = opt { block() }
+        return ConstructorDecl(params = params, body = body)
     }
 
     //constructorDelegationCall
@@ -1269,7 +1275,7 @@ interface KotlinParser : KotlinLexer {
         }
     }
 
-    private fun <T> parseList(oneOrMore: Boolean = false, separator: () -> Boolean, doBreak: () -> Boolean = { false }, node: () -> T): List<T> {
+    private fun <T> parseList(oneOrMore: Boolean = false, separator: () -> Boolean = { expectOpt(",") }, doBreak: () -> Boolean = { false }, node: () -> T): List<T> {
         val nodes = arrayListOf<T>()
         loop@while (hasMore) {
             NLs()
@@ -1489,7 +1495,7 @@ interface KotlinParser : KotlinLexer {
             { collectionLiteral() },
             //{ callableReference() },
             //{ functionLiteral() },
-            //{ objectLiteral() },
+            { objectLiteral() },
             { thisExpression() },
             { superExpression() },
             { ifExpression() },
@@ -1684,11 +1690,21 @@ interface KotlinParser : KotlinLexer {
     //objectLiteral
     //    : DATA? NL* OBJECT (NL* COLON NL* delegationSpecifiers NL*)? (NL* classBody)?
     //    ;
-    fun objectLiteral(): Expr {
+    fun objectLiteral(): ObjectLiteralExpr {
         val isData = expectOpt("data")
         NLs()
         expect("object")
-        TODO()
+        val delegationSpecifiers = opt {
+            NLs()
+            COLON()
+            NLs()
+            delegationSpecifiers().also { NLs() }
+        }
+        val body = opt {
+            NLs()
+            classBody()
+        }
+        return ObjectLiteralExpr(delegationSpecifiers = delegationSpecifiers, body = body, isData = isData)
     }
 
     //thisExpression

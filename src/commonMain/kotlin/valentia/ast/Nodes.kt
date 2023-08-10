@@ -65,6 +65,8 @@ fun TypeNode.nullable(): TypeNode {
 
 open class DeclNode : Node()
 
+data class ConstructorDecl(val params: List<FuncValueParam>, val body: Stm?) : DeclNode()
+data class InitDecl(val stm: Stm) : DeclNode()
 data class CompanionObjectDecl(val name: String?) : DeclNode()
 data class ClassDecl(val name: String) : DeclNode()
 data class ObjectDecl(val name: String) : DeclNode()
@@ -86,6 +88,11 @@ data class Identifier(val parts: List<String>) : Expr() {
 
 open class Expr : Node()
 
+data class ObjectLiteralExpr(
+    val delegationSpecifiers: List<Unit>? = null,
+    val body: List<DeclNode>? = null,
+    val isData: Boolean = false,
+) : Expr()
 data class WhenExpr(
     val subject: Subject? = null,
     val entries: List<Entry> = emptyList(),

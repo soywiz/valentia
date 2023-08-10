@@ -39,6 +39,18 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     }
 
     @Test
+    fun testObjectLiteral() {
+        assertEquals(
+            ObjectLiteralExpr(body = emptyList()),
+            ValentiaParser.expression("""object { }""")
+        )
+        assertEquals(
+            ObjectLiteralExpr(body = listOf(FunDecl(name="test", params=emptyList(), body=Stms()))),
+            ValentiaParser.expression("""object { fun test() { } }""")
+        )
+    }
+
+    @Test
     fun testCollectionLiteral() {
         assertEquals(
             CollectionLiteralExpr(listOf(1.lit, 2.lit, 3.lit)),
