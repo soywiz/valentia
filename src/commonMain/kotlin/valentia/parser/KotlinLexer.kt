@@ -89,7 +89,7 @@ interface KotlinLexer : UnicodeLexer {
 
     // SECTION: separatorsAndOperations
     //RESERVED: '...';
-    fun RESERVED(): Unit = TODO("...")
+    fun RESERVED(): Unit = expect("...")
 
     //DOT: '.';
     //val _DOT = "."
@@ -97,7 +97,7 @@ interface KotlinLexer : UnicodeLexer {
 
     //COMMA: ',';
     //val _COMMA = ","
-    fun COMMA(): Unit = TODO(",")
+    fun COMMA(): Unit = expect(",")
 
     //LPAREN: '(' -> pushMode(Inside);
     //val _LPAREN = "("
@@ -109,42 +109,42 @@ interface KotlinLexer : UnicodeLexer {
 
     //LSQUARE: '[' -> pushMode(Inside);
     //val _LSQUARE = "["
-    fun LSQUARE(): Unit = TODO("[")
+    fun LSQUARE(): Unit = expect("[")
 
     //RSQUARE: ']';
     //val _RSQUARE = "]"
-    fun RSQUARE(): Unit = TODO("]")
+    fun RSQUARE(): Unit = expect("]")
 
     //LCURL: '{' -> pushMode(DEFAULT_MODE);
-    fun LCURL(): Unit = TODO("{")
+    fun LCURL(): Unit = expect("{")
 
     ///*
     // * When using another programming language (not Java) to generate a parser,
     // * please replace this code with the corresponding code of a programming language you are using.
     // */
     //RCURL: '}' { if (!_modeStack.isEmpty()) { popMode(); } };
-    fun RCURL(): Unit = TODO("}")
+    fun RCURL(): Unit = expect("}")
 
     //MULT: '*';
     fun MULT(): Unit = expect("*")
 
     //MOD: '%';
-    fun MOD(): Unit = TODO("%")
+    fun MOD(): Unit = expect("%")
 
     //DIV: '/';
-    fun DIV(): Unit = TODO("/")
+    fun DIV(): Unit = expect("/")
 
     //ADD: '+';
-    fun ADD(): Unit = TODO("+")
+    fun ADD(): Unit = expect("+")
 
     //SUB: '-';
-    fun SUB(): Unit = TODO("-")
+    fun SUB(): Unit = expect("-")
 
     //INCR: '++';
-    fun INCR(): Unit = TODO("++")
+    fun INCR(): Unit = expect("++")
 
     //DECR: '--';
-    fun DECR(): Unit = TODO("--")
+    fun DECR(): Unit = expect("--")
 
     //CONJ: '&&';
     fun CONJ(): String = expectAny("&&")
@@ -168,43 +168,43 @@ interface KotlinLexer : UnicodeLexer {
     fun ASSIGNMENT(): Unit = expect("=")
 
     //ADD_ASSIGNMENT: '+=';
-    fun ADD_ASSIGNMENT(): Unit = TODO("+=")
+    fun ADD_ASSIGNMENT(): Unit = expect("+=")
 
     //SUB_ASSIGNMENT: '-=';
-    fun SUB_ASSIGNMENT(): Unit = TODO("-=")
+    fun SUB_ASSIGNMENT(): Unit = expect("-=")
 
     //MULT_ASSIGNMENT: '*=';
-    fun MULT_ASSIGNMENT(): Unit = TODO("*=")
+    fun MULT_ASSIGNMENT(): Unit = expect("*=")
 
     //DIV_ASSIGNMENT: '/=';
-    fun DIV_ASSIGNMENT(): Unit = TODO("/=")
+    fun DIV_ASSIGNMENT(): Unit = expect("/=")
 
     //MOD_ASSIGNMENT: '%=';
-    fun MOD_ASSIGNMENT(): Unit = TODO("%=")
+    fun MOD_ASSIGNMENT(): Unit = expect("%=")
 
     //ARROW: '->';
     fun ARROW(): Unit = expect("->")
 
     //DOUBLE_ARROW: '=>';
-    fun DOUBLE_ARROW(): Unit = TODO("=>")
+    fun DOUBLE_ARROW(): Unit = expect("=>")
 
     //RANGE: '..';
-    fun RANGE(): Unit = TODO("..")
+    fun RANGE(): Unit = expect("..")
 
     //RANGE_UNTIL: '..<';
-    fun RANGE_UNTIL(): Unit = TODO("--<")
+    fun RANGE_UNTIL(): Unit = expect("..<")
 
     //COLONCOLON: '::';
-    fun COLONCOLON(): Unit = TODO("::")
+    fun COLONCOLON(): Unit = expect("::")
 
     //DOUBLE_SEMICOLON: ';;';
-    fun DOUBLE_SEMICOLON(): Unit = TODO(";;")
+    fun DOUBLE_SEMICOLON(): Unit = expect(";;")
 
     //HASH: '#';
-    fun HASH(): Unit = TODO("#")
+    fun HASH(): Unit = expect("#")
 
     //AT_NO_WS: '@';
-    fun AT_NO_WS(): Unit = TODO("@")
+    fun AT_NO_WS(): Unit = expect("@")
 
     //AT_POST_WS: '@' (Hidden | NL);
     fun AT_POST_WS(): Unit = TODO("'@' (Hidden | NL)")
@@ -219,40 +219,40 @@ interface KotlinLexer : UnicodeLexer {
     fun QUEST_WS(): Unit = TODO("'?' Hidden")
 
     //QUEST_NO_WS: '?';
-    fun QUEST_NO_WS(): Unit = TODO("?")
+    fun QUEST_NO_WS(): Unit = expect("?")
 
     //LANGLE: '<';
-    fun LANGLE(): Unit = TODO("<")
+    fun LANGLE(): Unit = expect("<")
 
     //RANGLE: '>';
-    fun RANGLE(): Unit = TODO(">")
+    fun RANGLE(): Unit = expect(">")
 
     //LE: '<=';
-    fun LE(): Unit = TODO("<=")
+    fun LE(): Unit = expect("<=")
 
     //GE: '>=';
-    fun GE(): Unit = TODO(">=")
+    fun GE(): Unit = expect(">=")
 
     //EXCL_EQ: '!=';
-    fun EXCL_EQ(): Unit = TODO("!=")
+    fun EXCL_EQ(): Unit = expect("!=")
 
     //EXCL_EQEQ: '!==';
-    fun EXCL_EQEQ(): Unit = TODO("!==")
+    fun EXCL_EQEQ(): Unit = expect("!==")
 
     //AS_SAFE: 'as?';
-    fun AS_SAFE(): Unit = TODO("as?")
+    fun AS_SAFE(): Unit = expect("as?")
 
     //EQEQ: '==';
-    fun EQEQ(): Unit = TODO("==")
+    fun EQEQ(): Unit = expect("==")
 
     //EQEQEQ: '===';
-    fun EQEQEQ(): Unit = TODO("===")
+    fun EQEQEQ(): Unit = expect("===")
 
     //SINGLE_QUOTE: '\'';
-    fun SINGLE_QUOTE(): Unit = TODO("\'")
+    fun SINGLE_QUOTE(): Unit = expect("'")
 
     //AMP: '&';
-    fun AMP(): Unit = TODO("&")
+    fun AMP(): Unit = expect("&")
 
 // SECTION: keywords
 
@@ -272,10 +272,10 @@ interface KotlinLexer : UnicodeLexer {
     fun SUPER_AT(): Unit = TODO("super@' Identifier")
 
     //FILE: 'file';
-    fun FILE(): Unit = TODO("file")
+    fun FILE(): Unit = expect("file")
 
     //FIELD: 'field';
-    fun FIELD(): Unit = TODO("field")
+    fun FIELD(): Unit = expect("field")
 
     //PROPERTY: 'property';
     fun PROPERTY(): Unit = TODO()
@@ -287,40 +287,40 @@ interface KotlinLexer : UnicodeLexer {
     fun SET(): Unit = expect("set")
 
     //RECEIVER: 'receiver';
-    fun RECEIVER(): Unit = TODO()
+    fun RECEIVER(): Unit = expect("receiver")
 
     //PARAM: 'param';
-    fun PARAM(): Unit = TODO()
+    fun PARAM(): Unit = expect("param")
 
     //SETPARAM: 'setparam';
-    fun SETPARAM(): Unit = TODO()
+    fun SETPARAM(): Unit = expect("setparam")
 
     //DELEGATE: 'delegate';
-    fun DELEGATE(): Unit = TODO()
+    fun DELEGATE(): Unit = expect("delegate")
 
     //PACKAGE: 'package';
-    fun PACKAGE(): Unit = TODO()
+    fun PACKAGE(): Unit = expect("package")
 
     //IMPORT: 'import';
-    fun IMPORT(): Unit = TODO()
+    fun IMPORT(): Unit = expect("import")
 
     //CLASS: 'class';
-    fun CLASS(): Unit = TODO()
+    fun CLASS(): Unit = expect("class")
 
     //INTERFACE: 'interface';
-    fun INTERFACE(): Unit = TODO()
+    fun INTERFACE(): Unit = expect("interface")
 
     //FUN: 'fun';
-    fun FUN(): Unit = TODO()
+    fun FUN(): Unit = expect("fun")
 
     //OBJECT: 'object';
-    fun OBJECT(): Unit = TODO()
+    fun OBJECT(): Unit = expect("object")
 
     //VAL: 'val';
-    fun VAL(): Unit = TODO()
+    fun VAL(): Unit = expect("val")
 
     //VAR: 'var';
-    fun VAR(): Unit = TODO()
+    fun VAR(): Unit = expect("var")
 
     //TYPE_ALIAS: 'typealias';
     fun TYPE_ALIAS(): Unit = expect("typealias")
@@ -329,73 +329,73 @@ interface KotlinLexer : UnicodeLexer {
     fun CONSTRUCTOR(): Unit = expect("constructor")
 
     //BY: 'by';
-    fun BY(): Unit = TODO()
+    fun BY(): Unit = expect("by")
 
     //COMPANION: 'companion';
-    fun COMPANION(): Unit = TODO()
+    fun COMPANION(): Unit = expect("companion")
 
     //INIT: 'init';
-    fun INIT(): Unit = TODO()
+    fun INIT(): Unit = expect("init")
 
     //THIS: 'this';
-    fun THIS(): Unit = TODO()
+    fun THIS(): Unit = expect("this")
 
     //SUPER: 'super';
-    fun SUPER(): Unit = TODO()
+    fun SUPER(): Unit = expect("super")
 
     //TYPEOF: 'typeof';
-    fun TYPEOF(): Unit = TODO()
+    fun TYPEOF(): Unit = expect("typeof")
 
     //WHERE: 'where';
     fun WHERE(): Unit = expect("where")
 
     //IF: 'if';
-    fun IF(): Unit = TODO()
+    fun IF(): Unit = expect("if")
 
     //ELSE: 'else';
-    fun ELSE(): Unit = TODO()
+    fun ELSE(): Unit = expect("else")
 
     //WHEN: 'when';
-    fun WHEN(): Unit = TODO()
+    fun WHEN(): Unit = expect("when")
 
     //TRY: 'try';
-    fun TRY(): Unit = TODO()
+    fun TRY(): Unit = expect("try")
 
     //CATCH: 'catch';
-    fun CATCH(): Unit = TODO()
+    fun CATCH(): Unit = expect("catch")
 
     //FINALLY: 'finally';
-    fun FINALLY(): Unit = TODO()
+    fun FINALLY(): Unit = expect("finally")
 
     //FOR: 'for';
-    fun FOR(): Unit = TODO()
+    fun FOR(): Unit = expect("for")
 
     //DO: 'do';
-    fun DO(): Unit = TODO()
+    fun DO(): Unit = expect("do")
 
     //WHILE: 'while';
-    fun WHILE(): Unit = TODO()
+    fun WHILE(): Unit = expect("while")
 
     //THROW: 'throw';
-    fun THROW(): Unit = TODO()
+    fun THROW(): Unit = expect("throw")
 
     //RETURN: 'return';
-    fun RETURN(): Unit = TODO()
+    fun RETURN(): Unit = expect("return")
 
     //CONTINUE: 'continue';
-    fun CONTINUE(): Unit = TODO()
+    fun CONTINUE(): Unit = expect("continue")
 
     //BREAK: 'break';
-    fun BREAK(): Unit = TODO()
+    fun BREAK(): Unit = expect("break")
 
     //AS: 'as';
-    fun AS(): Unit = TODO()
+    fun AS(): Unit = expect("as")
 
     //IS: 'is';
-    fun IS(): Unit = TODO()
+    fun IS(): Unit = expect("is")
 
     //IN: 'in';
-    fun IN(): Unit = TODO()
+    fun IN(): Unit = expect("in")
 
     //NOT_IS: '!is' (Hidden | NL);
     fun NOT_IS(): Unit = TODO()
@@ -404,95 +404,95 @@ interface KotlinLexer : UnicodeLexer {
     fun NOT_IN(): Unit = TODO()
 
     //OUT: 'out';
-    fun OUT(): Unit = TODO()
+    fun OUT(): Unit = expect("out")
 
     //DYNAMIC: 'dynamic';
-    fun DYNAMIC(): Unit = TODO()
+    fun DYNAMIC(): Unit = expect("dynamic")
 
     // SECTION: lexicalModifiers
     //PUBLIC: 'public';
-    fun PUBLIC(): Unit = TODO()
+    fun PUBLIC(): Unit = expect("public")
 
     //PRIVATE: 'private';
-    fun PRIVATE(): Unit = TODO()
+    fun PRIVATE(): Unit = expect("private")
 
     //PROTECTED: 'protected';
-    fun PROTECTED(): Unit = TODO()
+    fun PROTECTED(): Unit = expect("protected")
 
     //INTERNAL: 'internal';
-    fun INTERNAL(): Unit = TODO()
+    fun INTERNAL(): Unit = expect("internal")
 
     //ENUM: 'enum';
-    fun ENUM(): Unit = TODO()
+    fun ENUM(): Unit = expect("enum")
 
     //SEALED: 'sealed';
-    fun SEALED(): Unit = TODO()
+    fun SEALED(): Unit = expect("sealed")
 
     //ANNOTATION: 'annotation';
-    fun ANNOTATION(): Unit = TODO()
+    fun ANNOTATION(): Unit = expect("annotation")
 
     //DATA: 'data';
-    fun DATA(): Unit = TODO()
+    fun DATA(): Unit = expect("data")
 
     //INNER: 'inner';
-    fun INNER(): Unit = TODO()
+    fun INNER(): Unit = expect("inner")
 
     //VALUE: 'value';
-    fun VALUE(): Unit = TODO()
+    fun VALUE(): Unit = expect("value")
 
     //TAILREC: 'tailrec';
-    fun TAILREC(): Unit = TODO()
+    fun TAILREC(): Unit = expect("tailrec")
 
     //OPERATOR: 'operator';
-    fun OPERATOR(): Unit = TODO()
+    fun OPERATOR(): Unit = expect("operator")
 
     //INLINE: 'inline';
-    fun INLINE(): Unit = TODO()
+    fun INLINE(): Unit = expect("inline")
 
     //INFIX: 'infix';
-    fun INFIX(): Unit = TODO()
+    fun INFIX(): Unit = expect("infix")
 
     //EXTERNAL: 'external';
-    fun EXTERNAL(): Unit = TODO()
+    fun EXTERNAL(): Unit = expect("external")
 
     //SUSPEND: 'suspend';
-    fun SUSPEND(): Unit = TODO()
+    fun SUSPEND(): Unit = expect("suspend")
 
     //OVERRIDE: 'override';
-    fun OVERRIDE(): Unit = TODO()
+    fun OVERRIDE(): Unit = expect("override")
 
     //ABSTRACT: 'abstract';
-    fun ABSTRACT(): Unit = TODO()
+    fun ABSTRACT(): Unit = expect("abstract")
 
     //FINAL: 'final';
-    fun FINAL(): Unit = TODO()
+    fun FINAL(): Unit = expect("final")
 
     //OPEN: 'open';
-    fun OPEN(): Unit = TODO()
+    fun OPEN(): Unit = expect("open")
 
     //CONST: 'const';
-    fun CONST(): Unit = TODO()
+    fun CONST(): Unit = expect("const")
 
     //LATEINIT: 'lateinit';
-    fun LATEINIT(): Unit = TODO()
+    fun LATEINIT(): Unit = expect("lateinit")
 
     //VARARG: 'vararg';
-    fun VARARG(): Unit = TODO()
+    fun VARARG(): Unit = expect("vararg")
 
     //NOINLINE: 'noinline';
-    fun NOINLINE(): Unit = TODO()
+    fun NOINLINE(): Unit = expect("noinline")
 
     //CROSSINLINE: 'crossinline';
-    fun CROSSINLINE(): Unit = TODO()
+    fun CROSSINLINE(): Unit = expect("crossinline")
 
     //REIFIED: 'reified';
-    fun REIFIED(): Unit = TODO()
+    fun REIFIED(): Unit = expect("reified")
 
     //EXPECT: 'expect';
-    fun EXPECT(): Unit = TODO("expect")
+    fun EXPECT(): Unit = expect("expect")
 
     //ACTUAL: 'actual';
-    fun ACTUAL(): Unit = TODO("actual")
+    fun ACTUAL(): Unit = expect("actual")
 
 // SECTION: literals
 
@@ -694,7 +694,8 @@ interface KotlinLexer : UnicodeLexer {
         }
         val str = peek(n)
         when (str) {
-            "return", "for", "while", "do" -> error("not an identifier")
+            "return", "for", "while", "do", "else", "when", "if", "super"
+                -> error("not an identifier")
         }
         skip(n)
         return str

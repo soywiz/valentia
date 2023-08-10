@@ -9,6 +9,115 @@ import kotlin.test.assertEquals
 
 class ValentiaParserTest : NodeBuilder, StmBuilder {
     @Test
+    fun testWhen() {
+        assertEquals(
+            WhenExpr(subject=null, entries=listOf(WhenExpr.Entry(conditions = null, body = ExprStm(expr = 1.lit)))),
+            ValentiaParser.expression("""
+                when {
+                    else -> 1
+                }
+            """.trimIndent())
+        )
+
+        assertEquals(
+            WhenExpr(subject=WhenExpr.Subject(expr = 1.lit), entries=listOf(WhenExpr.Entry(conditions = null, body = ExprStm(expr = 1.lit)))),
+            ValentiaParser.expression("""
+                when (1) {
+                    else -> 1
+                }
+            """.trimIndent())
+        )
+
+        assertEquals(
+            WhenExpr(subject=WhenExpr.Subject(expr = 1.lit, decl=VariableDecl(id="a", type=null)), entries=listOf(WhenExpr.Entry(conditions = null, body = ExprStm(expr = 1.lit)))),
+            ValentiaParser.expression("""
+                when (val a = 1) {
+                    else -> 1
+                }
+            """.trimIndent())
+        )
+    }
+
+    @Test
+    fun testCollectionLiteral() {
+        assertEquals(
+            CollectionLiteralExpr(listOf(1.lit, 2.lit, 3.lit)),
+            ValentiaParser.expression("[1, 2, 3]")
+        )
+    }
+
+    @Test
+    fun testTryCatch() {
+        assertEquals(
+            TryExpr(body=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(1)))), catches=listOf(TryExpr.Catch(local="e", type="Throwable".type, body=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(2)))))), finally=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(3))))),
+            ValentiaParser.expression("try { 1 } catch (e: Throwable) { 2 } finally { 3 }")
+        )
+        assertEquals(
+            TryExpr(body=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(1)))), finally=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(2))))),
+            ValentiaParser.expression("try { 1 } finally { 2 }")
+        )
+    }
+
+    @Test
+    fun testSuper() {
+        assertEquals(
+            SuperExpr(),
+            ValentiaParser.expression("super")
+        )
+        assertEquals(
+            SuperExpr(label = "test"),
+            ValentiaParser.expression("super@test")
+        )
+        assertEquals(
+            SuperExpr(label = "test", type = "Test".type),
+            ValentiaParser.expression("super<Test>@test")
+        )
+        assertEquals(
+            SuperExpr(type = "Test".type),
+            ValentiaParser.expression("super<Test>") as? Any?
+        )
+    }
+
+    @Test
+    fun testIfElseExpression() {
+        assertEquals(
+            IfExpr(cond=BoolLiteralExpr(value=true), trueBody = EmptyStm()),
+            ValentiaParser.expression("if (true) ;")
+        )
+        assertEquals(
+            IfExpr(cond=BoolLiteralExpr(value=true), trueBody = ExprStm(expr=IntLiteralExpr(1))),
+            ValentiaParser.expression("if (true) 1")
+        )
+        assertEquals(
+            IfExpr(cond=BoolLiteralExpr(value=true), trueBody=ExprStm(expr=IntLiteralExpr(1)), falseBody=ExprStm(expr=IntLiteralExpr(2))),
+            ValentiaParser.expression("""
+                if (true) 1 else 2
+            """) as? Any?
+        )
+        assertEquals(
+            IfExpr(cond=BoolLiteralExpr(value=true), trueBody=ExprStm(expr=IntLiteralExpr(1)), falseBody=ExprStm(expr=IntLiteralExpr(2))),
+            ValentiaParser.expression("""
+                if (true) 1; else 2;
+            """) as? Any?
+        )
+    }
+
+    @Test
+    fun test3() {
+        assertEquals(
+            null,
+            ValentiaParser.statements("""
+                fun test(a: Int, b: Int): Int {
+                    return when (a + b) {
+                        1 -> "a"
+                        2 -> 'b' 
+                    }
+                }
+            """) as? Any?
+        )
+    }
+
+    @Test
     fun testStatements() {
         assertEquals(
             listOf(

@@ -86,6 +86,20 @@ data class Identifier(val parts: List<String>) : Expr() {
 
 open class Expr : Node()
 
+data class WhenExpr(
+    val subject: Subject? = null,
+    val entries: List<Entry> = emptyList(),
+) : Expr() {
+    data class Subject(val expr: Expr? = null, val decl: VariableDecl? = null)
+    data class Entry(val conditions: List<Condition>? = null, val body: Stm = EmptyStm())
+    data class Condition(val op: String? = null, val expr: Expr = EmptyExpr())
+}
+data class CollectionLiteralExpr(val items: List<Expr>) : Expr()
+data class TryExpr(val body: Node, val catches: List<Catch> = emptyList(), val finally: Stm = EmptyStm()) : Expr() {
+    data class Catch(val local: String, val type: TypeNode, val body: Stm)
+}
+data class SuperExpr(val label: String? = null, val type: TypeNode? = null) : Expr()
+data class IfExpr(val cond: Expr?, val trueBody: Node? = null, val falseBody: Node? = null) : Expr()
 data class BreakExpr(val label: String? = null) : Expr()
 data class ContinueExpr(val label: String? = null) : Expr()
 data class ReturnExpr(val expr: Expr?, val label: String? = null) : Expr()

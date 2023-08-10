@@ -1269,7 +1269,7 @@ interface KotlinParser : KotlinLexer {
         }
     }
 
-    private fun <T> parseList(oneOrMore: Boolean = false, separator: () -> Boolean, doBreak: () -> Boolean, node: () -> T): List<T> {
+    private fun <T> parseList(oneOrMore: Boolean = false, separator: () -> Boolean, doBreak: () -> Boolean = { false }, node: () -> T): List<T> {
         val nodes = arrayListOf<T>()
         loop@while (hasMore) {
             NLs()
@@ -1476,29 +1476,25 @@ interface KotlinParser : KotlinLexer {
 
         println("TODO: primaryExpression")
 
-        if (matches("\"")) {
-            return stringLiteral()
-        }
-
-        if (matches("this")) {
-            return thisExpression()
-        }
-
-        if (matches("throw") || matches("return") || matches("continue") || matches("break")) {
-            return jumpExpression()
-        }
+        if (matches("\"")) return stringLiteral()
+        if (matches("[")) return collectionLiteral()
+        if (matches("this")) return thisExpression()
+        if (matches("if")) return ifExpression()
+        if (matches("try")) return tryExpression()
+        if (matches("super")) return superExpression()
+        if (matches("throw") || matches("return") || matches("continue") || matches("break")) return jumpExpression()
 
         return OR(
             { stringLiteral() },
+            { collectionLiteral() },
             //{ callableReference() },
             //{ functionLiteral() },
             //{ objectLiteral() },
-            //{ collectionLiteral() },
             { thisExpression() },
-            //{ superExpression() },
-            //{ ifExpression() },
-            //{ whenExpression() },
-            //{ tryExpression() },
+            { superExpression() },
+            { ifExpression() },
+            { whenExpression() },
+            { tryExpression() },
             { jumpExpression() },
             { IdentifierExpr(simpleIdentifier()) },
         )
@@ -1524,8 +1520,10 @@ interface KotlinParser : KotlinLexer {
     //collectionLiteral
     //    : LSQUARE NL* (expression (NL* COMMA NL* expression)* (NL* COMMA)? NL*)? RSQUARE
     //    ;
-    fun collectionLiteral(): Expr {
-        TODO()
+    fun collectionLiteral(): CollectionLiteralExpr {
+        return CollectionLiteralExpr(parseListWithStartEnd("[", "]", separator = { expectOpt("," )}) {
+            expression()
+        })
     }
 
     //literalConstant
@@ -1687,7 +1685,7 @@ interface KotlinParser : KotlinLexer {
     //    : DATA? NL* OBJECT (NL* COLON NL* delegationSpecifiers NL*)? (NL* classBody)?
     //    ;
     fun objectLiteral(): Expr {
-        expectOpt("data")
+        val isData = expectOpt("data")
         NLs()
         expect("object")
         TODO()
@@ -1708,7 +1706,17 @@ interface KotlinParser : KotlinLexer {
     //    | SUPER_AT
     //    ;
     fun superExpression(): Expr {
-        TODO()
+        expect("super")
+        val type = if (matches("<")) {
+            expectAndRecover("<", ">") {
+                NLs()
+                type().also { NLs() }
+            }
+        } else {
+            null
+        }
+        val label = if (expectOpt("@")) Identifier() else null
+        return SuperExpr(label = label, type = type)
     }
 
     //ifExpression
@@ -1718,29 +1726,85 @@ interface KotlinParser : KotlinLexer {
     //      | SEMICOLON)
     //    ;
     fun ifExpression(): Expr {
-        TODO()
+        NLs()
+        expect("if")
+        NLs()
+        val cond = expectAndRecover("(", ")") {
+            NLs()
+            expression().also { NLs() }
+        }
+        NLs()
+        if (expectOpt(";")) {
+            return IfExpr(cond, EmptyStm())
+        }
+        val trueBody = opt { controlStructureBody() }
+        NLs()
+        opt { SEMICOLON() }
+        NLs()
+        val falseBody = if (expectOpt("else")) {
+            opt { controlStructureBody() }.also {
+                NLs()
+                opt { SEMICOLON() }
+                NLs()
+            }
+        } else {
+            null
+        }
+        return IfExpr(cond, trueBody, falseBody)
     }
 
     //whenSubject
     //    : LPAREN (annotation* NL* VAL NL* variableDeclaration NL* ASSIGNMENT NL*)? expression RPAREN
     //    ;
-    fun whenSubject() {
-        TODO()
+    fun whenSubject(): WhenExpr.Subject {
+        var decl: VariableDecl? = null
+        val expr = expectAndRecover("(", ")") {
+            opt {
+                annotations()
+                NLs()
+                expect("val")
+                NLs()
+                decl = variableDeclaration()
+                NLs()
+                ASSIGNMENT()
+                NLs()
+            }
+            expression()
+        }
+        return WhenExpr.Subject(expr, decl)
     }
 
     //whenExpression
     //    : WHEN NL* whenSubject? NL* LCURL NL* (whenEntry NL*)* NL* RCURL
     //    ;
-    fun whenExpression(): Expr {
-        TODO()
+    fun whenExpression(): WhenExpr {
+        expect("when")
+        NLs()
+        val subject = opt { whenSubject() }
+        NLs()
+        val entries = expectAndRecover("{", "}") { zeroOrMore { NLs(); whenEntry() }.also { NLs() } } ?: emptyList()
+        return WhenExpr(subject, entries)
     }
 
     //whenEntry
     //    : whenCondition (NL* COMMA NL* whenCondition)* (NL* COMMA)? NL* ARROW NL* controlStructureBody semi?
     //    | ELSE NL* ARROW NL* controlStructureBody semi?
     //    ;
-    fun whenEntry() {
-        TODO()
+    fun whenEntry(): WhenExpr.Entry {
+        val conditions = if (matches("else")) {
+            expect("else")
+            null
+        } else {
+            parseList(separator = { expectOpt(",") }, doBreak = { matches("->") }) {
+                whenCondition()
+            }
+        }
+        NLs()
+        expect("->")
+        NLs()
+        val body = controlStructureBody()
+        semiOpt()
+        return WhenExpr.Entry(conditions, body)
     }
 
     //whenCondition
@@ -1748,8 +1812,11 @@ interface KotlinParser : KotlinLexer {
     //    | rangeTest
     //    | typeTest
     //    ;
-    fun whenCondition() {
-        TODO()
+    fun whenCondition(): WhenExpr.Condition {
+        return when {
+            matches("in") || matches("!in") || matches("is") || matches("!is") -> WhenExpr.Condition(op = inIsOperator().also { NLs() }, expr = expression())
+            else -> WhenExpr.Condition(expr = expression())
+        }
     }
 
     //rangeTest
@@ -1773,26 +1840,45 @@ interface KotlinParser : KotlinLexer {
     //}
 
     //tryExpression
-    //    : TRY NL* block ((NL* catchBlock)+ (NL* finallyBlock)? | NL* finallyBlock)
+    //    : TRY NL* block ( (NL* catchBlock)+ (NL* finallyBlock)? | NL* finallyBlock )
     //    ;
     fun tryExpression(): Expr {
-        TODO()
+        expect("try")
+        NLs()
+        val body = block()
+        val catches = zeroOrMore { NLs(); catchBlock() }
+        NLs()
+        val finally = finallyBlock()
+        return TryExpr(body, catches, finally)
     }
 
     //catchBlock
     //    : CATCH NL* LPAREN annotation* simpleIdentifier COLON type (NL* COMMA)? RPAREN NL* block
     //    ;
-    fun catchBlock() {
-        TODO()
+    fun catchBlock(): TryExpr.Catch {
+        expect("catch")
+        NLs()
+        var localName: String = "unknown"
+        var type: TypeNode = SimpleType("unknown")
+        expectAndRecover("(", ")") {
+            annotations()
+            localName = simpleIdentifier()
+            COLON()
+            type = type()
+            opt { NLs(); COMMA() }
+        }
+        NLs()
+        val block = block()
+        return TryExpr.Catch(localName, type, block)
     }
 
     //finallyBlock
     //    : FINALLY NL* block
     //    ;
-    fun finallyBlock() {
+    fun finallyBlock(): Stm {
         expect("finally")
         NLs()
-        block()
+        return block()
     }
 
     //jumpExpression
@@ -1858,6 +1944,8 @@ interface KotlinParser : KotlinLexer {
     //    | GE
     //    ;
     fun comparisonOperator(): String = expectAny(">=", "<=", "<", ">")
+
+    fun inIsOperator(): String = expectAny("!in", "!is", "in", "is")
 
     //inOperator
     //    : IN
@@ -2106,8 +2194,8 @@ interface KotlinParser : KotlinLexer {
         return AnnotationNodes(nodes.annotations.map { it.copy(useSite = useSite) })
     }
 
-    fun annotations(): List<AnnotationNodes> {
-        return zeroOrMore { annotation() }
+    fun annotations(atLeastOne: Boolean = false): List<AnnotationNodes> {
+        return multiple(atLeastOne = atLeastOne) { annotation() }
     }
 
     //singleAnnotation
