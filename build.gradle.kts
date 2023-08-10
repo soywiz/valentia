@@ -12,6 +12,7 @@ repositories {
 
 java {
     targetCompatibility = JavaVersion.VERSION_1_8
+    sourceCompatibility = JavaVersion.VERSION_1_8
 }
 
 kotlin {
@@ -45,7 +46,11 @@ kotlin {
             dependencies {
             }
         }
-        val jvmTest by getting
+        val jvmTest by getting {
+            dependencies {
+                api("org.antlr:antlr4-runtime:4.13.0")
+            }
+        }
         val jsMain by getting {
             dependencies {
             }
