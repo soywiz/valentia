@@ -79,6 +79,8 @@ inline fun <T> BaseReader.resetOnException(block: () -> T): Boolean {
 }
 
 interface BaseParser : BaseReader {
+    fun reportError(e: Throwable)
+
     fun unexpected(reason: String? = null): Nothing = TODO("reason=$reason")
 
     //open fun Hidden() {
@@ -133,13 +135,13 @@ interface BaseParser : BaseReader {
 
 }
 
-inline fun <T> BaseParser.OR(vararg funcs: () -> T): T {
+inline fun <T> BaseParser.OR(vararg funcs: () -> T?): T {
     val rpos = pos
     val exceptions = arrayListOf<Throwable>()
     for (func in funcs) {
         pos = rpos
         try {
-            return func()
+            return func() ?: continue
         } catch (e: IllegalStateException) {
             exceptions += e
         }

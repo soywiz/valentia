@@ -188,8 +188,13 @@ data class Identifier(val parts: List<String>) : Expr() {
 
 // Expressions
 
-open class Expr : Node()
+abstract class Expr : Node()
 
+abstract class AssignableExpr : Expr()
+
+data class TypeArgumentsAssignableSuffixExpr(val expr: Expr, val types: List<TypeNode>) : AssignableExpr()
+
+data class CallableReferenceExt(val type: TypeNode?, val kind: String) : Expr()
 data class ObjectLiteralExpr(
     val delegationSpecifiers: List<SubTypeInfo>? = null,
     val body: List<DeclNode>? = null,
@@ -221,11 +226,11 @@ data class ClassParameter(val id: String)
 
 data class CastExpr(val expr: Expr, val targetType: TypeNode, val kind: String) : Expr()
 data class CallExpr(val expr: Expr, val params: List<Expr>, val lambdaArg: Expr? = null, val typeArgs: List<TypeNode>? = null) : Expr()
-data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : Expr()
+data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : AssignableExpr()
 data class UnaryPostOpExpr(val expr: Expr, val op: String) : Expr()
 data class UnaryPreOpExpr(val op: String, val expr: Expr) : Expr()
 
-data class IdentifierExpr(val id: String) : Expr()
+data class IdentifierExpr(val id: String) : AssignableExpr()
 
 data class OpSeparatedExprs(val ops: List<String>, val exprs: List<Expr>) : Expr()
 
@@ -252,6 +257,8 @@ data class ThisExpr(val id: Identifier?) : Expr() {
 
 open class Stm : Node() {
 }
+
+data class AssignStm(val lvalue: Expr, val op: String, val expr: Expr) : Stm()
 
 fun List<Stm>.compact(): Stm = when {
     this.isEmpty() -> EmptyStm()

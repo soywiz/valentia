@@ -51,6 +51,7 @@ interface NodeBuilder {
     val String.type: SimpleType get() = SimpleType(this)
     val TypeNode.multi: MultiType get() = MultiType(this)
     val List<TypeNode>.multi: MultiType get() = MultiType(this)
+    operator fun Expr.get(vararg indices: Expr): IndexedExpr = IndexedExpr(this, indices.toList())
     operator fun Expr.invoke(vararg params: Expr, lambdaArg: Expr? = null, typeArgs: List<TypeNode>? = null): CallExpr = CallExpr(this, params.toList(), lambdaArg, typeArgs)
     operator fun Expr.unaryMinus(): UnaryPreOpExpr = UnaryPreOpExpr("-", this)
     operator fun Expr.unaryPlus(): UnaryPreOpExpr = UnaryPreOpExpr("+", this)

@@ -130,7 +130,7 @@ interface KotlinParser : KotlinLexer {
             typeParameters()
         }
         NLs()
-        ASSIGNMENT()
+        expect("=")
         NLs()
         val type = type()
         return TypeAliasDecl(id, type, types, modifiers)
@@ -1106,20 +1106,15 @@ interface KotlinParser : KotlinLexer {
     //assignment
     //    : (directlyAssignableExpression ASSIGNMENT | assignableExpression assignmentAndOperator) NL* expression
     //    ;
-    fun assignment(): Stm {
-        OR(
-            {
-                directlyAssignableExpression()
-                ASSIGNMENT()
-            },
-            {
-                assignableExpression()
-                assignmentAndOperator()
-            }
+    fun assignment(): AssignStm {
+        var op = "="
+        val lvalue = OR(
+            { directlyAssignableExpression().also { ASSIGNMENT(); op = "=" } },
+            { assignableExpression().also { Hidden(); op = assignmentAndOperator() } }
         )
         NLs()
-        expression()
-        TODO("assignment")
+        val expr = expression()
+        return AssignStm(lvalue, op, expr)
     }
 
     //semi
@@ -1397,23 +1392,22 @@ interface KotlinParser : KotlinLexer {
     //    | simpleIdentifier
     //    | parenthesizedDirectlyAssignableExpression
     //    ;
-    fun directlyAssignableExpression() {
-        println("TODO: directlyAssignableExpression")
+    fun directlyAssignableExpression(): AssignableExpr {
+        //println("TODO: directlyAssignableExpression")
         return OR(
-            //{ postfixUnaryExpression(); assignableSuffix() },
-            { simpleIdentifier() },
-            { parenthesizedDirectlyAssignableExpression() }
+            { parenthesizedDirectlyAssignableExpression() },
+            { assignableSuffix(postfixUnaryExpression()) },
+            { IdentifierExpr(simpleIdentifier()) },
         )
     }
 
     //parenthesizedDirectlyAssignableExpression
     //    : LPAREN NL* directlyAssignableExpression NL* RPAREN
     //    ;
-    fun parenthesizedDirectlyAssignableExpression() {
+    fun parenthesizedDirectlyAssignableExpression(): AssignableExpr {
         return expectAndRecoverSure("(", ")") {
             NLs()
-            directlyAssignableExpression()
-            NLs()
+            directlyAssignableExpression().also { NLs() }
         }
     }
 
@@ -1421,14 +1415,18 @@ interface KotlinParser : KotlinLexer {
     //    : prefixUnaryExpression
     //    | parenthesizedAssignableExpression
     //    ;
-    fun assignableExpression(): Expr {
-        return OR({ prefixUnaryExpression() }, { parenthesizedAssignableExpression() })
+    fun assignableExpression(): AssignableExpr {
+        return OR({
+            val expr = prefixUnaryExpression()
+            //(expr as? AssignableExpr?) ?: TODO("expr=$expr !is AssignableExpr")
+            (expr as? AssignableExpr?) ?: error("expr=$expr !is AssignableExpr")
+        }, { parenthesizedAssignableExpression() })
     }
 
     //parenthesizedAssignableExpression
     //    : LPAREN NL* assignableExpression NL* RPAREN
     //    ;
-    fun parenthesizedAssignableExpression(): Expr {
+    fun parenthesizedAssignableExpression(): AssignableExpr {
         return expectAndRecover("(", ")") {
             NLs()
             assignableExpression().also {
@@ -1442,23 +1440,24 @@ interface KotlinParser : KotlinLexer {
     //    | indexingSuffix
     //    | navigationSuffix
     //    ;
-    fun assignableSuffix(): Any {
-        return OR({ typeArguments() }, { indexingSuffix() }, { navigationSuffix() })
-    }
+    fun assignableSuffix(expr: Expr): AssignableExpr = OR(
+        { TypeArgumentsAssignableSuffixExpr(expr, typeArguments()) },
+        { indexingSuffix(expr) },
+        { navigationSuffix(expr) }
+    )
 
     //indexingSuffix
     //    : LSQUARE NL* expression (NL* COMMA NL* expression)* (NL* COMMA)? NL* RSQUARE
     //    ;
-    fun indexingSuffix(): List<Expr> {
-        return parseListWithStartEnd("[", "]", oneOrMore = true, separator = { expectOpt(",") }) {
+    fun indexingSuffix(expr: Expr): AssignableExpr =
+        IndexedExpr(expr, parseListWithStartEnd("[", "]", oneOrMore = true, separator = { expectOpt(",") }) {
             expression()
-        }
-    }
+        })
 
     //navigationSuffix
     //    : memberAccessOperator NL* (simpleIdentifier | parenthesizedExpression | CLASS)
     //    ;
-    fun navigationSuffix() {
+    fun navigationSuffix(expr: Expr): AssignableExpr {
         memberAccessOperator()
         NLs()
         OR({ CLASS() }, { parenthesizedExpression() }, { simpleIdentifier() })
@@ -1560,15 +1559,22 @@ interface KotlinParser : KotlinLexer {
         if (matches("[")) return collectionLiteral()
         if (matches("this")) return thisExpression()
         if (matches("if")) return ifExpression()
+        if (matches("when")) return whenExpression()
         if (matches("try")) return tryExpression()
         if (matches("super")) return superExpression()
+        if (matches("this")) return thisExpression()
+        if (matches("{")) return functionLiteral()
+        //if (matches("suspend")) return functionLiteral()
+        if (matches("fun")) return functionLiteral()
+        if (matches("object")) return objectLiteral()
+
         if (matches("throw") || matches("return") || matches("continue") || matches("break")) return jumpExpression()
 
         return OR(
             { stringLiteral() },
             { collectionLiteral() },
-            //{ callableReference() },
-            //{ functionLiteral() },
+            { callableReference() },
+            { functionLiteral() },
             { objectLiteral() },
             { thisExpression() },
             { superExpression() },
@@ -1727,8 +1733,8 @@ interface KotlinParser : KotlinLexer {
     //lambdaParameters
     //    : lambdaParameter (NL* COMMA NL* lambdaParameter)* (NL* COMMA)?
     //    ;
-    fun lambdaParameters() {
-        TODO("lambdaParameters")
+    fun lambdaParameters(): List<Unit> {
+        return parseList(oneOrMore = true) { lambdaParameter() }
     }
 
     //lambdaParameter
@@ -1736,6 +1742,7 @@ interface KotlinParser : KotlinLexer {
     //    | multiVariableDeclaration (NL* COLON NL* type)?
     //    ;
     fun lambdaParameter() {
+        OR({ multiVariableDeclaration(); NLs(); COLON(); NLs(); type() }, { variableDeclaration() })
         TODO("lambdaParameter")
     }
 
@@ -2014,11 +2021,11 @@ interface KotlinParser : KotlinLexer {
     //    : receiverType? COLONCOLON NL* (simpleIdentifier | CLASS)
     //    ;
     fun callableReference(): Expr {
-        opt { receiverType() }
+        val type = opt { receiverType() }
         expect("::")
         NLs()
-        OR({ CLASS() }, { simpleIdentifier() })
-        TODO("callableReference")
+        val kind = if (matches("class")) { CLASS(); "class" } else simpleIdentifier()
+        return CallableReferenceExt(type, kind)
     }
 
     //assignmentAndOperator
@@ -2124,7 +2131,7 @@ interface KotlinParser : KotlinLexer {
     //    : QUEST_NO_WS DOT
     //    ;
     /** ?. */
-    fun safeNav(): Unit = TODO("safeNav")
+    //fun safeNav(): Unit = expect("?.")
 
     // SECTION: modifiers
     //modifiers
@@ -2194,13 +2201,13 @@ interface KotlinParser : KotlinLexer {
     //    | INNER
     //    | VALUE
     //    ;
-    fun classModifier(): ClassModifier = ClassModifier.BY_ID[expectAny("enum", "sealed", "annotation", "data", "inner", "value")]!!
+    fun classModifier(): ClassModifier? = ClassModifier.BY_ID[expectAnyOpt("enum", "sealed", "annotation", "data", "inner", "value")]
 
     //memberModifier
     //    : OVERRIDE
     //    | LATEINIT
     //    ;
-    fun memberModifier(): MemberModifier = MemberModifier.BY_ID[expectAny("override", "lateinit")]!!
+    fun memberModifier(): MemberModifier? = MemberModifier.BY_ID[expectAnyOpt("override", "lateinit")]
 
     //visibilityModifier
     //    : PUBLIC
