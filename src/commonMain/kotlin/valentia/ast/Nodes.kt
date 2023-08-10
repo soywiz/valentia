@@ -7,6 +7,13 @@ open class Node {
     var spos: Int = -1
     var epos: Int = -1
     val rangeStr: String? get() = reader?.readAbsoluteRange(spos, epos)
+
+    var nodeAnnotations: List<AnnotationNodes>? = null
+}
+
+fun <T : Node> T.annotated(annotations: List<AnnotationNodes>): T {
+    this.nodeAnnotations = annotations
+    return this
 }
 
 data class AnnotationNodes(
@@ -50,12 +57,26 @@ fun <T : Node> T.enrich(reader: BaseReader?, spos: Int, epos: Int): T {
     return this
 }
 
+// Sub Types
+
+abstract class SubTypeInfo : Node()
+data class ExplicitDelegation(val type: TypeNode, val delegate: Expr) : SubTypeInfo()
+data class ConstructorInvocation(val type: UserType, val args: List<Expr>) : SubTypeInfo()
+data class BasicSubTypeInfo(val type: TypeNode) : SubTypeInfo()
+
 // Type
 
-open class TypeNode : Node()
+abstract class TypeNode : Node()
+data class FuncTypeNode(val suspendable: Boolean = false) : TypeNode()
+data class UserType(val types: List<TypeNode>) : TypeNode() {
+    constructor(vararg types: TypeNode) : this(types.toList())
+}
 object UnknownType : TypeNode()
 object DynamicType : TypeNode()
 data class SimpleType(val name: String) : TypeNode()
+
+fun FuncTypeNode.suspendable(): FuncTypeNode = this.copy(suspendable = true)
+
 fun TypeNode.nullable(): TypeNode {
     println("TODO: TypeNode.nullable")
     return this
@@ -68,7 +89,7 @@ open class DeclNode : Node()
 data class ConstructorDecl(val params: List<FuncValueParam>, val body: Stm?) : DeclNode()
 data class InitDecl(val stm: Stm) : DeclNode()
 data class CompanionObjectDecl(val name: String?) : DeclNode()
-data class ClassDecl(val name: String) : DeclNode()
+data class ClassDecl(val kind: String, val name: String, val subTypes: List<SubTypeInfo>? = null) : DeclNode()
 data class ObjectDecl(val name: String) : DeclNode()
 data class FunDecl(val name: String, val params: List<FuncValueParam> = emptyList(), val body: Stm? = null) : DeclNode()
 data class VariableDecl(val id: String, val type: TypeNode?) : DeclNode()
@@ -89,7 +110,7 @@ data class Identifier(val parts: List<String>) : Expr() {
 open class Expr : Node()
 
 data class ObjectLiteralExpr(
-    val delegationSpecifiers: List<Unit>? = null,
+    val delegationSpecifiers: List<SubTypeInfo>? = null,
     val body: List<DeclNode>? = null,
     val isData: Boolean = false,
 ) : Expr()

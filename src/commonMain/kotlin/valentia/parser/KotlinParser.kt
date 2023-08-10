@@ -164,23 +164,25 @@ interface KotlinParser : KotlinLexer {
     //      (NL* classBody | NL* enumClassBody)?
     //    ;
     fun classDeclaration(): ClassDecl {
-        opt { modifiers() }
-        OR(
-            { expect("class") },
+        println("TODO: classDeclaration")
+        val modifiers = opt { modifiers() }
+        val kind = OR(
+            { expect("class"); "class" },
             {
                 val isFun = expectOpt("fun")
                 NLs()
                 expect("interface")
+                if (isFun) "fun interface" else "interface"
             },
         )
         NLs()
         val className = simpleIdentifier()
         opt { NLs(); typeParameters() }
         opt { NLs(); primaryConstructor() }
-        opt { NLs(); COLON(); NLs(); delegationSpecifiers() }
+        val subTypes = opt { NLs(); COLON(); NLs(); delegationSpecifiers() }
         opt { NLs(); typeConstraints() }
         opt { NLs(); OR({ classBody() }, { enumClassBody() }) }
-        return ClassDecl(className)
+        return ClassDecl(kind = kind, name = className, subTypes = subTypes)
     }
 
     // primaryConstructor
@@ -236,7 +238,7 @@ interface KotlinParser : KotlinLexer {
     //delegationSpecifiers
     //    : annotatedDelegationSpecifier (NL* COMMA NL* annotatedDelegationSpecifier)*
     //    ;
-    fun delegationSpecifiers(): List<Unit> {
+    fun delegationSpecifiers(): List<SubTypeInfo> {
         return parseList(oneOrMore = true, separator = { expectOpt(",") }) {
             annotatedDelegationSpecifier()
         }
@@ -249,31 +251,47 @@ interface KotlinParser : KotlinLexer {
     //    | functionType
     //    | SUSPEND NL* functionType
     //    ;
-    fun delegationSpecifier() {
-        TODO("delegationSpecifier")
+    fun delegationSpecifier(): SubTypeInfo {
+        return OR(
+            { constructorInvocation() },
+            { explicitDelegation() },
+            { BasicSubTypeInfo(userType()) },
+            { BasicSubTypeInfo(functionType()) },
+            { SUSPEND(); NLs(); BasicSubTypeInfo(functionType().suspendable()) },
+        )
     }
 
     //constructorInvocation
     //    : userType NL* valueArguments
     //    ;
-    fun constructorInvocation() {
-        TODO()
+    fun constructorInvocation(): ConstructorInvocation {
+        val type = userType()
+        NLs()
+        val args = valueArguments()
+        return ConstructorInvocation(type, args)
     }
 
     //annotatedDelegationSpecifier
     //    : annotation* NL* delegationSpecifier
     //    ;
-    fun annotatedDelegationSpecifier() {
-        annotations(atLeastOne = false)
-        NLs()
-        return delegationSpecifier()
+    fun annotatedDelegationSpecifier(): SubTypeInfo {
+        val annotations = annotations(atLeastOne = false).also { NLs() }
+        return delegationSpecifier().annotated(annotations)
     }
 
     //explicitDelegation
     //    : (userType | functionType) NL* BY NL* expression
     //    ;
-    fun explicitDelegation() {
-        TODO()
+    fun explicitDelegation(): ExplicitDelegation {
+        val type = OR(
+            { userType() },
+            { functionType() }
+        )
+        NLs()
+        BY()
+        NLs()
+        val delegate = expression()
+        return ExplicitDelegation(type, delegate)
     }
 
     //typeParameters
@@ -740,11 +758,11 @@ interface KotlinParser : KotlinLexer {
         //zeroOrMore { typeModifier() }
         //return typeReference()
         return OR(
-            //{ functionType() },
             { nullableType() },
             { parenthesizedType() },
             { typeReference() },
-            //{ definitelyNonNullableType() },
+            { definitelyNonNullableType() },
+            //{ functionType() },
         )
     }
 
@@ -782,16 +800,21 @@ interface KotlinParser : KotlinLexer {
     //userType
     //    : simpleUserType (NL* DOT NL* simpleUserType)*
     //    ;
-    fun userType(): TypeNode {
-        println("TODO: userType")
-        val res = simpleUserType()
-        zeroOrMore {
+    fun userType(): UserType {
+        //println("TODO: userType")
+        val base = simpleUserType()
+        val more = zeroOrMore {
             NLs()
             DOT()
             NLs()
             simpleUserType()
         }
-        return res
+
+        return UserType(listOf(base, *more.toTypedArray()))
+        //val types = parseList(oneOrMore = true, separator = { expectOpt(".") }) {
+        //    simpleUserType()
+        //}
+        //return UserType(types)
     }
 
     //simpleUserType
@@ -842,7 +865,7 @@ interface KotlinParser : KotlinLexer {
     //functionType
     //    : (receiverType NL* DOT NL*)? functionTypeParameters NL* ARROW NL* type
     //    ;
-    fun functionType(): TypeNode {
+    fun functionType(): FuncTypeNode {
         TODO("functionType")
     }
 
@@ -1694,7 +1717,7 @@ interface KotlinParser : KotlinLexer {
         val isData = expectOpt("data")
         NLs()
         expect("object")
-        val delegationSpecifiers = opt {
+        val delegationSpecifiers: List<SubTypeInfo>? = opt {
             NLs()
             COLON()
             NLs()

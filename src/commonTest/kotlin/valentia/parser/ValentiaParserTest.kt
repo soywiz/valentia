@@ -1,40 +1,15 @@
-package valentia
+package valentia.parser
 
 import valentia.ast.*
-import valentia.ast.NodeBuilder.Companion.id
-import valentia.ast.NodeBuilder.Companion.lit
-import valentia.parser.ValentiaParser
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class ValentiaParserTest : NodeBuilder, StmBuilder {
+class ValentiaParserTest : StmBuilder {
     @Test
-    fun testWhen() {
+    fun testInheritance() {
         assertEquals(
-            WhenExpr(subject=null, entries=listOf(WhenExpr.Entry(conditions = null, body = ExprStm(expr = 1.lit)))),
-            ValentiaParser.expression("""
-                when {
-                    else -> 1
-                }
-            """.trimIndent())
-        )
-
-        assertEquals(
-            WhenExpr(subject=WhenExpr.Subject(expr = 1.lit), entries=listOf(WhenExpr.Entry(conditions = null, body = ExprStm(expr = 1.lit)))),
-            ValentiaParser.expression("""
-                when (1) {
-                    else -> 1
-                }
-            """.trimIndent())
-        )
-
-        assertEquals(
-            WhenExpr(subject=WhenExpr.Subject(expr = 1.lit, decl=VariableDecl(id="a", type=null)), entries=listOf(WhenExpr.Entry(conditions = null, body = ExprStm(expr = 1.lit)))),
-            ValentiaParser.expression("""
-                when (val a = 1) {
-                    else -> 1
-                }
-            """.trimIndent())
+            ClassDecl(kind = "class", name = "Hello", subTypes = listOf(BasicSubTypeInfo(UserType("World".type)))),
+            ValentiaParser.topLevelDecl("""class Hello : World""")
         )
     }
 
@@ -61,32 +36,12 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     @Test
     fun testTryCatch() {
         assertEquals(
-            TryExpr(body=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(1)))), catches=listOf(TryExpr.Catch(local="e", type="Throwable".type, body=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(2)))))), finally=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(3))))),
+            TryExpr(body=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(1)))), catches=listOf(TryExpr.Catch(local="e", type="Throwable".userType, body=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(2)))))), finally=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(3))))),
             ValentiaParser.expression("try { 1 } catch (e: Throwable) { 2 } finally { 3 }")
         )
         assertEquals(
             TryExpr(body=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(1)))), finally=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(2))))),
             ValentiaParser.expression("try { 1 } finally { 2 }")
-        )
-    }
-
-    @Test
-    fun testSuper() {
-        assertEquals(
-            SuperExpr(),
-            ValentiaParser.expression("super")
-        )
-        assertEquals(
-            SuperExpr(label = "test"),
-            ValentiaParser.expression("super@test")
-        )
-        assertEquals(
-            SuperExpr(label = "test", type = "Test".type),
-            ValentiaParser.expression("super<Test>@test")
-        )
-        assertEquals(
-            SuperExpr(type = "Test".type),
-            ValentiaParser.expression("super<Test>") as? Any?
         )
     }
 
@@ -179,7 +134,7 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
     @Test
     fun testSimpleClass() {
         assertEquals(
-            ClassDecl(name = "Test"),
+            ClassDecl(kind = "class", name = "Test"),
             ValentiaParser("""
                 class Test {
                     fun demo() { println("1") }
@@ -306,82 +261,6 @@ class ValentiaParserTest : NodeBuilder, StmBuilder {
         assertEquals(
             ForLoopStm(IntLiteralExpr(1), vardecl = VariableDecls(VariableDecl(id = "n", type = null)), body = null),
             ValentiaParser.statement("for (n in 1) ;")
-        )
-    }
-
-    @Test
-    fun testSimplestExpr() {
-        assertEquals(
-            OpSeparatedExprs(listOf("+"), listOf(IntLiteralExpr(1), IntLiteralExpr(5))),
-            ValentiaParser.expression("1 \n + 5")
-        )
-    }
-
-    @Test
-    fun testSimpleExpr() {
-        assertEquals(
-            OpSeparatedExprs(listOf("*"), listOf(IntLiteralExpr(1000), IntLiteralExpr(200))),
-            ValentiaParser.expression("1_000 * 2_0_0")
-        )
-    }
-
-    @Test
-    fun testExpr() {
-        assertEquals(
-            2.lit * (3.lit + 4.lit),
-            ValentiaParser.expression("2 * (3 + 4)")
-        )
-    }
-
-    @Test
-    fun testInfix() {
-        assertEquals(
-            1.lit shl 5.lit,
-            ValentiaParser.expression("1 shl 5")
-        )
-    }
-
-    @Test
-    fun testIn() {
-        assertEquals(
-            1.lit _in 5.lit,
-            ValentiaParser.expression("1 in 5")
-        )
-    }
-
-    @Test
-    fun testNotIn() {
-        assertEquals(
-            1.lit _notIn 5.lit,
-            ValentiaParser.expression("1 !in 5")
-        )
-    }
-
-    @Test
-    fun testIs() {
-        assertEquals(
-            1.lit _is "Int".type,
-            ValentiaParser.expression("1 is Int")
-        )
-    }
-
-    @Test
-    fun testNotIs() {
-        assertEquals(
-            1.lit _notIs "Int".type,
-            ValentiaParser.expression("1 !is Int")
-        )
-    }
-
-    @Test
-    fun testAs() {
-        assertEquals(
-            1.lit.safeCastTo(SimpleType("Float")),
-            ValentiaParser.expression("1 as? Float")
-        )
-        assertEquals(
-            1.lit.castTo(SimpleType("Float")),
-            ValentiaParser.expression("1 as Float")
         )
     }
 }

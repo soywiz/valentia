@@ -1,6 +1,6 @@
 package valentia.ast
 
-interface StmBuilder {
+interface StmBuilder : NodeBuilder {
     companion object {
         fun buildStms(block: StmBuilder.() -> Unit): Stms = Stms(buildStmList(block))
         fun buildStmCompact(block: StmBuilder.() -> Unit): Stm = buildStmList(block).compact()
@@ -40,13 +40,15 @@ interface NodeBuilder {
         operator fun <T> invoke(block: NodeBuilder.() -> T): T = block(NodeBuilder)
     }
 
-    val IntType: SimpleType get() = "Int".type
+    val IntType: TypeNode get() = "Int".userType
     val Boolean.lit: BoolLiteralExpr get() = BoolLiteralExpr(this)
     val Int.lit: IntLiteralExpr get() = IntLiteralExpr(this.toLong())
     val Long.lit: IntLiteralExpr get() = IntLiteralExpr(this, isLong = true)
     val String.lit: StringLiteralExpr get() = StringLiteralExpr(this)
     val String.id: IdentifierExpr get() = IdentifierExpr(this)
+    val String.userType: UserType get() = this.type.user
     val String.type: SimpleType get() = SimpleType(this)
+    val SimpleType.user: UserType get() = UserType(this)
     operator fun Expr.invoke(vararg params: Expr, lambdaArg: Expr? = null, typeArgs: List<TypeNode>? = null): CallExpr = CallExpr(this, params.toList(), lambdaArg, typeArgs)
     operator fun Expr.unaryMinus(): UnaryPreOpExpr = UnaryPreOpExpr("-", this)
     operator fun Expr.unaryPlus(): UnaryPreOpExpr = UnaryPreOpExpr("+", this)

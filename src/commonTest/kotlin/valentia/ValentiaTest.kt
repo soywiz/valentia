@@ -1,0 +1,4 @@
+package valentia
+
+class ValentiaTest {
+}
