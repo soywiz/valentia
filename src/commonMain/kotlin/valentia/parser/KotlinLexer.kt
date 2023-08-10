@@ -627,7 +627,18 @@ interface KotlinLexer : UnicodeLexer {
     //    : '\'' (EscapeSeq | ~[\n\r'\\]) '\''
     //    ;
     fun CharacterLiteral(): LiteralExpr {
-        TODO("CharacterLiteral")
+        expect("'")
+        val str = StringBuilder()
+        loop@while (hasMore) {
+            val c = peekChar()
+            when (c) {
+                '\\' -> TODO("Not implemented character escaping")
+                '\'' -> break@loop
+                else -> str.append(readChar())
+            }
+        }
+        expect("'")
+        return CharLiteralExpr(str.toString().firstOrNull() ?: '\u0000')
     }
 
     // SECTION: lexicalIdentifiers

@@ -1,6 +1,5 @@
 package valentia.parser
 
-import valentia.ast.NodeBuilder.Companion.multiType
 import valentia.ast.NodeBuilder.Companion.type
 import valentia.ast.SuperExpr
 import kotlin.test.Test

@@ -67,6 +67,7 @@ data class BasicSubTypeInfo(val type: TypeNode) : SubTypeInfo()
 // Type
 
 abstract class TypeNode : Node()
+
 data class FuncTypeNode(val suspendable: Boolean = false) : TypeNode()
 data class MultiType(val types: List<TypeNode>) : TypeNode() {
     constructor(vararg types: TypeNode) : this(types.toList())
@@ -75,12 +76,19 @@ object UnknownType : TypeNode()
 object DynamicType : TypeNode()
 data class SimpleType(val name: String) : TypeNode()
 data class GenericType(val type: TypeNode, val generics: List<TypeNode>) : TypeNode()
+data class NullableType(val type: TypeNode) : TypeNode()
 
 fun FuncTypeNode.suspendable(): FuncTypeNode = this.copy(suspendable = true)
 
-fun TypeNode.nullable(): TypeNode {
-    println("TODO: TypeNode.nullable")
+fun TypeNode.withModifiers(modifiers: List<Any>): TypeNode {
+    if (modifiers.isNotEmpty()) {
+        println("TODO: TypeNode.withModifiers: $modifiers")
+    }
     return this
+}
+
+fun TypeNode.nullable(): NullableType {
+    return if (this is NullableType) this else NullableType(this)
 }
 
 // Modifiers
@@ -238,6 +246,7 @@ open class LiteralExpr(val literal: Any?) : Expr()
 
 data class NullLiteralExpr(val dummy: Unit = Unit) : LiteralExpr(null)
 data class BoolLiteralExpr(val value: Boolean) : LiteralExpr(value)
+data class CharLiteralExpr(val value: Char) : LiteralExpr(value)
 data class IntLiteralExpr(val value: Long, val isLong: Boolean = false, val isUnsigned: Boolean = false) : LiteralExpr(value) {
     override fun toString(): String = "IntLiteralExpr($value${if (isUnsigned) "U" else ""}${if (isLong) "L" else ""})"
 }

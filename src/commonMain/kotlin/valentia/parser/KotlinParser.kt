@@ -767,15 +767,33 @@ interface KotlinParser : KotlinLexer {
     fun type(): TypeNode {
         Hidden()
         println("TODO: type")
+        val type = when {
+            matches("(") -> expectAndRecover("(", ")") {
+                NLs()
+                type().also { NLs() }
+            } ?: UnknownType
+            else -> OR({ definitelyNonNullableType() }, { typeReference() })
+        }
+        NLs()
+        val isNullable = if (expectOpt("?")) {
+            do {
+                Hidden()
+            } while (expectOpt("?"))
+            true
+        } else {
+            false
+        }
+
+        return if (isNullable) type.nullable() else type
         //zeroOrMore { typeModifier() }
         //return typeReference()
-        return OR(
-            { nullableType() },
-            { parenthesizedType() },
-            { typeReference() },
-            { definitelyNonNullableType() },
-            //{ functionType() },
-        )
+        //return OR(
+        //    { nullableType() },
+        //    { parenthesizedType() },
+        //    { typeReference() },
+        //    { definitelyNonNullableType() },
+        //    //{ functionType() },
+        //)
     }
 
     //typeReference
@@ -790,15 +808,8 @@ interface KotlinParser : KotlinLexer {
     //nullableType
     //    : (typeReference | parenthesizedType) NL* quest+
     //    ;
-    fun nullableType(): TypeNode {
-        val type = OR({ typeReference() }, { parenthesizedType() })
-        NLs()
-        expect("?")
-        do {
-            Hidden()
-        } while (expectOpt("?"))
-        return type.nullable()
-    }
+    //fun nullableType(): TypeNode {
+    //}
 
     //quest
     //    : QUEST_NO_WS
@@ -917,12 +928,12 @@ interface KotlinParser : KotlinLexer {
     //parenthesizedType
     //    : LPAREN NL* type NL* RPAREN
     //    ;
-    fun parenthesizedType(): TypeNode {
-        return expectAndRecover("(", ")") {
-            NLs()
-            type().also { NLs() }
-        } ?: UnknownType
-    }
+    //fun parenthesizedType(): TypeNode {
+    //    return expectAndRecover("(", ")") {
+    //        NLs()
+    //        type().also { NLs() }
+    //    } ?: UnknownType
+    //}
 
     //receiverType
     //    : typeModifiers? (parenthesizedType | nullableType | typeReference)
@@ -930,12 +941,8 @@ interface KotlinParser : KotlinLexer {
     fun receiverType(): TypeNode {
         println("TODO: receiverType")
         val modifiers = zeroOrMore { typeModifier() }
-        val res = OR(
-            { parenthesizedType() },
-            { nullableType() },
-            { typeReference() },
-        )
-        return res
+        //return nullableType().withModifiers(modifiers)
+        return type().withModifiers(modifiers)
     }
 
     //parenthesizedUserType
@@ -955,7 +962,7 @@ interface KotlinParser : KotlinLexer {
         opt { typeModifiers() }
         OR({ userType() }, { parenthesizedUserType() })
         NLs()
-        AMP()
+        expect("&")
         NLs()
         opt { typeModifiers() }
         OR({ userType() }, { parenthesizedUserType() })
