@@ -8,7 +8,7 @@ class ValentiaParserTest : StmBuilder {
     @Test
     fun testInheritance() {
         assertEquals(
-            ClassDecl(kind = "class", name = "Hello", subTypes = listOf(BasicSubTypeInfo(UserType("World".type)))),
+            ClassDecl(kind = "class", name = "Hello", subTypes = listOf(BasicSubTypeInfo("World".type))),
             ValentiaParser.topLevelDecl("""class Hello : World""")
         )
     }
@@ -36,7 +36,7 @@ class ValentiaParserTest : StmBuilder {
     @Test
     fun testTryCatch() {
         assertEquals(
-            TryExpr(body=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(1)))), catches=listOf(TryExpr.Catch(local="e", type="Throwable".userType, body=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(2)))))), finally=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(3))))),
+            TryExpr(body=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(1)))), catches=listOf(TryExpr.Catch(local="e", type="Throwable".type, body=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(2)))))), finally=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(3))))),
             ValentiaParser.expression("try { 1 } catch (e: Throwable) { 2 } finally { 3 }")
         )
         assertEquals(

@@ -61,19 +61,20 @@ fun <T : Node> T.enrich(reader: BaseReader?, spos: Int, epos: Int): T {
 
 abstract class SubTypeInfo : Node()
 data class ExplicitDelegation(val type: TypeNode, val delegate: Expr) : SubTypeInfo()
-data class ConstructorInvocation(val type: UserType, val args: List<Expr>) : SubTypeInfo()
+data class ConstructorInvocation(val type: TypeNode, val args: List<Expr>) : SubTypeInfo()
 data class BasicSubTypeInfo(val type: TypeNode) : SubTypeInfo()
 
 // Type
 
 abstract class TypeNode : Node()
 data class FuncTypeNode(val suspendable: Boolean = false) : TypeNode()
-data class UserType(val types: List<TypeNode>) : TypeNode() {
+data class MultiType(val types: List<TypeNode>) : TypeNode() {
     constructor(vararg types: TypeNode) : this(types.toList())
 }
 object UnknownType : TypeNode()
 object DynamicType : TypeNode()
 data class SimpleType(val name: String) : TypeNode()
+data class GenericType(val type: TypeNode, val generics: List<TypeNode>) : TypeNode()
 
 fun FuncTypeNode.suspendable(): FuncTypeNode = this.copy(suspendable = true)
 
@@ -82,10 +83,90 @@ fun TypeNode.nullable(): TypeNode {
     return this
 }
 
+// Modifiers
+
+interface Modifier {
+    val id: String
+}
+enum class ClassModifier(override val id: String) : Modifier {
+    ENUM("enum"), SEALED("sealed"), ANNOTATION("annotation"), DATA("data"), INNER("inner"), VALUE("value");
+    companion object {
+        val BY_ID = entries.associateBy { it.id }
+    }
+}
+enum class MemberModifier(override val id: String) : Modifier {
+    OVERRIDE("override"), LATE_INIT("lateinit");
+    companion object {
+        val BY_ID = entries.associateBy { it.id }
+    }
+}
+enum class VisibilityModifier(override val id: String) : Modifier {
+    PUBLIC("public"), PRIVATE("private"), INTERNAL("internal"), PROTECTED("protected");
+    companion object {
+        val BY_ID = entries.associateBy { it.id }
+    }
+}
+enum class VarianceModifier(override val id: String) : Modifier {
+    IN("in"), OUT("out");
+    companion object {
+        val BY_ID = entries.associateBy { it.id }
+    }
+}
+enum class FunctionModifier(override val id: String) : Modifier {
+    TAILREC("tailrec"), OPERATOR("operator"), INFIX("infix"), INLINE("inline"), EXTERNAL("external"), SUSPEND("suspend");
+    companion object {
+        val BY_ID = entries.associateBy { it.id }
+    }
+}
+enum class PropertyModifier(override val id: String) : Modifier {
+    CONST("const");
+    companion object {
+        val BY_ID = entries.associateBy { it.id }
+    }
+}
+enum class InheritanceModifier(override val id: String) : Modifier {
+    ABSTRACT("abstract"), FINAL("final"), OPEN("open");
+    companion object {
+        val BY_ID = entries.associateBy { it.id }
+    }
+}
+enum class ParameterModifier(override val id: String) : Modifier {
+    VARARG("vararg"), NOINLINE("noinline"), CROSSINLINE("crossinline");
+    companion object {
+        val BY_ID = entries.associateBy { it.id }
+    }
+}
+enum class ReificationModifier(override val id: String) : Modifier {
+    REIFIED("reified");
+    companion object {
+        val BY_ID = entries.associateBy { it.id }
+    }
+}
+enum class PlatformModifier(override val id: String) : Modifier {
+    EXPECT("expect"), ACTUAL("actual");
+    companion object {
+        val BY_ID = entries.associateBy { it.id }
+    }
+}
+
+enum class AnnotationUseSite(override val id: String) : Modifier {
+    FIELD("field"), PROPERTY("property"), GET("get"), SET("set"), RECEIVER("receiver"),
+    PARAM("param"), SETPARAM("setparam"), DELEGATE("delegate"), FILE("file");
+    companion object {
+        val BY_ID = entries.associateBy { it.id }
+    }
+}
+
 // Decl
 
 open class DeclNode : Node()
 
+data class TypeAliasDecl(
+    val id: String,
+    val type: TypeNode,
+    val types: List<TypeParameter>? = null,
+    val modifiers: List<Any> = emptyList()
+) : DeclNode()
 data class ConstructorDecl(val params: List<FuncValueParam>, val body: Stm?) : DeclNode()
 data class InitDecl(val stm: Stm) : DeclNode()
 data class CompanionObjectDecl(val name: String?) : DeclNode()

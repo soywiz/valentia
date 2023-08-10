@@ -58,7 +58,7 @@ open class ValentiaParserExprTest : StmBuilder {
     @Test
     fun testIs() {
         assertEquals(
-            1.lit _is "Int".userType,
+            1.lit _is "Int".type,
             ValentiaParser.expression("1 is Int")
         )
     }
@@ -66,7 +66,7 @@ open class ValentiaParserExprTest : StmBuilder {
     @Test
     fun testNotIs() {
         assertEquals(
-            1.lit _notIs "Int".userType,
+            1.lit _notIs "Int".type,
             ValentiaParser.expression("1 !is Int")
         )
     }
@@ -74,11 +74,11 @@ open class ValentiaParserExprTest : StmBuilder {
     @Test
     fun testAs() {
         assertEquals(
-            1.lit.safeCastTo("Float".type.user),
+            1.lit.safeCastTo("Float".type),
             ValentiaParser.expression("1 as? Float")
         )
         assertEquals(
-            1.lit.castTo("Float".type.user),
+            1.lit.castTo("Float".type),
             ValentiaParser.expression("1 as Float")
         )
     }

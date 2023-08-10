@@ -40,15 +40,17 @@ interface NodeBuilder {
         operator fun <T> invoke(block: NodeBuilder.() -> T): T = block(NodeBuilder)
     }
 
-    val IntType: TypeNode get() = "Int".userType
+    val IntType: TypeNode get() = "Int".type
     val Boolean.lit: BoolLiteralExpr get() = BoolLiteralExpr(this)
     val Int.lit: IntLiteralExpr get() = IntLiteralExpr(this.toLong())
     val Long.lit: IntLiteralExpr get() = IntLiteralExpr(this, isLong = true)
     val String.lit: StringLiteralExpr get() = StringLiteralExpr(this)
     val String.id: IdentifierExpr get() = IdentifierExpr(this)
-    val String.userType: UserType get() = this.type.user
+    val String.multiType: MultiType get() = this.type.multi
+    fun TypeNode.generic(vararg generics: TypeNode): GenericType = GenericType(this, generics.toList())
     val String.type: SimpleType get() = SimpleType(this)
-    val SimpleType.user: UserType get() = UserType(this)
+    val TypeNode.multi: MultiType get() = MultiType(this)
+    val List<TypeNode>.multi: MultiType get() = MultiType(this)
     operator fun Expr.invoke(vararg params: Expr, lambdaArg: Expr? = null, typeArgs: List<TypeNode>? = null): CallExpr = CallExpr(this, params.toList(), lambdaArg, typeArgs)
     operator fun Expr.unaryMinus(): UnaryPreOpExpr = UnaryPreOpExpr("-", this)
     operator fun Expr.unaryPlus(): UnaryPreOpExpr = UnaryPreOpExpr("+", this)
