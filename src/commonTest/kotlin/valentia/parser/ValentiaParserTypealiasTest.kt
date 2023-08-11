@@ -1,5 +1,6 @@
 package valentia.parser
 
+import valentia.ast.Modifiers
 import valentia.ast.NodeBuilder.Companion.generic
 import valentia.ast.NodeBuilder.Companion.type
 import valentia.ast.TypeAliasDecl
@@ -24,7 +25,7 @@ open class ValentiaParserTypealiasTest {
                 id = "Example",
                 type = "Int".type,
                 types = null,
-                modifiers = listOf(VisibilityModifier.PRIVATE)
+                modifiers = Modifiers(VisibilityModifier.PRIVATE)
             ),
             ValentiaParser.topLevelDecl("private typealias Example = Int") as Any?
         )
@@ -37,7 +38,7 @@ open class ValentiaParserTypealiasTest {
                 id = "Example",
                 type = "Map".type.generic("Int".type, "T".type),
                 types = listOf(TypeParameter(id = "T", type = null)),
-                modifiers = listOf(VisibilityModifier.PRIVATE)
+                modifiers = Modifiers(VisibilityModifier.PRIVATE)
             ),
             ValentiaParser.topLevelDecl("private typealias Example<T> = Map<Int, T>") as Any?
         )

@@ -172,7 +172,7 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun classDeclaration(): ClassDecl {
         debug("TODO: classDeclaration")
-        val modifiers = opt { modifiers() }
+        val modifiers = modifiers(atLeastOne = false)
         val kind = OR(
             { expect("class"); "class" },
             {
@@ -184,10 +184,10 @@ interface KotlinParser : KotlinLexer {
         )
         NLs()
         val className = simpleIdentifier()
-        opt { NLs(); typeParameters() }
-        opt { NLs(); primaryConstructor() }
+        val types = opt { NLs(); typeParameters() }
+        val primaryConstructor = opt { NLs(); primaryConstructor() }
         val subTypes = opt { NLs(); COLON(); NLs(); delegationSpecifiers() }
-        opt { NLs(); typeConstraints() }
+        val typeConstraints = opt { NLs(); typeConstraints() }
         val decls = opt { NLs(); OR({ classBody() }, { enumClassBody() }) }
         return ClassDecl(kind = kind, name = className, subTypes = subTypes, body = decls)
     }
@@ -195,15 +195,10 @@ interface KotlinParser : KotlinLexer {
     // primaryConstructor
     //    : (modifiers? CONSTRUCTOR NL*)? classParameters
     //    ;
-    fun primaryConstructor() {
+    fun primaryConstructor(): List<ClassParameter> {
         debug("TODO: primaryConstructor")
-        opt {
-            opt { modifiers() }
-            CONSTRUCTOR()
-            NLs()
-        }
-        classParameters()
-        return
+        val optModifiers: Modifiers? = opt { modifiers(atLeastOne = false).also { CONSTRUCTOR(); NLs() } }
+        return classParameters()
     }
 
     //classBody
@@ -221,9 +216,28 @@ interface KotlinParser : KotlinLexer {
     //    ;
     //
     fun classParameters(): List<ClassParameter> {
-        return parseListWithStartEnd("(", ")", oneOrMore = true, separator = { expectOpt(",") }) {
-            classParameter()
-        }
+        val list = expectAndRecover("(", ")") {
+            NLs()
+            opt {
+                val param = classParameter()
+                val extra = zeroOrMore {
+                    NLs()
+                    COMMA()
+                    NLs()
+                    classParameter()
+                }
+                opt {
+                    NLs()
+                    COMMA()
+                }
+                listOf(param) + extra
+            }.also { NLs() }
+        } ?: emptyList()
+
+        return list
+        //return parseListWithStartEnd("(", ")", oneOrMore = true, separator = { expectOpt(",") }) {
+        //    classParameter()
+        //}
     }
 
     //classParameter
@@ -331,24 +345,33 @@ interface KotlinParser : KotlinLexer {
     //typeConstraints
     //    : WHERE NL* typeConstraint (NL* COMMA NL* typeConstraint)*
     //    ;
-    fun typeConstraints() {
+    fun typeConstraints(): List<TypeConstraint> {
+        debug("TODO: typeConstraints")
         expect("where")
         NLs()
-        typeConstraint()
-        zeroOrMore {
+        val tc = typeConstraint()
+        val more = zeroOrMore {
             NLs()
-            expect(",")
+            COMMA()
             NLs()
             typeConstraint()
         }
-        TODO("typeConstraints")
+        return listOf(tc) + more
+        //return parseList(oneOrMore = true) { typeConstraint() }
     }
 
     //typeConstraint
     //    : annotation* simpleIdentifier NL* COLON NL* type
     //    ;
-    fun typeConstraint() {
-        TODO("typeConstraint")
+    fun typeConstraint(): TypeConstraint {
+        debug("TODO: typeConstraint")
+        val annotations = annotations()
+        val id = simpleIdentifier()
+        NLs()
+        COLON()
+        NLs()
+        val type = type()
+        return TypeConstraint(id, type, annotations)
     }
 
 // SECTION: classMembers
@@ -444,6 +467,7 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun functionDeclaration(): Decl {
         debug("TODO: functionDeclaration")
+        val modifiers = modifiers(atLeastOne = false)
         expect("fun")
         opt {
             NLs()
@@ -459,13 +483,13 @@ interface KotlinParser : KotlinLexer {
         val funcName = simpleIdentifier()
         NLs()
         val params = functionValueParameters()
-        opt {
+        val retType = opt {
             NLs()
             COLON()
             NLs()
             type()
         }
-        opt {
+        val typeConstraints = opt {
             NLs()
             typeConstraints()
         }
@@ -473,7 +497,7 @@ interface KotlinParser : KotlinLexer {
             NLs()
             functionBody()
         }
-        return FunDecl(funcName, params, body = body)
+        return FunDecl(funcName, params, retType = retType, where = typeConstraints, body = body, modifiers = modifiers)
     }
 
     //functionBody
@@ -481,11 +505,16 @@ interface KotlinParser : KotlinLexer {
     //    | ASSIGNMENT NL* expression
     //    ;
     fun functionBody(): Stm {
-        debug("TODO: functionBody")
-        return OR(
-            { block() },
-            { ASSIGNMENT(); NLs(); ExprStm(expression()) }
-        )
+        if (expectOpt("=")) {
+            NLs()
+            return ReturnStm(expression())
+        }
+        return block()
+        //debug("TODO: functionBody")
+        //return OR(
+        //    { block() },
+        //    { ASSIGNMENT(); NLs(); ExprStm(expression()) }
+        //)
     }
 
     //variableDeclaration
@@ -593,9 +622,9 @@ interface KotlinParser : KotlinLexer {
         GET()
         opt {
             NLs()
-            LPAREN()
-            NLs()
-            RPAREN()
+            expectAndRecover("(", ")") {
+                NLs()
+            }
             opt {
                 NLs()
                 COLON()
@@ -616,14 +645,14 @@ interface KotlinParser : KotlinLexer {
         SET()
         opt {
             NLs()
-            LPAREN()
-            NLs()
-            functionValueParameterWithOptionalType()
-            opt {
+            expectAndRecover("(", ")") {
                 NLs()
-                COMMA()
+                functionValueParameterWithOptionalType()
+                opt {
+                    NLs()
+                    COMMA()
+                }
             }
-            RPAREN()
             opt {
                 NLs()
                 COLON()
@@ -636,10 +665,29 @@ interface KotlinParser : KotlinLexer {
     }
 
     //parametersWithOptionalType
-    //    : LPAREN NL* (functionValueParameterWithOptionalType (NL* COMMA NL* functionValueParameterWithOptionalType)* (NL* COMMA)?)? NL* RPAREN
+    //    : LPAREN NL*
+    //      (
+    //          functionValueParameterWithOptionalType
+    //          (NL* COMMA NL* functionValueParameterWithOptionalType)*
+    //          (NL* COMMA)?
+    //      )?
+    //      NL* RPAREN
     //    ;
     fun parametersWithOptionalType() {
-        TODO("parametersWithOptionalType")
+        expectAndRecover("(", ")") {
+            NLs()
+            opt {
+                functionValueParameterWithOptionalType()
+                zeroOrMore {
+                    NLs()
+                    COMMA()
+                    NLs()
+                    functionValueParameterWithOptionalType()
+                }
+                opt { NLs(); COMMA() }
+            }
+            NLs()
+        }
     }
 
     //functionValueParameterWithOptionalType
@@ -682,7 +730,7 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun objectDeclaration(): Decl {
         debug("TODO: objectDeclaration")
-        opt { modifiers() }
+        opt { modifiers(atLeastOne = false) }
         expect("object")
         NLs()
         val name = simpleIdentifier()
@@ -763,7 +811,7 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun enumEntry(): EnumEntry {
         debug("TODO: enumEntry")
-        val modifiers = opt { modifiers() }
+        val modifiers = modifiers(atLeastOne = false)
         NLs()
         val id = simpleIdentifier()
         NLs()
@@ -1365,6 +1413,14 @@ interface KotlinParser : KotlinLexer {
 
     private fun <T> parseList(oneOrMore: Boolean = false, separator: () -> Boolean = { expectOpt(",") }, doBreak: () -> Boolean = { false }, node: () -> T): List<T> {
         val nodes = arrayListOf<T>()
+        //val oldPos = pos
+        //try {
+        //    out += block() ?: break
+        //} catch (e: IllegalStateException) {
+        //    pos = oldPos
+        //    break
+        //}
+
         loop@while (hasMore) {
             NLs()
             if (doBreak()) break@loop
@@ -1813,7 +1869,7 @@ interface KotlinParser : KotlinLexer {
     //      (NL* functionBody)?
     //    ;
     fun anonymousFunction(): Expr {
-        opt { expect("suspend") }
+        val isSuspend = opt { expect("suspend") }
         NLs()
         expect("fun")
         opt { NLs(); expect("type"); NLs(); DOT() }
@@ -2197,10 +2253,11 @@ interface KotlinParser : KotlinLexer {
     //modifiers
     //    : (annotation | modifier)+
     //    ;
-    fun modifiers(atLeastOne: Boolean = true): List<Any> {
-        return multiple(atLeastOne = atLeastOne) {
+    fun modifiers(atLeastOne: Boolean = true): Modifiers {
+        val items: List<Any> = multiple(atLeastOne = atLeastOne) {
             OR({ annotation() }, { modifier() })
         }
+        return Modifiers(items)
     }
 
     //parameterModifiers
@@ -2483,4 +2540,3 @@ interface KotlinParser : KotlinLexer {
         return valentia.ast.Identifier(ids)
     }
 }
-

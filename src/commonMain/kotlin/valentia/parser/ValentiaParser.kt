@@ -14,8 +14,10 @@ open class ValentiaParser(
     fun valentiaFile(): FileNode = kotlinFile()
 
     companion object {
-        fun topLevelDecl(@Language("kotlin") str: String): Decl = ValentiaParser(str).topLevelObject()
-        fun file(@Language("kotlin") str: String): FileNode = ValentiaParser(str).valentiaFile()
+        fun topLevelDecl(@Language("kotlin") str: String): Decl =
+            ValentiaParser(str).topLevelObject()
+        fun file(@Language("kotlin") str: String): FileNode =
+            ValentiaParser(str).valentiaFile()
         fun expression(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Expr =
             ValentiaParser(str).expression()
         fun assignment(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Stm =

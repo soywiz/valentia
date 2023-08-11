@@ -44,7 +44,8 @@ open class JSCodegen : Codegen(), Indenter by Indenter() {
 
     override fun generateFunction(func: FunDecl) {
         val params = func.params.joinToString(", ") { it.id }
-        line("function ${func.jsName}($params)") {
+        val suspendMod = if (func.isSuspend) "*" else ""
+        line("function ${suspendMod}${func.jsName}($params)") {
             func.body?.let {
                 generateStmsCompact(transformer.transform(it))
             }

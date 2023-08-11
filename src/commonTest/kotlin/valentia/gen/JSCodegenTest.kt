@@ -9,6 +9,12 @@ import kotlin.test.assertEquals
 
 class JSCodegenTest {
     @Test
+    fun testSuspend() {
+        println(genFilesJSString("suspend fun test() { }"))
+        println(genFilesJSString("suspend fun test() = 1"))
+    }
+
+    @Test
     fun testOverload() {
         assertEquals(
             "String\nChar",

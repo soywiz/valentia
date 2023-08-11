@@ -34,8 +34,13 @@ interface StmBuilder : NodeBuilder {
     fun WHILE(expr: Expr, compact: Boolean = true, block: StmBuilder.() -> Unit): WhileLoopStm = WhileLoopStm(expr, buildStm(compact) { block() }).addStm()
     fun FOR(id: String, expr: Expr, block: (StmBuilder.() -> Unit)? = null): ForLoopStm =
         ForLoopStm(expr, VariableDecl(id), body = block?.let { buildStmCompact { block() } })
-    fun FUN(name: String, ret: TypeNode, vararg params: Pair<String, TypeNode>, block: StmBuilder.() -> Unit = {}): FunDecl =
-        FunDecl(name, params.map { FuncValueParam(it.first, it.second) }, body = buildStms { block() })
+    fun FUN(
+        name: String,
+        ret: TypeNode? = null,
+        vararg params: Pair<String, TypeNode>,
+        block: StmBuilder.() -> Unit = {}
+    ): FunDecl =
+        FunDecl(name, params.map { FuncValueParam(it.first, it.second) }, retType = ret, body = buildStms { block() })
     fun RETURN(expr: Expr? = null, label: String? = null): ReturnExpr = ReturnExpr(expr, label).addStm()
     fun WHEN(expr: Expr? = null, block: WhenBuilder.() -> Unit): WhenExpr {
         val builder = WhenBuilder().also(block)

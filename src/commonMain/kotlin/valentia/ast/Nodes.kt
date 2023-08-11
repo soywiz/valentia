@@ -20,6 +20,14 @@ abstract class Node {
     }
 }
 
+data class Modifiers(val items: List<Any> = emptyList()) {
+    constructor(vararg items: Any) : this(items.toList())
+    val modifiers = items.filterIsInstance<Modifier>().toSet()
+    val annotations = items.filterIsInstance<AnnotationNodes>()
+
+    operator fun contains(item: Modifier): Boolean = item in modifiers
+}
+
 abstract class ExprOrStm : Node() {
     fun toStm(): Stm = when (this) {
         is Stm -> this
@@ -27,6 +35,12 @@ abstract class ExprOrStm : Node() {
         else -> TODO()
     }
 }
+
+data class TypeConstraint(
+    val id: String,
+    val type: TypeNode,
+    val annotations: List<AnnotationNodes> = emptyList(),
+) : Node()
 
 data class LabelNode(val id: String) : Node()
 
@@ -210,7 +224,7 @@ data class TypeAliasDecl(
     val id: String,
     val type: TypeNode,
     val types: List<TypeParameter>? = null,
-    val modifiers: List<Any> = emptyList()
+    val modifiers: Modifiers = Modifiers(),
 ) : Decl(id)
 data class ConstructorDecl(val params: List<FuncValueParam>, val body: Stm?) : Decl("constructor")
 data class InitDecl(val stm: Stm) : Decl("init")
@@ -222,11 +236,20 @@ data class ClassDecl(
     val body: List<Decl>? = null,
 ) : Decl(name)
 data class ObjectDecl(val name: String) : Decl(name)
-data class FunDecl(val name: String, val params: List<FuncValueParam> = emptyList(), val body: Stm? = null) : Decl(name) {
+data class FunDecl constructor(
+    val name: String,
+    val params: List<FuncValueParam> = emptyList(),
+    val retType: TypeNode? = null,
+    val where: List<TypeConstraint>? = null,
+    val body: Stm? = null,
+    val modifiers: Modifiers = Modifiers(),
+) : Decl(name) {
     val jsHash by lazy { params.map { it.type }.hashCode() and 0x7FFFFFFF }
     override val jsName by lazy {
         if (params.isEmpty()) name else "$name\$${jsHash.toString(16)}"
     }
+
+    val isSuspend: Boolean get() = FunctionModifier.SUSPEND in modifiers
 
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
         return FuncTypeNode(UnknownType, params.map { it.type })

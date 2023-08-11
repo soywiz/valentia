@@ -23,10 +23,18 @@ class ValentiaParserClassTest : StmBuilder {
     }
 
     @Test
+    fun testClass() {
+        assertEquals(
+            ClassDecl(kind = "class", name = "Demo"),
+            ValentiaParser.topLevelDecl("class Demo(val a: Int, val b: String)")
+        )
+    }
+
+    @Test
     fun testSimpleClass() {
         assertEquals(
             ClassDecl(kind = "class", name = "Test", body = listOf(
-                FUN("demo", IntType) {
+                FUN("demo", null) {
                     STM("println".id("1".lit))
                 }
             )),
