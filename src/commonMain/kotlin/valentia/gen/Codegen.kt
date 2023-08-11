@@ -47,6 +47,7 @@ open class Codegen {
             is IdentifierExpr -> expr.id
             is BoolLiteralExpr -> "${expr.value}"
             is IntLiteralExpr -> "${expr.value}"
+            is StringLiteralExpr -> "\"${expr.value}\"" // @TODO: Escaping
             is UnaryPostOpExpr -> {
                 val exprStr = generateExpr(expr.expr)
                 when (expr.op) {
@@ -54,6 +55,15 @@ open class Codegen {
                     UnaryPostOp.DECR -> "$exprStr--"
                     UnaryPostOp.NOT_NULL -> exprStr
                 }
+            }
+            is OpSeparatedExprs -> {
+                val exprStrs = expr.exprs.map { generateExpr(it) }
+                exprStrs[0] + " " + (0 until expr.ops.size).joinToString(" ") {
+                    expr.ops[it] + " " + exprStrs[it + 1]
+                }
+            }
+            is CallExpr -> {
+                generateExpr(expr.expr) + "(" + expr.params.joinToString(", ") { generateExpr(it) } + ")"
             }
             else -> TODO("generateExpr: $expr")
         }

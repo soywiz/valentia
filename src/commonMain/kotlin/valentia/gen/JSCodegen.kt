@@ -3,6 +3,7 @@ package valentia.gen
 import valentia.ast.*
 import valentia.transform.TransformUnsupportedNodes
 import valentia.util.Indenter
+import valentia.util.indent
 
 open class JSCodegen : Codegen(), Indenter by Indenter() {
     val transformer = TransformUnsupportedNodes {
@@ -15,6 +16,19 @@ open class JSCodegen : Codegen(), Indenter by Indenter() {
 
     override fun generateClass(clazz: ClassDecl) {
         line("class ${clazz.name}") {
+            for (decl in clazz.body ?: emptyList()) {
+                when (decl) {
+                    is FunDecl -> {
+                        val params = decl.params.joinToString(", ") { it.id }
+                        line("${decl.name}($params)") {
+                            decl.body?.let {
+                                generateStmsCompact(transformer.transform(it))
+                            }
+                        }
+                    }
+                    else -> TODO("generateClass: $decl")
+                }
+            }
         }
     }
 
@@ -27,18 +41,50 @@ open class JSCodegen : Codegen(), Indenter by Indenter() {
         }
     }
 
-    fun generateStmsCompact(stm: Stm) {
-        if (stm is Stms) {
-            for (stm in stm.stms) {
-                generateStm(stm)
-            }
-        } else {
-            generateStm(stm)
+    fun generateStmsCompact(stm: Stm?) {
+        when (stm) {
+            null -> return
+            is Stms -> for (stm in stm.stms) generateStm(stm)
+            else -> generateStm(stm)
         }
+    }
+
+    infix fun Indenter.Line.ELSE(block: () -> Unit) {
+        str += "else {"
+        indent {
+            block()
+        }
+        line("}")
     }
 
     override fun generateStm(stm: Stm) {
         when (stm) {
+            is AssignStm -> {
+                line("${generateExpr(stm.lvalue)} ${stm.op} ${generateExpr(stm.expr)};")
+            }
+            is IfStm -> {
+                val (pre, expr) = transformer.ensure(stm.cond)
+                pre?.let { generateStm(pre) }
+                if (expr != null) {
+                    val lin = line("if (${generateExpr(expr)})") {
+                        generateStmsCompact(stm.btrue)
+                    }
+                    if (stm.bfalse != null) {
+                        lin ELSE {
+                            generateStmsCompact(stm.bfalse)
+                        }
+                    }
+                }
+            }
+            is ForLoopStm -> {
+                val (pre, expr) = transformer.ensure(stm.expr)
+                pre?.let { generateStm(pre) }
+                if (expr != null) {
+                    line("for (const ${stm.vardecl}) of ${generateExpr(expr)}") {
+                        generateStmsCompact(stm.body)
+                    }
+                }
+            }
             is WhileLoopStm -> {
                 val (pre, expr) = transformer.ensure(stm.cond)
                 pre?.let { generateStm(pre) }
@@ -62,7 +108,8 @@ open class JSCodegen : Codegen(), Indenter by Indenter() {
             }
             is ReturnStm -> {
                 if (stm.expr == null) {
-                    return line("return;")
+                    line("return;")
+                    return
                 }
                 val (pre, expr) = transformer.ensure(stm.expr)
                 pre?.let { generateStm(pre) }

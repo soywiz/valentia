@@ -11,6 +11,14 @@ open class Node {
     var nodeAnnotations: List<AnnotationNodes>? = null
 }
 
+open class ExprOrStm : Node() {
+    fun toStm(): Stm = when (this) {
+        is Stm -> this
+        is Expr -> ExprStm(this)
+        else -> TODO()
+    }
+}
+
 data class LabelNode(val id: String) : Node()
 
 fun <T : Node> T.annotated(annotations: List<AnnotationNodes>): T {
@@ -72,6 +80,9 @@ data class BasicSubTypeInfo(val type: TypeNode) : SubTypeInfo()
 
 abstract class TypeNode : Node()
 
+data class UnificationExprType(val exprs: List<ExprOrStm>) : TypeNode() {
+    constructor(vararg exprs: ExprOrStm?) : this(exprs.filterNotNull())
+}
 data class FuncTypeNode(val suspendable: Boolean = false) : TypeNode()
 data class MultiType(val types: List<TypeNode>) : TypeNode() {
     constructor(vararg types: TypeNode) : this(types.toList())
@@ -182,7 +193,12 @@ data class TypeAliasDecl(
 data class ConstructorDecl(val params: List<FuncValueParam>, val body: Stm?) : DeclNode()
 data class InitDecl(val stm: Stm) : DeclNode()
 data class CompanionObjectDecl(val name: String?) : DeclNode()
-data class ClassDecl(val kind: String, val name: String, val subTypes: List<SubTypeInfo>? = null) : DeclNode()
+data class ClassDecl(
+    val kind: String,
+    val name: String,
+    val subTypes: List<SubTypeInfo>? = null,
+    val body: List<DeclNode>? = null,
+) : DeclNode()
 data class ObjectDecl(val name: String) : DeclNode()
 data class FunDecl(val name: String, val params: List<FuncValueParam> = emptyList(), val body: Stm? = null) : DeclNode()
 data class VariableDecl(val id: String, val type: TypeNode?) : DeclNode()
@@ -200,7 +216,7 @@ data class Identifier(val parts: List<String>) : Expr() {
 
 // Expressions
 
-abstract class Expr : Node()
+abstract class Expr : ExprOrStm()
 
 abstract class AssignableExpr : Expr()
 
@@ -224,8 +240,9 @@ data class CollectionLiteralExpr(val items: List<Expr>) : Expr()
 data class TryCatchExpr(val body: Node, val catches: List<Catch> = emptyList(), val finally: Stm = EmptyStm()) : Expr() {
     data class Catch(val local: String, val type: TypeNode, val body: Stm)
 }
+data class Temp(val type: TypeNode) : Expr()
 data class SuperExpr(val label: String? = null, val type: TypeNode? = null) : Expr()
-data class IfExpr(val cond: Expr?, val trueBody: Node? = null, val falseBody: Node? = null) : Expr()
+data class IfExpr(val cond: Expr, val trueBody: ExprOrStm, val falseBody: ExprOrStm? = null) : Expr()
 data class BreakExpr(val label: String? = null) : Expr()
 data class ContinueExpr(val label: String? = null) : Expr()
 data class ReturnExpr(val expr: Expr?, val label: String? = null) : Expr()
@@ -288,16 +305,15 @@ data class ThisExpr(val id: Identifier?) : Expr() {
 // Statements
 
 
-open class Stm : Node()
+open class Stm : ExprOrStm()
 
 /** JavaScript for example only supports try catch statements, not expressions */
 data class TryCatchStm(val body: Stm, val catches: List<Catch> = emptyList(), val finally: Stm = EmptyStm()) : Stm() {
     data class Catch(val local: String, val type: TypeNode, val body: Stm)
 }
 
-data class ReturnStm(val expr: Expr?) : Stm() {
-}
-
+data class ReturnStm(val expr: Expr?) : Stm()
+data class IfStm(val cond: Expr, val btrue: Stm, val bfalse: Stm? = null) : Stm()
 data class AssignStm(val lvalue: Expr, val op: String, val expr: Expr) : Stm()
 
 fun List<Stm>.compact(): Stm = when {
@@ -319,7 +335,7 @@ abstract class LoopStm : Stm() {
 }
 
 /** Iterates over a collection */
-data class ForLoopStm(val expr: Expr?, val vardecl: VariableDecls?, val body: Stm? = null, val annotations: List<Node> = emptyList()) : LoopStm() {
+data class ForLoopStm(val expr: Expr, val vardecl: VariableDecls?, val body: Stm? = null, val annotations: List<Node> = emptyList()) : LoopStm() {
 }
 
 /** Executes 0 or more times */

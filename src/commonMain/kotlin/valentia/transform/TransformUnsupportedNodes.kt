@@ -12,6 +12,18 @@ class TransformUnsupportedNodes(val supported: (Node) -> Boolean) {
             is ReturnExpr -> {
                 return ReturnStm(expr.expr) to null
             }
+            is IfExpr -> {
+                if (expr.falseBody == null) {
+                    return IfStm(expr.cond, expr.trueBody.toStm()) to null
+                }
+                val type = UnificationExprType(expr.trueBody, expr.falseBody)
+                val temp = Temp(type)
+                //TempExpr(temp)
+                val tempExpr = IdentifierExpr("temp")
+                val btrue = AssignStm(tempExpr, "=", (expr.trueBody as ExprStm).expr)
+                val bfalse = expr.falseBody?.let { AssignStm(tempExpr, "=", (it as ExprStm).expr) }
+                return IfStm(expr.cond, btrue, bfalse) to tempExpr
+            }
         }
         return null to expr
     }

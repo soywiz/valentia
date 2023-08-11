@@ -1,7 +1,6 @@
 package valentia.parser
 
 import valentia.ast.*
-import valentia.util.Disjunction2
 import valentia.util.Disjunction3
 
 interface KotlinParser : KotlinLexer {
@@ -146,7 +145,7 @@ interface KotlinParser : KotlinLexer {
     //    | typeAlias
     //    ;
     fun declaration(): DeclNode {
-        println("TODO: declaration")
+        debug("TODO: declaration")
         if (matches("typealias")) {
             return typeAlias()
         }
@@ -169,7 +168,7 @@ interface KotlinParser : KotlinLexer {
     //      (NL* classBody | NL* enumClassBody)?
     //    ;
     fun classDeclaration(): ClassDecl {
-        println("TODO: classDeclaration")
+        debug("TODO: classDeclaration")
         val modifiers = opt { modifiers() }
         val kind = OR(
             { expect("class"); "class" },
@@ -186,15 +185,15 @@ interface KotlinParser : KotlinLexer {
         opt { NLs(); primaryConstructor() }
         val subTypes = opt { NLs(); COLON(); NLs(); delegationSpecifiers() }
         opt { NLs(); typeConstraints() }
-        opt { NLs(); OR({ classBody() }, { enumClassBody() }) }
-        return ClassDecl(kind = kind, name = className, subTypes = subTypes)
+        val decls = opt { NLs(); OR({ classBody() }, { enumClassBody() }) }
+        return ClassDecl(kind = kind, name = className, subTypes = subTypes, body = decls)
     }
 
     // primaryConstructor
     //    : (modifiers? CONSTRUCTOR NL*)? classParameters
     //    ;
     fun primaryConstructor() {
-        println("TODO: primaryConstructor")
+        debug("TODO: primaryConstructor")
         opt {
             opt { modifiers() }
             CONSTRUCTOR()
@@ -228,7 +227,7 @@ interface KotlinParser : KotlinLexer {
     //    : modifiers? (VAL | VAR)? NL* simpleIdentifier COLON NL* type (NL* ASSIGNMENT NL* expression)?
     //    ;
     fun classParameter(): ClassParameter {
-        println("TODO: classParameter")
+        debug("TODO: classParameter")
         opt { modifiers() }
         opt { expectAnyOpt("val", "var") }
         NLs()
@@ -312,7 +311,7 @@ interface KotlinParser : KotlinLexer {
     //    : typeParameterModifiers? NL* simpleIdentifier (NL* COLON NL* type)?
     //    ;
     fun typeParameter(): TypeParameter {
-        println("TODO: typeParameter")
+        debug("TODO: typeParameter")
         //opt { typeParameterModifiers() }
         NLs()
         val id = simpleIdentifier()
@@ -394,7 +393,7 @@ interface KotlinParser : KotlinLexer {
     //      (NL* classBody)?
     //    ;
     fun companionObject(): CompanionObjectDecl {
-        println("TODO: companionObject")
+        debug("TODO: companionObject")
         modifiers(atLeastOne = false)
         expect("companion")
         NLs()
@@ -428,7 +427,7 @@ interface KotlinParser : KotlinLexer {
             NLs()
             expression()
         }
-        println("TODO: functionValueParameter")
+        debug("TODO: functionValueParameter")
         return FuncValueParam(param.id, param.type)
     }
 
@@ -441,7 +440,7 @@ interface KotlinParser : KotlinLexer {
     //      (NL* functionBody)?
     //    ;
     fun functionDeclaration(): DeclNode {
-        println("TODO: functionDeclaration")
+        debug("TODO: functionDeclaration")
         expect("fun")
         opt {
             NLs()
@@ -479,7 +478,7 @@ interface KotlinParser : KotlinLexer {
     //    | ASSIGNMENT NL* expression
     //    ;
     fun functionBody(): Stm {
-        println("TODO: functionBody")
+        debug("TODO: functionBody")
         return OR(
             { block() },
             { ASSIGNMENT(); NLs(); ExprStm(expression()) }
@@ -542,7 +541,7 @@ interface KotlinParser : KotlinLexer {
     //      )
     //    ;
     fun propertyDeclaration(): VariableDecls {
-        println("TODO: propertyDeclaration")
+        debug("TODO: propertyDeclaration")
         modifiers(atLeastOne = false)
         expectAny("val", "var")
         opt { NLs(); typeParameters() }
@@ -671,7 +670,7 @@ interface KotlinParser : KotlinLexer {
     //      (NL* classBody)?
     //    ;
     fun objectDeclaration(): DeclNode {
-        println("TODO: objectDeclaration")
+        debug("TODO: objectDeclaration")
         opt { modifiers() }
         expect("object")
         NLs()
@@ -693,7 +692,7 @@ interface KotlinParser : KotlinLexer {
     //    : modifiers? CONSTRUCTOR NL* functionValueParameters (NL* COLON NL* constructorDelegationCall)? NL* block?
     //    ;
     fun secondaryConstructor(): ConstructorDecl {
-        println("TODO: secondaryConstructor")
+        debug("TODO: secondaryConstructor")
         modifiers(atLeastOne = false)
         CONSTRUCTOR()
         NLs()
@@ -723,8 +722,8 @@ interface KotlinParser : KotlinLexer {
     //enumClassBody
     //    : LCURL NL* enumEntries? (NL* SEMICOLON NL* classMemberDeclarations)? NL* RCURL
     //    ;
-    fun enumClassBody() {
-        println("TODO: enumClassBody")
+    fun enumClassBody(): List<DeclNode> {
+        debug("TODO: enumClassBody")
         expect("{")
         NLs()
         enumEntries(oneOrMore = false)
@@ -736,6 +735,7 @@ interface KotlinParser : KotlinLexer {
         }
         NLs()
         expect("}")
+        return emptyList()
     }
 
     //enumEntries
@@ -751,7 +751,7 @@ interface KotlinParser : KotlinLexer {
     //    : (modifiers NL*)? simpleIdentifier (NL* valueArguments)? (NL* classBody)?
     //    ;
     fun enumEntry(): EnumEntry {
-        println("TODO: enumEntry")
+        debug("TODO: enumEntry")
         val modifiers = opt { modifiers() }
         NLs()
         val id = simpleIdentifier()
@@ -768,7 +768,7 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun type(): TypeNode {
         Hidden()
-        println("TODO: type")
+        debug("TODO: type")
         val type = when {
             matches("(") -> expectAndRecover("(", ")") {
                 NLs()
@@ -846,7 +846,7 @@ interface KotlinParser : KotlinLexer {
     //    : simpleIdentifier (NL* typeArguments)?
     //    ;
     fun simpleUserType(): TypeNode {
-        println("TODO: simpleUserType")
+        debug("TODO: simpleUserType")
         val id = simpleIdentifier()
         NLs()
         val generic = if (peekChar() == '<') typeArguments() else null
@@ -941,7 +941,7 @@ interface KotlinParser : KotlinLexer {
     //    : typeModifiers? (parenthesizedType | nullableType | typeReference)
     //    ;
     fun receiverType(): TypeNode {
-        println("TODO: receiverType")
+        debug("TODO: receiverType")
         val modifiers = zeroOrMore { typeModifier() }
         //return nullableType().withModifiers(modifiers)
         return type().withModifiers(modifiers)
@@ -995,7 +995,7 @@ interface KotlinParser : KotlinLexer {
     //    : (label | annotation)* ( declaration | assignment | loopStatement | expression)
     //    ;
     fun statement(): Stm {
-        println("TODO: statement")
+        debug("TODO: statement")
         NLs()
         zeroOrMore {
             OR({ label() }, { annotation() })
@@ -1065,9 +1065,9 @@ interface KotlinParser : KotlinLexer {
         expect("for")
         NLs()
         var annotations: List<Node> = emptyList()
-        var expr: Expr? = null
+        var expr: Expr = EmptyExpr()
         var vardecl: VariableDecls? = null
-        expectAndRecover("(", ")") {
+        expectAndRecoverSure("(", ")") {
             annotations = annotations()
             vardecl = variableDeclarationOrMultiVariableDeclaration()
             expect("in")
@@ -1306,7 +1306,7 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun prefixUnaryExpression(): Expr {
         val prefixes = zeroOrMore { unaryPrefix() }
-        println("TODO: prefixUnaryExpression : $prefixes")
+        debug("TODO: prefixUnaryExpression : $prefixes")
         var res: Expr = postfixUnaryExpression()
         for (prefix in prefixes.reversed()) {
             val prefixValue = prefix.value
@@ -1335,7 +1335,7 @@ interface KotlinParser : KotlinLexer {
     //    : primaryExpression postfixUnarySuffix*
     //    ;
     fun postfixUnaryExpression(): Expr {
-        println("TODO: postfixUnaryExpression")
+        debug("TODO: postfixUnaryExpression")
         var res: Expr = primaryExpression()
         zeroOrMore {
             postfixUnarySuffix(res)?.let { res = it }
@@ -1379,7 +1379,7 @@ interface KotlinParser : KotlinLexer {
         // valueArguments: LPAREN NL* (valueArgument (NL* COMMA NL* valueArgument)* (NL* COMMA)? NL*)? RPAREN
         // annotatedLambda: annotation* label? NL* lambdaLiteral
         if (peekChar() == '<' || peekChar() == '(') {
-            println("TODO: postfixUnarySuffix.callSuffix")
+            debug("TODO: postfixUnarySuffix.callSuffix")
             return callSuffix(expr)
         }
         if (peekChar() == '[') {
@@ -1524,13 +1524,13 @@ interface KotlinParser : KotlinLexer {
     //    : LPAREN NL* (valueArgument (NL* COMMA NL* valueArgument)* (NL* COMMA)? NL*)? RPAREN
     //    ;
     fun valueArguments(): List<Expr> {
-        println("valueArguments: $this")
+        debug("valueArguments: $this")
         return expectAndRecoverSure("(", ")") {
             parseList(oneOrMore = false, separator = { expectOpt(",") }, doBreak = { matches(")") }) {
                 valueArgument()
             }
         }.also {
-            println("/valueArguments: $this")
+            debug("/valueArguments: $this")
         }
     }
 
@@ -1538,7 +1538,7 @@ interface KotlinParser : KotlinLexer {
     //    : annotation? NL* (simpleIdentifier NL* ASSIGNMENT NL*)? MULT? NL* expression
     //    ;
     fun valueArgument(): Expr {
-        println("TODO: valueArgument")
+        debug("TODO: valueArgument")
         return expression()
     }
 
@@ -1563,7 +1563,7 @@ interface KotlinParser : KotlinLexer {
         if (peekChar() == '(') return parenthesizedExpression()
         literalConstantOpt()?.let { return it }
 
-        println("TODO: primaryExpression")
+        debug("TODO: primaryExpression")
 
         if (matches("\"")) return stringLiteral()
         if (matches("[")) return collectionLiteral()
@@ -1869,15 +1869,16 @@ interface KotlinParser : KotlinLexer {
         NLs()
         expect("if")
         NLs()
-        val cond = expectAndRecover("(", ")") {
+        val cond = expectAndRecoverSure("(", ")") {
             NLs()
             expression().also { NLs() }
         }
         NLs()
-        if (expectOpt(";")) {
-            return IfExpr(cond, EmptyStm())
+        val trueBody = if (expectOpt(";")) {
+            EmptyStm()
+        } else {
+            controlStructureBody()
         }
-        val trueBody = opt { controlStructureBody() }
         NLs()
         opt { SEMICOLON() }
         NLs()

@@ -5,8 +5,8 @@ interface Indenter {
         private var level: Int = 0
         private val lines: ArrayList<Line> = arrayListOf()
 
-        override fun line(str: String) {
-            lines += Line(level, str)
+        override fun line(str: String): Line {
+            return Line(level, str).also { lines += it }
         }
 
         override fun indent() {
@@ -27,20 +27,20 @@ interface Indenter {
         operator fun invoke(): Indenter = Impl()
     }
 
-    data class Line(val indentLevel: Int, val str: String) {
+    data class Line(val indentLevel: Int, var str: String) {
         override fun toString(): String = "${INDENT_LEVELS[indentLevel]}$str"
     }
 
-    fun line(str: String)
+    fun line(str: String): Line
     fun indent()
     fun unindent()
 
-    fun line(str: String, suffix: String = " {", newline: String = "}", block: () -> Unit) {
+    fun line(str: String, suffix: String = " {", newline: String = "}", block: () -> Unit): Line {
         line("$str$suffix")
         indent {
             block()
         }
-        line(newline)
+        return line(newline)
     }
 
     fun indentToString(): String

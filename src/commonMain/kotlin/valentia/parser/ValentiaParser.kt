@@ -7,7 +7,7 @@ open class ValentiaParser(
     str: String
 ) : StrReader(str), KotlinParser {
     override fun reportError(e: Throwable) {
-        println("reportError: PARSER ERROR: $e")
+        debug("reportError: PARSER ERROR: $e")
         e.printStackTrace()
     }
 

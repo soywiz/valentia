@@ -83,6 +83,10 @@ inline fun <T> BaseReader.resetOnException(block: () -> T): Boolean {
 interface BaseParser : BaseReader {
     fun reportError(e: Throwable)
 
+    fun debug(message: Any?) {
+        //kotlin.io.println(message)
+    }
+
     fun unexpected(reason: String? = null): Nothing = TODO("reason=$reason")
 
     //open fun Hidden() {
@@ -125,7 +129,7 @@ interface BaseParser : BaseReader {
             expect(end)
             return res
         } catch (e: IllegalStateException) {
-            println("RECOVERING NOT IMPLEMENTED!")
+            debug("RECOVERING NOT IMPLEMENTED!")
             throw e
         }
         return null
