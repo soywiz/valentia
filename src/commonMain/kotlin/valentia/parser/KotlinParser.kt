@@ -1390,9 +1390,9 @@ interface KotlinParser : KotlinLexer {
             }
             return IndexedExpr(expr, params)
         }
-        if (expectAnyOpt(".", "?.", "::") != null) {
-            //return navigationSuffix()
-            TODO("postfixUnarySuffix.navigationSuffix")
+        val op = expectAnyOpt(".", "?.", "::", consume = false)
+        if (op != null) {
+            return navigationSuffix(expr)
         }
         return null
     }
@@ -1468,10 +1468,16 @@ interface KotlinParser : KotlinLexer {
     //    : memberAccessOperator NL* (simpleIdentifier | parenthesizedExpression | CLASS)
     //    ;
     fun navigationSuffix(expr: Expr): AssignableExpr {
-        memberAccessOperator()
+        val op = memberAccessOperator()
         NLs()
-        OR({ CLASS() }, { parenthesizedExpression() }, { simpleIdentifier() })
-        TODO("navigationSuffix")
+        if (matches("class")) {
+            return NavigationExpr(op, expr, "class")
+        }
+        if (matches("(")) {
+            return NavigationExpr(op, expr, parenthesizedExpression())
+        }
+        val id = simpleIdentifier()
+        return NavigationExpr(op, expr, id)
     }
 
     data class CallSuffix(

@@ -220,6 +220,8 @@ abstract class Expr : ExprOrStm()
 
 abstract class AssignableExpr : Expr()
 
+data class NavigationExpr(val op: String, val expr: Expr, val key: Any) : AssignableExpr()
+
 data class TypeArgumentsAssignableSuffixExpr(val expr: Expr, val types: List<TypeNode>) : AssignableExpr()
 
 data class CallableReferenceExt(val type: TypeNode?, val kind: String) : Expr()

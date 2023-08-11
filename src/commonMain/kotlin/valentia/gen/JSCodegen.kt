@@ -1,11 +1,21 @@
 package valentia.gen
 
 import valentia.ast.*
+import valentia.sema.Program
 import valentia.transform.TransformUnsupportedNodes
 import valentia.util.Indenter
 import valentia.util.indent
 
 open class JSCodegen : Codegen(), Indenter by Indenter() {
+    var hasMainFunction = false
+
+    override fun generateProgram(program: Program) {
+        super.generateProgram(program)
+        if (hasMainFunction) {
+            line("main([])")
+        }
+    }
+
     val transformer = TransformUnsupportedNodes {
         when (it) {
             // ReturnExpr should be ReturnStm in JS
@@ -38,6 +48,9 @@ open class JSCodegen : Codegen(), Indenter by Indenter() {
             func.body?.let {
                 generateStmsCompact(transformer.transform(it))
             }
+        }
+        if (func.name == "main") {
+            hasMainFunction = true
         }
     }
 

@@ -27,13 +27,18 @@ kotlin {
     }
     js(IR) {
         binaries.executable()
-        browser {
-            commonWebpackConfig {
-                cssSupport {
-                    enabled.set(true)
-                }
+        nodejs {
+            testTask {
+                //environment("key", "value")
             }
         }
+        //browser {
+        //    commonWebpackConfig {
+        //        cssSupport {
+        //            enabled.set(true)
+        //        }
+        //    }
+        //}
     }
     sourceSets {
         val commonMain by getting
@@ -63,10 +68,10 @@ application {
     mainClass.set("valentia.MainKt")
 }
 
-tasks.named<Copy>("jvmProcessResources") {
-    val jsBrowserDistribution = tasks.named("jsBrowserDistribution")
-    from(jsBrowserDistribution)
-}
+//tasks.named<Copy>("jvmProcessResources") {
+//    val jsBrowserDistribution = tasks.named("jsBrowserDistribution")
+//    from(jsBrowserDistribution)
+//}
 
 tasks.named<JavaExec>("run") {
     dependsOn(tasks.named<Jar>("jvmJar"))

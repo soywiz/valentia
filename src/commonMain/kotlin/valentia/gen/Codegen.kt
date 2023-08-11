@@ -65,6 +65,14 @@ open class Codegen {
             is CallExpr -> {
                 generateExpr(expr.expr) + "(" + expr.params.joinToString(", ") { generateExpr(it) } + ")"
             }
+            is NavigationExpr -> {
+                if (expr.op != ".") error("Unsupported ${expr.op}")
+                val keyStr = when (expr.key) {
+                    is Expr -> generateExpr(expr.key)
+                    else -> expr.key.toString()
+                }
+                "${generateExpr(expr.expr)}.$keyStr"
+            }
             else -> TODO("generateExpr: $expr")
         }
     }
