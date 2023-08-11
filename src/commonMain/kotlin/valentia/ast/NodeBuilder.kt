@@ -41,7 +41,7 @@ interface NodeBuilder {
     }
 
     fun STR(vararg chunks: Any?): Expr {
-        if (chunks.size == 0) return StringLiteralExpr("")
+        if (chunks.isEmpty()) return StringLiteralExpr("")
         if (chunks.size == 1 && chunks.first() is String) return StringLiteralExpr(chunks[0].toString())
         return InterpolatedStringExpr(chunks.map {
             when (it) {

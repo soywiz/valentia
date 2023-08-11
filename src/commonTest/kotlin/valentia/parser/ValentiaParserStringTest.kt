@@ -9,7 +9,7 @@ class ValentiaParserStringTest : StmBuilder {
     fun testString1() {
         assertEquals(
             STR("hello".id, " world"),
-            ValentiaParser.expression("\"\$hello world\"") as Any
+            ValentiaParser.expression("\"\$hello world\"")
         )
     }
 
@@ -17,7 +17,7 @@ class ValentiaParserStringTest : StmBuilder {
     fun testString2() {
         assertEquals(
             STR(1.lit + 2.lit, " world"),
-            ValentiaParser.expression("\"\${1 + 2} world\"") as Any
+            ValentiaParser.expression("\"\${1 + 2} world\"")
         )
     }
 }
