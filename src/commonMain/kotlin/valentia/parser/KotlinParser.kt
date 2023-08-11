@@ -1,6 +1,8 @@
 package valentia.parser
 
 import valentia.ast.*
+import valentia.util.Disjunction2
+import valentia.util.Disjunction3
 
 interface KotlinParser : KotlinLexer {
     /**
@@ -1010,11 +1012,11 @@ interface KotlinParser : KotlinLexer {
     //label
     //    : simpleIdentifier (AT_NO_WS | AT_POST_WS) NL*
     //    ;
-    fun label(): String {
+    fun label(): LabelNode {
         val id = simpleIdentifier()
         expect("@")
         NLs()
-        return id
+        return LabelNode(id)
     }
 
     //controlStructureBody
@@ -1307,8 +1309,9 @@ interface KotlinParser : KotlinLexer {
         println("TODO: prefixUnaryExpression : $prefixes")
         var res: Expr = postfixUnaryExpression()
         for (prefix in prefixes.reversed()) {
-            res = when (prefix) {
-                is String -> UnaryPreOpExpr(prefix, res)
+            val prefixValue = prefix.value
+            res = when (prefixValue) {
+                is UnaryPreOp -> UnaryPreOpExpr(prefixValue, res)
                 else -> TODO("prefixUnaryExpression")
             }
         }
@@ -1320,8 +1323,8 @@ interface KotlinParser : KotlinLexer {
     //    | label
     //    | prefixUnaryOperator NL*
     //    ;
-    fun unaryPrefix(): Any {
-        return OR(
+    fun unaryPrefix(): Disjunction3<UnaryPreOp, AnnotationNodes, LabelNode> {
+        return ORDis(
             { prefixUnaryOperator().also { NLs() } },
             { annotation() },
             { label() },
@@ -1371,7 +1374,7 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun postfixUnarySuffix(expr: Expr): Expr? {
         expectAnyOpt("++", "--", "!!")?.let {
-            return UnaryPostOpExpr(expr, it)
+            return UnaryPostOpExpr(expr, UnaryPostOp.BY_ID[it]!!)
         }
         // valueArguments: LPAREN NL* (valueArgument (NL* COMMA NL* valueArgument)* (NL* COMMA)? NL*)? RPAREN
         // annotatedLambda: annotation* label? NL* lambdaLiteral
@@ -2126,14 +2129,14 @@ interface KotlinParser : KotlinLexer {
     //    | ADD
     //    | excl
     //    ;
-    fun prefixUnaryOperator(): String = expectAny("++", "--", "-", "+", "!")
+    fun prefixUnaryOperator(): UnaryPreOp = UnaryPreOp.BY_ID[expectAny("++", "--", "-", "+", "!")]!!
 
     //postfixUnaryOperator
     //    : INCR
     //    | DECR
     //    | EXCL_NO_WS excl
     //    ;
-    fun postfixUnaryOperator(): String = expectAny("++", "--", "!!")
+    fun postfixUnaryOperator(): UnaryPostOp = UnaryPostOp.BY_ID[expectAny("++", "--", "!!")]!!
 
     //excl
     //    : EXCL_NO_WS

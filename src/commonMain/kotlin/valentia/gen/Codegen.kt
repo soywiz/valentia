@@ -44,8 +44,17 @@ open class Codegen {
     }
     open fun generateExpr(expr: Expr): String {
         return when (expr) {
+            is IdentifierExpr -> expr.id
             is BoolLiteralExpr -> "${expr.value}"
             is IntLiteralExpr -> "${expr.value}"
+            is UnaryPostOpExpr -> {
+                val exprStr = generateExpr(expr.expr)
+                when (expr.op) {
+                    UnaryPostOp.INCR -> "$exprStr++"
+                    UnaryPostOp.DECR -> "$exprStr--"
+                    UnaryPostOp.NOT_NULL -> exprStr
+                }
+            }
             else -> TODO("generateExpr: $expr")
         }
     }

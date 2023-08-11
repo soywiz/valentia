@@ -6,6 +6,26 @@ import valentia.sema.Program
 import kotlin.test.Test
 
 class JSCodegenTest {
+    @Test
+    fun test() {
+        val gen = genFiles(
+            """
+                class Test {
+                    fun demo() {
+                    }
+                }
+
+                fun test(a: Int, b: String) {   
+                    a++
+                    while (true) {
+                        return 1
+                    }
+                }
+            """.trimIndent()
+        )
+        println(gen.indentToString())
+    }
+
     fun genFiles(
         @Language("kotlin")
         vararg filesContent: String
@@ -18,22 +38,5 @@ class JSCodegenTest {
         }
         gen.generateProgram(program)
         return gen
-    }
-
-    @Test
-    fun test() {
-        val gen = genFiles(
-            """
-                class Test {
-                }
-
-                fun test(a: Int, b: String) {       
-                    while (true) {
-                        return 1
-                    }
-                }
-            """.trimIndent()
-        )
-        println(gen.indentToString())
     }
 }

@@ -11,6 +11,8 @@ open class Node {
     var nodeAnnotations: List<AnnotationNodes>? = null
 }
 
+data class LabelNode(val id: String) : Node()
+
 fun <T : Node> T.annotated(annotations: List<AnnotationNodes>): T {
     this.nodeAnnotations = annotations
     return this
@@ -234,11 +236,26 @@ data class TypeParameter(val id: String, val type: TypeNode?)
 
 data class ClassParameter(val id: String)
 
+enum class UnaryPreOp(val str: String) {
+    INCR("++"), DECR("--"), MINUS("-"), PLUS("+"), EXCL("!");
+    companion object {
+        val BY_ID = entries.associateBy { it.str }
+    }
+}
+
+enum class UnaryPostOp(val str: String) {
+    INCR("++"), DECR("--"), NOT_NULL("!!");
+
+    companion object {
+        val BY_ID = entries.associateBy { it.str }
+    }
+}
+
 data class CastExpr(val expr: Expr, val targetType: TypeNode, val kind: String) : Expr()
 data class CallExpr(val expr: Expr, val params: List<Expr>, val lambdaArg: Expr? = null, val typeArgs: List<TypeNode>? = null) : Expr()
 data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : AssignableExpr()
-data class UnaryPostOpExpr(val expr: Expr, val op: String) : Expr()
-data class UnaryPreOpExpr(val op: String, val expr: Expr) : Expr()
+data class UnaryPostOpExpr(val expr: Expr, val op: UnaryPostOp) : Expr()
+data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr()
 
 data class IdentifierExpr(val id: String) : AssignableExpr()
 

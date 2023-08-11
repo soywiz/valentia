@@ -2,6 +2,8 @@ package valentia.parser
 
 import valentia.ast.Node
 import valentia.ast.enrich
+import valentia.util.Disjunction2
+import valentia.util.Disjunction3
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
@@ -149,6 +151,42 @@ inline fun <T> BaseParser.OR(vararg funcs: () -> T?): T {
     error("Couldn't match any of OR [${funcs.size}]: ${exceptions.toList()}")
 }
 
+inline fun <T1, T2> BaseParser.ORDis(func1: () -> T1?, func2: () -> T2?): Disjunction2<T1, T2> {
+    val rpos = pos
+    val exceptions = arrayListOf<Throwable>()
+    for (n in 0 until 2) {
+        pos = rpos
+        try {
+            return Disjunction2(when (n) {
+                0 -> func1()
+                1 -> func2()
+                else -> TODO()
+            } ?: continue)
+        } catch (e: IllegalStateException) {
+            exceptions += e
+        }
+    }
+    error("Couldn't match any of OR [2]: ${exceptions.toList()}")
+}
+
+inline fun <T1, T2, T3> BaseParser.ORDis(func1: () -> T1?, func2: () -> T2?, func3: () -> T3?): Disjunction3<T1, T2, T3> {
+    val rpos = pos
+    val exceptions = arrayListOf<Throwable>()
+    for (n in 0 until 2) {
+        pos = rpos
+        try {
+            return Disjunction3(when (n) {
+                0 -> func1()
+                1 -> func2()
+                2 -> func3()
+                else -> TODO()
+            } ?: continue)
+        } catch (e: IllegalStateException) {
+            exceptions += e
+        }
+    }
+    error("Couldn't match any of OR [2]: ${exceptions.toList()}")
+}
 
 @OptIn(ExperimentalContracts::class)
 inline fun <T> BaseParser.opt(block: () -> T): T? {

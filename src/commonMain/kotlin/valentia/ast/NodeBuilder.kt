@@ -66,8 +66,8 @@ interface NodeBuilder {
     fun collection(vararg items: Expr): CollectionLiteralExpr = CollectionLiteralExpr(items.toList())
     operator fun Expr.get(vararg indices: Expr): IndexedExpr = IndexedExpr(this, indices.toList())
     operator fun Expr.invoke(vararg params: Expr, lambdaArg: Expr? = null, typeArgs: List<TypeNode>? = null): CallExpr = CallExpr(this, params.toList(), lambdaArg, typeArgs)
-    operator fun Expr.unaryMinus(): UnaryPreOpExpr = UnaryPreOpExpr("-", this)
-    operator fun Expr.unaryPlus(): UnaryPreOpExpr = UnaryPreOpExpr("+", this)
+    operator fun Expr.unaryMinus(): UnaryPreOpExpr = UnaryPreOpExpr(UnaryPreOp.MINUS, this)
+    operator fun Expr.unaryPlus(): UnaryPreOpExpr = UnaryPreOpExpr(UnaryPreOp.PLUS, this)
     fun Expr.castTo(targetType: TypeNode, safe: Boolean = false): Expr =
         CastExpr(this, targetType, if (safe) "as?" else "as")
     fun Expr.safeCastTo(targetType: TypeNode, safe: Boolean = true): Expr = castTo(targetType, safe)
