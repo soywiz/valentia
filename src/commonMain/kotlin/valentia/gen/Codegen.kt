@@ -1,4 +1,52 @@
 package valentia.gen
 
+import valentia.ast.*
+import valentia.sema.Module
+import valentia.sema.Package
+import valentia.sema.Program
+
 open class Codegen {
+    open fun supportedNode(node: Node): Boolean {
+        return true
+    }
+
+    open fun generateProgram(program: Program) {
+        for (module in program.modulesById.values) {
+            generateModule(module)
+        }
+    }
+    open fun generateModule(module: Module) {
+        for (file in module.filesByPackage.values) {
+            generatePackage(file)
+        }
+    }
+
+    open fun generatePackage(pack: Package) {
+        for (file in pack.files) {
+            generateFile(file)
+        }
+    }
+
+    open fun generateFile(file: FileNode) {
+        for (decl in file.topLevelDecls) {
+            when (decl) {
+                is ClassDecl -> generateClass(decl)
+                is FunDecl -> generateFunction(decl)
+            }
+        }
+    }
+
+    open fun generateClass(clazz: ClassDecl) {
+    }
+    open fun generateFunction(func: FunDecl) {
+    }
+    open fun generateStm(stm: Stm) {
+    }
+    open fun generateExpr(expr: Expr): String {
+        return when (expr) {
+            is BoolLiteralExpr -> "${expr.value}"
+            is IntLiteralExpr -> "${expr.value}"
+            else -> TODO("generateExpr: $expr")
+        }
+    }
 }

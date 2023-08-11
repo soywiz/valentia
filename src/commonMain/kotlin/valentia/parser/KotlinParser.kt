@@ -328,12 +328,12 @@ interface KotlinParser : KotlinLexer {
     //    : WHERE NL* typeConstraint (NL* COMMA NL* typeConstraint)*
     //    ;
     fun typeConstraints() {
-        WHERE()
+        expect("where")
         NLs()
         typeConstraint()
         zeroOrMore {
             NLs()
-            COMMA()
+            expect(",")
             NLs()
             typeConstraint()
         }
@@ -1085,7 +1085,7 @@ interface KotlinParser : KotlinLexer {
         Hidden()
         NLs()
         Hidden()
-        val cond = expectAndRecover("(", ")") { expression() }
+        val cond = expectAndRecover("(", ")") { expression() } ?: EmptyExpr()
         Hidden()
         NLs()
         Hidden()
@@ -1986,13 +1986,13 @@ interface KotlinParser : KotlinLexer {
         val catches = zeroOrMore { NLs(); catchBlock() }
         NLs()
         val finally = finallyBlock()
-        return TryExpr(body, catches, finally)
+        return TryCatchExpr(body, catches, finally)
     }
 
     //catchBlock
     //    : CATCH NL* LPAREN annotation* simpleIdentifier COLON type (NL* COMMA)? RPAREN NL* block
     //    ;
-    fun catchBlock(): TryExpr.Catch {
+    fun catchBlock(): TryCatchExpr.Catch {
         expect("catch")
         NLs()
         var localName: String = "unknown"
@@ -2006,7 +2006,7 @@ interface KotlinParser : KotlinLexer {
         }
         NLs()
         val block = block()
-        return TryExpr.Catch(localName, type, block)
+        return TryCatchExpr.Catch(localName, type, block)
     }
 
     //finallyBlock

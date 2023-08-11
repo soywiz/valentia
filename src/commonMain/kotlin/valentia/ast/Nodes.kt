@@ -219,7 +219,7 @@ data class WhenExpr(
     data class Condition(val op: String? = null, val expr: Expr = EmptyExpr())
 }
 data class CollectionLiteralExpr(val items: List<Expr>) : Expr()
-data class TryExpr(val body: Node, val catches: List<Catch> = emptyList(), val finally: Stm = EmptyStm()) : Expr() {
+data class TryCatchExpr(val body: Node, val catches: List<Catch> = emptyList(), val finally: Stm = EmptyStm()) : Expr() {
     data class Catch(val local: String, val type: TypeNode, val body: Stm)
 }
 data class SuperExpr(val label: String? = null, val type: TypeNode? = null) : Expr()
@@ -271,7 +271,14 @@ data class ThisExpr(val id: Identifier?) : Expr() {
 // Statements
 
 
-open class Stm : Node() {
+open class Stm : Node()
+
+/** JavaScript for example only supports try catch statements, not expressions */
+data class TryCatchStm(val body: Stm, val catches: List<Catch> = emptyList(), val finally: Stm = EmptyStm()) : Stm() {
+    data class Catch(val local: String, val type: TypeNode, val body: Stm)
+}
+
+data class ReturnStm(val expr: Expr?) : Stm() {
 }
 
 data class AssignStm(val lvalue: Expr, val op: String, val expr: Expr) : Stm()
@@ -299,7 +306,7 @@ data class ForLoopStm(val expr: Expr?, val vardecl: VariableDecls?, val body: St
 }
 
 /** Executes 0 or more times */
-data class WhileLoopStm(val cond: Expr?, val body: Stm) : LoopStm() {
+data class WhileLoopStm(val cond: Expr, val body: Stm) : LoopStm() {
 }
 
 /** Executes 1 or more times */
