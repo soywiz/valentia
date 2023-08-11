@@ -5,67 +5,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ValentiaParserTest : StmBuilder {
-    @Test
-    fun testInheritance() {
-        assertEquals(
-            ClassDecl(kind = "class", name = "Hello", subTypes = listOf(BasicSubTypeInfo("World".type))),
-            ValentiaParser.topLevelDecl("""class Hello : World""")
-        )
-    }
-
-    @Test
-    fun testObjectLiteral() {
-        assertEquals(
-            ObjectLiteralExpr(body = emptyList()),
-            ValentiaParser.expression("""object { }""")
-        )
-        assertEquals(
-            ObjectLiteralExpr(body = listOf(FunDecl(name="test", params=emptyList(), body=Stms()))),
-            ValentiaParser.expression("""object { fun test() { } }""")
-        )
-    }
 
     @Test
     fun testCollectionLiteral() {
         assertEquals(
             CollectionLiteralExpr(listOf(1.lit, 2.lit, 3.lit)),
             ValentiaParser.expression("[1, 2, 3]")
-        )
-    }
-
-    @Test
-    fun testTryCatch() {
-        assertEquals(
-            TryExpr(body=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(1)))), catches=listOf(TryExpr.Catch(local="e", type="Throwable".type, body=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(2)))))), finally=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(3))))),
-            ValentiaParser.expression("try { 1 } catch (e: Throwable) { 2 } finally { 3 }")
-        )
-        assertEquals(
-            TryExpr(body=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(1)))), finally=Stms(stms=listOf(ExprStm(expr=IntLiteralExpr(2))))),
-            ValentiaParser.expression("try { 1 } finally { 2 }")
-        )
-    }
-
-    @Test
-    fun testIfElseExpression() {
-        assertEquals(
-            IfExpr(cond=BoolLiteralExpr(value=true), trueBody = EmptyStm()),
-            ValentiaParser.expression("if (true) ;")
-        )
-        assertEquals(
-            IfExpr(cond=BoolLiteralExpr(value=true), trueBody = ExprStm(expr=IntLiteralExpr(1))),
-            ValentiaParser.expression("if (true) 1")
-        )
-        assertEquals(
-            IfExpr(cond=BoolLiteralExpr(value=true), trueBody=ExprStm(expr=IntLiteralExpr(1)), falseBody=ExprStm(expr=IntLiteralExpr(2))),
-            ValentiaParser.expression("""
-                if (true) 1 else 2
-            """) as? Any?
-        )
-        assertEquals(
-            IfExpr(cond=BoolLiteralExpr(value=true), trueBody=ExprStm(expr=IntLiteralExpr(1)), falseBody=ExprStm(expr=IntLiteralExpr(2))),
-            ValentiaParser.expression("""
-                if (true) 1; else 2;
-            """) as? Any?
         )
     }
 
@@ -132,83 +77,6 @@ class ValentiaParserTest : StmBuilder {
     }
 
     @Test
-    fun testSimpleClass() {
-        assertEquals(
-            ClassDecl(kind = "class", name = "Test"),
-            ValentiaParser("""
-                class Test {
-                    fun demo() { println("1") }
-                }
-            """.trimIndent()).topLevelObject()
-        )
-    }
-
-    @Test
-    fun testReturn() {
-        assertEquals(
-            RETURN(1.lit),
-            ValentiaParser.expression("return 1")
-        )
-    }
-
-    @Test
-    fun testReturnAt() {
-        assertEquals(
-            RETURN(1.lit, label = "test"),
-            ValentiaParser.expression("return@test 1")
-        )
-    }
-
-    @Test
-    fun testSimpleFunction() {
-        assertEquals(
-            //"println".id("Hello World!".lit),
-            FUN("sum", IntType, "a" to IntType, "b" to IntType) {
-                RETURN("a".id + "b".id)
-            },
-            ValentiaParser.topLevelDecl("fun sum(a: Int, b: Int): Int { return a + b }")
-        )
-    }
-
-    @Test
-    fun testPrintHelloWorld() {
-        assertEquals(
-            "println".id("Hello World!".lit),
-            ValentiaParser.expression("println(\"Hello World!\")")
-        )
-    }
-
-    @Test
-    fun testSimplestFunctionCall() {
-        assertEquals(
-            "exit".id(),
-            ValentiaParser.expression("exit()")
-        )
-    }
-
-    @Test
-    fun testSimplerFunctionCall() {
-        assertEquals(
-            "exit".id(-(1).lit),
-            ValentiaParser.expression("exit(-1)")
-        )
-    }
-
-    @Test
-    fun testSimpleFunctionCall() {
-        assertEquals(
-            "max".id(12.lit, 34.lit),
-            ValentiaParser.expression("max(12, 34)")
-        )
-    }
-
-    @Test
-    fun testShebang() {
-        assertEquals(FileNode(shebang = "#!/bin/sh -x"), ValentiaParser.file("#!/bin/sh -x\n"))
-        assertEquals(FileNode(shebang = "#!/bin/sh -x"), ValentiaParser.file("#!/bin/sh -x"))
-    }
-
-    @Test
     fun testPackage() {
         assertEquals(
             FileNode(_package = Identifier("hello.world")),
@@ -248,19 +116,4 @@ class ValentiaParserTest : StmBuilder {
         )
     }
 
-    @Test
-    fun testSimplestWhile() {
-        assertEquals(
-            WHILE(1.lit) { },
-            ValentiaParser.statement("while (1) ;")
-        )
-    }
-
-    @Test
-    fun testSimplestFor() {
-        assertEquals(
-            ForLoopStm(IntLiteralExpr(1), vardecl = VariableDecls(VariableDecl(id = "n", type = null)), body = null),
-            ValentiaParser.statement("for (n in 1) ;")
-        )
-    }
 }

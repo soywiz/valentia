@@ -2369,7 +2369,12 @@ interface KotlinParser : KotlinLexer {
     //    | userType
     //    ;
     fun unescapedAnnotation(): AnnotationNode {
-        TODO("unescapedAnnotation")
+        val type = userType()
+        val args = opt {
+            NLs()
+            valueArguments()
+        }
+        return AnnotationNode(type, args)
     }
 
     // SECTION: identifiers

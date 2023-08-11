@@ -18,11 +18,13 @@ fun <T : Node> T.annotated(annotations: List<AnnotationNodes>): T {
 
 data class AnnotationNodes(
     val annotations: List<AnnotationNode>,
-) : Node()
+) : Node() {
+    constructor(vararg annotations: AnnotationNode) : this(annotations.toList())
+}
 
 data class AnnotationNode(
-    val name: Identifier = Identifier(""),
-    val args: List<Expr> = emptyList(),
+    val name: TypeNode,
+    val args: List<Expr>? = null,
     val useSite: String? = null,
 ) : Node()
 
