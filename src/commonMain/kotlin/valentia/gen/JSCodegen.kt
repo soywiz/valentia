@@ -63,7 +63,7 @@ open class JSCodegen : Codegen(), Indenter by Indenter() {
     }
 
     infix fun Indenter.Line.ELSE(block: () -> Unit) {
-        str += "else {"
+        str += " else {"
         indent {
             block()
         }

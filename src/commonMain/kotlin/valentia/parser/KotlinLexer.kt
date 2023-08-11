@@ -705,7 +705,7 @@ interface KotlinLexer : UnicodeLexer {
         }
         val str = peek(n)
         when (str) {
-            "return", "for", "while", "do", "else", "when", "if", "super", "is", "in", "class", "interface", "fun"
+            "return", "for", "while", "do", "else", "when", "if", "super", "is", "in", "class", "interface", "fun", "var"
                 -> error("not an identifier")
         }
         skip(n)

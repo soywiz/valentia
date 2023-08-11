@@ -8,7 +8,7 @@ class ValentiaParserLoopForTest : StmBuilder {
     @Test
     fun testSimplestFor() {
         assertEquals(
-            ForLoopStm(IntLiteralExpr(1), vardecl = VariableDecls(VariableDecl(id = "n", type = null)), body = null),
+            ForLoopStm(IntLiteralExpr(1), vardecl = MultiVariableDecl(VariableDecl(id = "n", type = null)), body = null),
             ValentiaParser.statement("for (n in 1) ;")
         )
     }

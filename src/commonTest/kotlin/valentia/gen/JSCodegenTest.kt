@@ -9,7 +9,21 @@ import kotlin.test.assertEquals
 
 class JSCodegenTest {
     @Test
-    fun test() {
+    fun testReturnIf() {
+        assertEquals(
+            "1\n-3",
+            genAndRunJs("""
+                fun min(a: Int, b: Int): Int { return if (a < b) a else b }
+                fun main() {
+                    console.log(min(1, 2))
+                    console.log(min(4, -3))
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
+    fun testSimpleGen() {
         assertEquals(
             "12",
             genAndRunJs("""
@@ -26,8 +40,10 @@ class JSCodegenTest {
         assertEquals("hello world", runJsCode("console.log('hello world')").trim())
     }
 
-    fun genAndRunJs(vararg filesContent: String, extraArgs: List<Any> = emptyList(), trim: Boolean = true): String {
-        return runJsCode(genFilesJSString(*filesContent)).let { if (trim) it.trim() else it }
+    fun genAndRunJs(vararg filesContent: String, extraArgs: List<Any> = emptyList(), trim: Boolean = true, printJs: Boolean = false): String {
+        val jsCode = genFilesJSString(*filesContent)
+        if (printJs) println(jsCode)
+        return runJsCode(jsCode, *extraArgs.toTypedArray()).let { if (trim) it.trim() else it }
     }
 
     fun runJsCode(jsCode: String, vararg extraArgs: Any): String {

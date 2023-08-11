@@ -29,6 +29,7 @@ interface StmBuilder : NodeBuilder {
     }
 
     fun STM(expr: Expr): ExprStm = ExprStm(expr).addStm()
+    fun STM(decl: Decl): DeclStm = DeclStm(decl).addStm()
     fun WHILE(expr: Expr, block: StmBuilder.() -> Unit): WhileLoopStm = WhileLoopStm(expr, buildStmCompact { block() }).addStm()
     fun FUN(name: String, ret: TypeNode, vararg params: Pair<String, TypeNode>, block: StmBuilder.() -> Unit = {}): FunDecl =
         FunDecl(name, params.map { FuncValueParam(it.first, it.second) }, body = buildStms { block() })

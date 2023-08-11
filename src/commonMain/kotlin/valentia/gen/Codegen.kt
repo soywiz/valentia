@@ -56,6 +56,13 @@ open class Codegen {
                     UnaryPostOp.NOT_NULL -> exprStr
                 }
             }
+            is UnaryPreOpExpr -> {
+                val exprStr = generateExpr(expr.expr)
+                when (expr.op) {
+                    UnaryPreOp.MINUS -> "-($exprStr)"
+                    else -> TODO("Unsupported $expr")
+                }
+            }
             is OpSeparatedExprs -> {
                 val exprStrs = expr.exprs.map { generateExpr(it) }
                 exprStrs[0] + " " + (0 until expr.ops.size).joinToString(" ") {

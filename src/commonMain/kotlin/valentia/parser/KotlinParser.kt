@@ -112,7 +112,7 @@ interface KotlinParser : KotlinLexer {
     // topLevelObject
     //    : declaration semis?
     //    ;
-    fun topLevelObject(): DeclNode {
+    fun topLevelObject(): Decl {
         return declaration().also {
             semis(atLeastOne = false)
         }
@@ -121,7 +121,7 @@ interface KotlinParser : KotlinLexer {
     // typeAlias
     //    : modifiers? TYPE_ALIAS NL* simpleIdentifier (NL* typeParameters)? NL* ASSIGNMENT NL* type
     //    ;
-    fun typeAlias(): DeclNode {
+    fun typeAlias(): Decl {
         val modifiers = modifiers(atLeastOne = false)
         expect("typealias")
         NLs()
@@ -144,10 +144,13 @@ interface KotlinParser : KotlinLexer {
     //    | propertyDeclaration
     //    | typeAlias
     //    ;
-    fun declaration(): DeclNode {
+    fun declaration(): Decl {
         debug("TODO: declaration")
         if (matches("typealias")) {
             return typeAlias()
+        }
+        if (matches("var") || matches("val")) {
+            return propertyDeclaration()
         }
         return OR(
             { functionDeclaration() },
@@ -206,7 +209,7 @@ interface KotlinParser : KotlinLexer {
     //classBody
     //    : LCURL NL* classMemberDeclarations NL* RCURL
     //    ;
-    fun classBody(): List<DeclNode> {
+    fun classBody(): List<Decl> {
         return expectAndRecover("{", "}") {
             NLs()
             classMemberDeclarations().also { NLs() }
@@ -353,7 +356,7 @@ interface KotlinParser : KotlinLexer {
     //classMemberDeclarations
     //    : (classMemberDeclaration semis?)*
     //    ;
-    fun classMemberDeclarations(): List<DeclNode> {
+    fun classMemberDeclarations(): List<Decl> {
         return zeroOrMore {
             classMemberDeclaration().also {
                 semis(atLeastOne = false)
@@ -367,7 +370,7 @@ interface KotlinParser : KotlinLexer {
     //    | anonymousInitializer
     //    | secondaryConstructor
     //    ;
-    fun classMemberDeclaration(): DeclNode {
+    fun classMemberDeclaration(): Decl {
         return OR(
             { declaration() },
             { companionObject() },
@@ -439,7 +442,7 @@ interface KotlinParser : KotlinLexer {
     //      (NL* typeConstraints)?
     //      (NL* functionBody)?
     //    ;
-    fun functionDeclaration(): DeclNode {
+    fun functionDeclaration(): Decl {
         debug("TODO: functionDeclaration")
         expect("fun")
         opt {
@@ -504,28 +507,28 @@ interface KotlinParser : KotlinLexer {
     //multiVariableDeclaration
     //    : LPAREN NL* variableDeclaration (NL* COMMA NL* variableDeclaration)* (NL* COMMA)? NL* RPAREN
     //    ;
-    fun multiVariableDeclaration(): VariableDecls {
+    fun multiVariableDeclaration(): MultiVariableDecl {
         val vars = arrayListOf<VariableDecl>()
         expectAndRecover("(", ")") {
             NLs()
             vars += variableDeclaration()
             while (hasMore) {
                 NLs()
+                if (expectOpt(")")) {
+                    skip(-1)
+                    break
+                }
                 if (expectOpt(",")) {
                     NLs()
-                    if (expectOpt(")")) {
-                        skip(-1)
-                        break
-                    }
                     vars += variableDeclaration()
                 }
             }
         }
-        return VariableDecls(vars)
+        return MultiVariableDecl(vars)
     }
 
-    fun variableDeclarationOrMultiVariableDeclaration(): VariableDecls {
-        return OR({ VariableDecls(variableDeclaration()) }, { multiVariableDeclaration() })
+    fun variableDeclarationOrMultiVariableDeclaration(): VariableDeclBase {
+        return OR({ variableDeclaration() }, { multiVariableDeclaration() })
     }
 
     //propertyDeclaration
@@ -540,28 +543,36 @@ interface KotlinParser : KotlinLexer {
     //      | setter? (NL* semi? getter)?
     //      )
     //    ;
-    fun propertyDeclaration(): VariableDecls {
+    fun propertyDeclaration(): VariableDeclBase {
         debug("TODO: propertyDeclaration")
         modifiers(atLeastOne = false)
         expectAny("val", "var")
         opt { NLs(); typeParameters() }
         opt { NLs(); receiverType(); NLs(); DOT() }
-        val decls = opt { NLs(); OR({ multiVariableDeclaration() }, { VariableDecls(variableDeclaration()) }) }
+        NLs()
+        val decl = OR({ multiVariableDeclaration() }, { variableDeclaration() })
         opt { typeConstraints() }
-        opt { NLs(); OR({ ASSIGNMENT(); NLs(); expression() }, { propertyDelegate() }) }
+        var delegation = false
+        NLs()
+        val expr = if (matches("by")) {
+            delegation = true
+            propertyDelegate()
+        } else {
+            opt { ASSIGNMENT(); NLs(); expression() }
+        }
         opt { NLs(); SEMICOLON() }
         NLs()
-        OR(
-            {
-                opt { getter() }
-                opt { NLs(); semiOpt(); setter() }
-            },
-            {
-                opt { setter() }
-                opt { NLs(); semiOpt(); getter() }
-            },
-        )
-        return decls ?: VariableDecls()
+        zeroOrMore {
+            modifiers(atLeastOne = false)
+            if (matches("get")) {
+                getter()
+            } else if (matches("set")) {
+                setter()
+            }
+            NLs()
+            semiOpt()
+        }
+        return decl.let { if (expr != null) it.withAssignment(expr, delegation = delegation) else it }
     }
 
     //propertyDelegate
@@ -669,7 +680,7 @@ interface KotlinParser : KotlinLexer {
     //      (NL* COLON NL* delegationSpecifiers)?
     //      (NL* classBody)?
     //    ;
-    fun objectDeclaration(): DeclNode {
+    fun objectDeclaration(): Decl {
         debug("TODO: objectDeclaration")
         opt { modifiers() }
         expect("object")
@@ -722,7 +733,7 @@ interface KotlinParser : KotlinLexer {
     //enumClassBody
     //    : LCURL NL* enumEntries? (NL* SEMICOLON NL* classMemberDeclarations)? NL* RCURL
     //    ;
-    fun enumClassBody(): List<DeclNode> {
+    fun enumClassBody(): List<Decl> {
         debug("TODO: enumClassBody")
         expect("{")
         NLs()
@@ -1001,6 +1012,9 @@ interface KotlinParser : KotlinLexer {
             OR({ label() }, { annotation() })
         }
         NLs()
+        if (matches("var") || matches("val")) {
+            return DeclStm(declaration())
+        }
         return OR(
             { loopStatement() },
             { DeclStm(declaration()) },
@@ -1066,7 +1080,7 @@ interface KotlinParser : KotlinLexer {
         NLs()
         var annotations: List<Node> = emptyList()
         var expr: Expr = EmptyExpr()
-        var vardecl: VariableDecls? = null
+        var vardecl: VariableDeclBase? = null
         expectAndRecoverSure("(", ")") {
             annotations = annotations()
             vardecl = variableDeclarationOrMultiVariableDeclaration()

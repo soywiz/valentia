@@ -182,28 +182,36 @@ enum class AnnotationUseSite(override val id: String) : Modifier {
 
 // Decl
 
-open class DeclNode : Node()
+open class Decl : Node()
 
 data class TypeAliasDecl(
     val id: String,
     val type: TypeNode,
     val types: List<TypeParameter>? = null,
     val modifiers: List<Any> = emptyList()
-) : DeclNode()
-data class ConstructorDecl(val params: List<FuncValueParam>, val body: Stm?) : DeclNode()
-data class InitDecl(val stm: Stm) : DeclNode()
-data class CompanionObjectDecl(val name: String?) : DeclNode()
+) : Decl()
+data class ConstructorDecl(val params: List<FuncValueParam>, val body: Stm?) : Decl()
+data class InitDecl(val stm: Stm) : Decl()
+data class CompanionObjectDecl(val name: String?) : Decl()
 data class ClassDecl(
     val kind: String,
     val name: String,
     val subTypes: List<SubTypeInfo>? = null,
-    val body: List<DeclNode>? = null,
-) : DeclNode()
-data class ObjectDecl(val name: String) : DeclNode()
-data class FunDecl(val name: String, val params: List<FuncValueParam> = emptyList(), val body: Stm? = null) : DeclNode()
-data class VariableDecl(val id: String, val type: TypeNode?) : DeclNode()
-data class VariableDecls(val decls: List<VariableDecl>) : DeclNode() {
-    constructor(vararg decls: VariableDecl) : this(decls.toList())
+    val body: List<Decl>? = null,
+) : Decl()
+data class ObjectDecl(val name: String) : Decl()
+data class FunDecl(val name: String, val params: List<FuncValueParam> = emptyList(), val body: Stm? = null) : Decl()
+sealed abstract class VariableDeclBase : Decl()
+data class VariableDecl(val id: String, val type: TypeNode? = null, val expr: Expr? = null, val delegation: Boolean = false) : VariableDeclBase()
+data class MultiVariableDecl(val decls: List<VariableDecl>, val expr: Expr? = null, val delegation: Boolean = false) : VariableDeclBase() {
+    constructor(vararg decls: VariableDecl, expr: Expr? = null) : this(decls.toList(), expr)
+}
+fun <T : VariableDeclBase> T.withAssignment(expr: Expr, delegation: Boolean = false): T {
+    return when (this) {
+        is VariableDecl -> this.copy(expr = expr, delegation = delegation) as T
+        is MultiVariableDecl -> this.copy(expr = expr, delegation = delegation) as T
+        else -> TODO()
+    }
 }
 
 // ID
@@ -227,7 +235,7 @@ data class TypeArgumentsAssignableSuffixExpr(val expr: Expr, val types: List<Typ
 data class CallableReferenceExt(val type: TypeNode?, val kind: String) : Expr()
 data class ObjectLiteralExpr(
     val delegationSpecifiers: List<SubTypeInfo>? = null,
-    val body: List<DeclNode>? = null,
+    val body: List<Decl>? = null,
     val isData: Boolean = false,
 ) : Expr()
 data class WhenExpr(
@@ -331,13 +339,13 @@ data class Stms(val stms: List<Stm>) : Stm() {
 data class EmptyStm(val dummy: Unit = Unit) : Stm()
 
 data class ExprStm(val expr: Expr) : Stm()
-data class DeclStm(val decl: DeclNode) : Stm()
+data class DeclStm(val decl: Decl) : Stm()
 
 abstract class LoopStm : Stm() {
 }
 
 /** Iterates over a collection */
-data class ForLoopStm(val expr: Expr, val vardecl: VariableDecls?, val body: Stm? = null, val annotations: List<Node> = emptyList()) : LoopStm() {
+data class ForLoopStm(val expr: Expr, val vardecl: VariableDeclBase?, val body: Stm? = null, val annotations: List<Node> = emptyList()) : LoopStm() {
 }
 
 /** Executes 0 or more times */
