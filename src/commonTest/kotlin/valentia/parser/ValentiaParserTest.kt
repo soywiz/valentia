@@ -22,7 +22,7 @@ class ValentiaParserTest : StmBuilder {
                 fun test(a: Int, b: Int): Int {
                     return when (a + b) {
                         1 -> "a"
-                        2 -> 'b' 
+                        2 -> 'b'
                     }
                 }
             """) as? Any?
@@ -33,7 +33,7 @@ class ValentiaParserTest : StmBuilder {
     fun testStatements() {
         assertEquals(
             listOf(
-                WHILE(true.lit) { STM("println".id(2.lit)) }
+                WHILE(true.lit, compact = false) { STM("println".id(2.lit)) }
             ),
             ValentiaParser.statements("""
                 //for (n in 0 until 10) println(1)

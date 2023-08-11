@@ -3,6 +3,7 @@ package valentia.ast
 interface StmBuilder : NodeBuilder {
     companion object {
         fun buildStms(block: StmBuilder.() -> Unit): Stms = Stms(buildStmList(block))
+        fun buildStm(compact: Boolean, block: StmBuilder.() -> Unit): Stm = if (compact) buildStmCompact(block) else buildStms(block)
         fun buildStmCompact(block: StmBuilder.() -> Unit): Stm = buildStmList(block).compact()
         fun buildStmList(block: StmBuilder.() -> Unit): List<Stm> {
             val stms = arrayListOf<Stm>()
@@ -30,7 +31,9 @@ interface StmBuilder : NodeBuilder {
 
     fun STM(expr: Expr): ExprStm = ExprStm(expr).addStm()
     fun STM(decl: Decl): DeclStm = DeclStm(decl).addStm()
-    fun WHILE(expr: Expr, block: StmBuilder.() -> Unit): WhileLoopStm = WhileLoopStm(expr, buildStmCompact { block() }).addStm()
+    fun WHILE(expr: Expr, compact: Boolean = true, block: StmBuilder.() -> Unit): WhileLoopStm = WhileLoopStm(expr, buildStm(compact) { block() }).addStm()
+    fun FOR(id: String, expr: Expr, block: (StmBuilder.() -> Unit)? = null): ForLoopStm =
+        ForLoopStm(expr, VariableDecl(id), body = block?.let { buildStmCompact { block() } })
     fun FUN(name: String, ret: TypeNode, vararg params: Pair<String, TypeNode>, block: StmBuilder.() -> Unit = {}): FunDecl =
         FunDecl(name, params.map { FuncValueParam(it.first, it.second) }, body = buildStms { block() })
     fun RETURN(expr: Expr? = null, label: String? = null): ReturnExpr = ReturnExpr(expr, label).addStm()
