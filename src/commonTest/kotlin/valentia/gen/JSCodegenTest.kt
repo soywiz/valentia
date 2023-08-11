@@ -9,6 +9,23 @@ import kotlin.test.assertEquals
 
 class JSCodegenTest {
     @Test
+    fun testOverload() {
+        assertEquals(
+            "String\nChar",
+            genAndRunJs("""
+                fun foverload(a: Int): String { return "Int" }
+                fun foverload(a: String): String { return "String" }
+                fun foverload(a: Char): String { return "Char" }
+                fun foverload(a: Float): String { return "Float" }
+                fun main() {
+                    console.log(foverload("a"))
+                    console.log(foverload('a'))
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
     fun testReturnIf() {
         assertEquals(
             "1\n-3",

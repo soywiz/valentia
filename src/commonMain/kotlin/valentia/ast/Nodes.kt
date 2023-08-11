@@ -1,17 +1,27 @@
 package valentia.ast
 
 import valentia.parser.BaseReader
+import valentia.sema.ResolutionContext
+import valentia.sema.SymbolProvider
 
-open class Node {
+abstract class Node {
     var reader: BaseReader? = null
     var spos: Int = -1
     var epos: Int = -1
     val rangeStr: String? get() = reader?.readAbsoluteRange(spos, epos)
-
     var nodeAnnotations: List<AnnotationNodes>? = null
+
+    var _cachedType: TypeNode? = null
+
+    fun getType(resolutionContext: ResolutionContext): TypeNode {
+        if (_cachedType == null) _cachedType = getTypeUncached(resolutionContext)
+        return _cachedType!!
+    }
+
+    open fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = TODO("${this::class} $this")
 }
 
-open class ExprOrStm : Node() {
+abstract class ExprOrStm : Node() {
     fun toStm(): Stm = when (this) {
         is Stm -> this
         is Expr -> ExprStm(this)
@@ -51,9 +61,14 @@ data class FileNode(
     val _package: Identifier? = null,
     val fileAnnotations: List<AnnotationNodes> = emptyList(),
     val imports: List<ImportNode> = emptyList(),
-    val topLevelDecls: List<Node> = emptyList(),
+    val topLevelDecls: List<Decl> = emptyList(),
 ) : Node() {
-
+    val symbolsByName by lazy {
+        topLevelDecls.groupBy { it.declName }
+    }
+    val symbolProvider = SymbolProvider {
+        symbolsByName[it] ?: emptyList()
+    }
 }
 
 data class EnumEntry(val id: String) : Node()
@@ -83,15 +98,21 @@ abstract class TypeNode : Node()
 data class UnificationExprType(val exprs: List<ExprOrStm>) : TypeNode() {
     constructor(vararg exprs: ExprOrStm?) : this(exprs.filterNotNull())
 }
-data class FuncTypeNode(val suspendable: Boolean = false) : TypeNode()
+data class FuncTypeNode(val ret: TypeNode, val params: List<TypeNode>, val suspendable: Boolean = false) : TypeNode()
 data class MultiType(val types: List<TypeNode>) : TypeNode() {
     constructor(vararg types: TypeNode) : this(types.toList())
 }
-object UnknownType : TypeNode()
-object DynamicType : TypeNode()
 data class SimpleType(val name: String) : TypeNode()
 data class GenericType(val type: TypeNode, val generics: List<TypeNode>) : TypeNode()
 data class NullableType(val type: TypeNode) : TypeNode()
+
+val UnknownType = SimpleType("unknown")
+val DynamicType = SimpleType("dynamic")
+val BoolType = SimpleType("Boolean")
+val CharType = SimpleType("Char")
+val StringType = SimpleType("String")
+val IntType = SimpleType("Int")
+val FloatType = SimpleType("Float")
 
 fun FuncTypeNode.suspendable(): FuncTypeNode = this.copy(suspendable = true)
 
@@ -182,28 +203,40 @@ enum class AnnotationUseSite(override val id: String) : Modifier {
 
 // Decl
 
-open class Decl : Node()
+open class Decl(val declName: String) : Node() {
+    open val jsName: String get() = declName
+}
 
 data class TypeAliasDecl(
     val id: String,
     val type: TypeNode,
     val types: List<TypeParameter>? = null,
     val modifiers: List<Any> = emptyList()
-) : Decl()
-data class ConstructorDecl(val params: List<FuncValueParam>, val body: Stm?) : Decl()
-data class InitDecl(val stm: Stm) : Decl()
-data class CompanionObjectDecl(val name: String?) : Decl()
+) : Decl(id)
+data class ConstructorDecl(val params: List<FuncValueParam>, val body: Stm?) : Decl("constructor")
+data class InitDecl(val stm: Stm) : Decl("init")
+data class CompanionObjectDecl(val name: String?) : Decl(name ?: "companion object")
 data class ClassDecl(
     val kind: String,
     val name: String,
     val subTypes: List<SubTypeInfo>? = null,
     val body: List<Decl>? = null,
-) : Decl()
-data class ObjectDecl(val name: String) : Decl()
-data class FunDecl(val name: String, val params: List<FuncValueParam> = emptyList(), val body: Stm? = null) : Decl()
-sealed abstract class VariableDeclBase : Decl()
-data class VariableDecl(val id: String, val type: TypeNode? = null, val expr: Expr? = null, val delegation: Boolean = false) : VariableDeclBase()
-data class MultiVariableDecl(val decls: List<VariableDecl>, val expr: Expr? = null, val delegation: Boolean = false) : VariableDeclBase() {
+) : Decl(name)
+data class ObjectDecl(val name: String) : Decl(name)
+data class FunDecl(val name: String, val params: List<FuncValueParam> = emptyList(), val body: Stm? = null) : Decl(name) {
+    val jsHash by lazy { params.map { it.type }.hashCode() and 0x7FFFFFFF }
+    override val jsName by lazy {
+        if (params.isEmpty()) name else "$name\$${jsHash.toString(16)}"
+    }
+
+    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+        return FuncTypeNode(UnknownType, params.map { it.type })
+        //TODO("${this::class} $this")
+    }
+}
+sealed abstract class VariableDeclBase(declName: String) : Decl(declName)
+data class VariableDecl(val id: String, val type: TypeNode? = null, val expr: Expr? = null, val delegation: Boolean = false) : VariableDeclBase(id)
+data class MultiVariableDecl(val decls: List<VariableDecl>, val expr: Expr? = null, val delegation: Boolean = false) : VariableDeclBase(decls.joinToString(",") { it.declName }) {
     constructor(vararg decls: VariableDecl, expr: Expr? = null) : this(decls.toList(), expr)
 }
 fun <T : VariableDeclBase> T.withAssignment(expr: Expr, delegation: Boolean = false): T {
@@ -291,16 +324,24 @@ data class OpSeparatedExprs(val ops: List<String>, val exprs: List<Expr>) : Expr
 open class LiteralExpr(val literal: Any?) : Expr()
 
 data class NullLiteralExpr(val dummy: Unit = Unit) : LiteralExpr(null)
-data class BoolLiteralExpr(val value: Boolean) : LiteralExpr(value)
-data class CharLiteralExpr(val value: Char) : LiteralExpr(value)
+data class BoolLiteralExpr(val value: Boolean) : LiteralExpr(value) {
+    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = BoolType
+}
+data class CharLiteralExpr(val value: Char) : LiteralExpr(value) {
+    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = CharType
+}
 data class IntLiteralExpr(val value: Long, val isLong: Boolean = false, val isUnsigned: Boolean = false) : LiteralExpr(value) {
     override fun toString(): String = "IntLiteralExpr($value${if (isUnsigned) "U" else ""}${if (isLong) "L" else ""})"
+    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = IntType
 }
-data class StringLiteralExpr(val value: String) : LiteralExpr(value)
+data class StringLiteralExpr(val value: String) : LiteralExpr(value) {
+    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = StringType
+}
 data class InterpolatedStringExpr(val chunks: List<Chunk>) : Expr() {
     interface Chunk
     data class StringChunk(val string: String) : Chunk
     data class ExpressionChunk(val expr: Expr) : Chunk
+    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = StringType
 }
 
 open class IncompleteExpr(val message: String) : Expr()

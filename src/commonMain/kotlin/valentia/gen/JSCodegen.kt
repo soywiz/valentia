@@ -44,7 +44,7 @@ open class JSCodegen : Codegen(), Indenter by Indenter() {
 
     override fun generateFunction(func: FunDecl) {
         val params = func.params.joinToString(", ") { it.id }
-        line("function ${func.name}($params)") {
+        line("function ${func.jsName}($params)") {
             func.body?.let {
                 generateStmsCompact(transformer.transform(it))
             }
@@ -132,7 +132,7 @@ open class JSCodegen : Codegen(), Indenter by Indenter() {
         }
     }
 
-    override fun generateExpr(expr: Expr): String {
+    override fun generateExpr(expr: Expr): Any {
         return super.generateExpr(expr)
     }
 }

@@ -1829,7 +1829,10 @@ interface KotlinParser : KotlinLexer {
     //    : lambdaLiteral
     //    | anonymousFunction
     //    ;
-    fun functionLiteral(): Expr = OR({ lambdaLiteral() }, { anonymousFunction() })
+    fun functionLiteral(): Expr {
+        if (matches("{")) return lambdaLiteral()
+        return anonymousFunction()
+    }
 
     //objectLiteral
     //    : DATA? NL* OBJECT (NL* COLON NL* delegationSpecifiers NL*)? (NL* classBody)?

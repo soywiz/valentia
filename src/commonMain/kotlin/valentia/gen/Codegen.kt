@@ -1,9 +1,7 @@
 package valentia.gen
 
 import valentia.ast.*
-import valentia.sema.Module
-import valentia.sema.Package
-import valentia.sema.Program
+import valentia.sema.*
 
 open class Codegen {
     open fun supportedNode(node: Node): Boolean {
@@ -27,11 +25,25 @@ open class Codegen {
         }
     }
 
+    var symbolProvider: SymbolProvider = EmptySymbolProvider
+
+    fun <T> pushSymbolProvider(symbolProvider: SymbolProvider, block: () -> T): T {
+        val parent = this.symbolProvider
+        try {
+            this.symbolProvider = this.symbolProvider + symbolProvider
+            return block()
+        } finally {
+            this.symbolProvider = parent
+        }
+    }
+
     open fun generateFile(file: FileNode) {
-        for (decl in file.topLevelDecls) {
-            when (decl) {
-                is ClassDecl -> generateClass(decl)
-                is FunDecl -> generateFunction(decl)
+        pushSymbolProvider(file.symbolProvider) {
+            for (decl in file.topLevelDecls) {
+                when (decl) {
+                    is ClassDecl -> generateClass(decl)
+                    is FunDecl -> generateFunction(decl)
+                }
             }
         }
     }
@@ -42,11 +54,28 @@ open class Codegen {
     }
     open fun generateStm(stm: Stm) {
     }
-    open fun generateExpr(expr: Expr): String {
+
+    data class IdWithContext(val id: String, val context: SymbolProvider) {
+        fun resolve(): List<Decl>? = context[id]
+        fun resolve(funcType: TypeNode): Decl? {
+            val items = resolve() ?: return null
+            for (item in items) {
+                // @TODO: Compat
+                if (funcType == item.getType(DummyResolutionContext)) {
+                    return item
+                }
+            }
+            return null
+        }
+        override fun toString(): String = id
+    }
+
+    open fun generateExpr(expr: Expr): Any {
         return when (expr) {
-            is IdentifierExpr -> expr.id
+            is IdentifierExpr -> IdWithContext(expr.id, symbolProvider)
             is BoolLiteralExpr -> "${expr.value}"
             is IntLiteralExpr -> "${expr.value}"
+            is CharLiteralExpr -> "${expr.value.code}"
             is StringLiteralExpr -> "\"${expr.value}\"" // @TODO: Escaping
             is UnaryPostOpExpr -> {
                 val exprStr = generateExpr(expr.expr)
@@ -65,12 +94,24 @@ open class Codegen {
             }
             is OpSeparatedExprs -> {
                 val exprStrs = expr.exprs.map { generateExpr(it) }
-                exprStrs[0] + " " + (0 until expr.ops.size).joinToString(" ") {
+                exprStrs[0].toString() + " " + (0 until expr.ops.size).joinToString(" ") {
                     expr.ops[it] + " " + exprStrs[it + 1]
                 }
             }
             is CallExpr -> {
-                generateExpr(expr.expr) + "(" + expr.params.joinToString(", ") { generateExpr(it) } + ")"
+                //val symbols = symbolProvider[expr.id]
+                //println("expr.id=${expr.id} : $symbols")
+
+                val res = generateExpr(expr.expr)
+                val paramsStr = "(" + expr.params.joinToString(", ") { generateExpr(it).toString() } + ")"
+                if (res is IdWithContext) {
+                    val funcType = FuncTypeNode(UnknownType, expr.params.map { it.getType(DummyResolutionContext) })
+                    val resolved = res.resolve(funcType) ?: error("Can't resolve $funcType")
+                    println("RESOLVE: $funcType : $resolved")
+                    resolved!!.jsName + paramsStr
+                } else {
+                    res.toString() + paramsStr
+                }
             }
             is NavigationExpr -> {
                 if (expr.op != ".") error("Unsupported ${expr.op}")
