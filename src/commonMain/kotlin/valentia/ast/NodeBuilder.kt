@@ -37,6 +37,19 @@ interface StmBuilder : NodeBuilder {
     fun FUN(name: String, ret: TypeNode, vararg params: Pair<String, TypeNode>, block: StmBuilder.() -> Unit = {}): FunDecl =
         FunDecl(name, params.map { FuncValueParam(it.first, it.second) }, body = buildStms { block() })
     fun RETURN(expr: Expr? = null, label: String? = null): ReturnExpr = ReturnExpr(expr, label).addStm()
+    fun WHEN(expr: Expr? = null, block: WhenBuilder.() -> Unit): WhenExpr {
+        val builder = WhenBuilder().also(block)
+        return WhenExpr(WhenExpr.Subject(expr), builder.entries)
+    }
+}
+
+class WhenBuilder {
+    val entries = arrayListOf<WhenExpr.Entry>()
+    fun CASE(expr: Expr, body: ExprOrStm): WhenExpr.Entry {
+        return WhenExpr.Entry(listOf(WhenExpr.Condition(expr = expr)), body.toStm()).also {
+            entries += it
+        }
+    }
 }
 
 interface NodeBuilder {
@@ -59,6 +72,7 @@ interface NodeBuilder {
     val IntType: TypeNode get() = "Int".type
     val Boolean.lit: BoolLiteralExpr get() = BoolLiteralExpr(this)
     val Int.lit: IntLiteralExpr get() = IntLiteralExpr(this.toLong())
+    val Char.lit: CharLiteralExpr get() = CharLiteralExpr(this)
     val Long.lit: IntLiteralExpr get() = IntLiteralExpr(this, isLong = true)
     val String.lit: StringLiteralExpr get() = StringLiteralExpr(this)
     val String.id: IdentifierExpr get() = IdentifierExpr(this)

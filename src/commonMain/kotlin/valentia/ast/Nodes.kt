@@ -11,14 +11,13 @@ abstract class Node {
     val rangeStr: String? get() = reader?.readAbsoluteRange(spos, epos)
     var nodeAnnotations: List<AnnotationNodes>? = null
 
-    var _cachedType: TypeNode? = null
-
+    private var _cachedType: TypeNode? = null
+    protected open fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode =
+        TODO("${this::class} $this")
     fun getType(resolutionContext: ResolutionContext): TypeNode {
         if (_cachedType == null) _cachedType = getTypeUncached(resolutionContext)
         return _cachedType!!
     }
-
-    open fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = TODO("${this::class} $this")
 }
 
 abstract class ExprOrStm : Node() {
@@ -315,7 +314,14 @@ data class CastExpr(val expr: Expr, val targetType: TypeNode, val kind: String) 
 data class CallExpr(val expr: Expr, val params: List<Expr>, val lambdaArg: Expr? = null, val typeArgs: List<TypeNode>? = null) : Expr()
 data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : AssignableExpr()
 data class UnaryPostOpExpr(val expr: Expr, val op: UnaryPostOp) : Expr()
-data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr()
+data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr() {
+    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+        val type = expr.getType(resolutionContext)
+        if (type == IntType) return type
+        TODO("UnaryPreOpExpr type=$type, expr=$expr")
+        return super.getTypeUncached(resolutionContext)
+    }
+}
 
 data class IdentifierExpr(val id: String) : AssignableExpr()
 

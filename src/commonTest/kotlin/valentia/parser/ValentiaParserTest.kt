@@ -17,8 +17,13 @@ class ValentiaParserTest : StmBuilder {
     @Test
     fun test3() {
         assertEquals(
-            null,
-            ValentiaParser.statements("""
+            STM(FUN("test", IntType, "a" to IntType, "b" to IntType) {
+                RETURN(WHEN("a".id + "b".id) {
+                    CASE(1.lit, "a".lit)
+                    CASE(2.lit, 'b'.lit)
+                })
+            }),
+            ValentiaParser.statement("""
                 fun test(a: Int, b: Int): Int {
                     return when (a + b) {
                         1 -> "a"
