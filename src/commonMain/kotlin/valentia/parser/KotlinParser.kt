@@ -1655,18 +1655,44 @@ interface KotlinParser : KotlinLexer {
         when (expectAnyOpt(TRIPLE_QUOTE, QUOTE)) {
             TRIPLE_QUOTE -> TODO("TRIPLE_QUOTE")
             QUOTE -> {
+                val chunks = arrayListOf<InterpolatedStringExpr.Chunk>()
                 val str = StringBuilder()
+                fun flush() {
+                    if (str.isNotEmpty()) {
+                        chunks.add(InterpolatedStringExpr.StringChunk(str.toString()))
+                        str.clear()
+                    }
+                }
                 while (hasMore) {
                     val c = readChar()
                     when (c) {
                         '"' -> break
                         '\\' -> TODO("Missing quoted strings")
-                        '\$' -> TODO("Missing dollar strings")
+                        '\$' -> {
+                            flush()
+                            val expr = when {
+                                peekChar() == '{' -> {
+                                    expectAndRecoverSure("{", "}") {
+                                        expression()
+                                    }
+                                }
+                                else -> {
+                                    IdentifierExpr(Identifier())
+                                }
+                            }
+                            chunks += InterpolatedStringExpr.ExpressionChunk(expr)
+                        }
                         else -> str.append(c)
                     }
                 }
-                //println("str='$str', this=$this")
-                StringLiteralExpr(str.toString())
+                flush()
+                if (chunks.isEmpty()) {
+                    StringLiteralExpr("")
+                } else if (chunks.size == 1 && chunks.first() is InterpolatedStringExpr.StringChunk) {
+                    StringLiteralExpr((chunks.first() as InterpolatedStringExpr.StringChunk).string)
+                } else {
+                    InterpolatedStringExpr(chunks)
+                }
             }
             else -> error("Not a string literal")
         }

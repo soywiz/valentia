@@ -251,6 +251,11 @@ data class IntLiteralExpr(val value: Long, val isLong: Boolean = false, val isUn
     override fun toString(): String = "IntLiteralExpr($value${if (isUnsigned) "U" else ""}${if (isLong) "L" else ""})"
 }
 data class StringLiteralExpr(val value: String) : LiteralExpr(value)
+data class InterpolatedStringExpr(val chunks: List<Chunk>) : Expr() {
+    interface Chunk
+    data class StringChunk(val string: String) : Chunk
+    data class ExpressionChunk(val expr: Expr) : Chunk
+}
 
 open class IncompleteExpr(val message: String) : Expr()
 open class EmptyExpr : Expr()

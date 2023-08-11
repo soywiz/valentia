@@ -40,6 +40,18 @@ interface NodeBuilder {
         operator fun <T> invoke(block: NodeBuilder.() -> T): T = block(NodeBuilder)
     }
 
+    fun STR(vararg chunks: Any?): Expr {
+        if (chunks.size == 0) return StringLiteralExpr("")
+        if (chunks.size == 1 && chunks.first() is String) return StringLiteralExpr(chunks[0].toString())
+        return InterpolatedStringExpr(chunks.map {
+            when (it) {
+                is String -> InterpolatedStringExpr.StringChunk(it)
+                is Expr -> InterpolatedStringExpr.ExpressionChunk(it)
+                is InterpolatedStringExpr.Chunk -> it
+                else -> TODO()
+            }
+        })
+    }
     val IntType: TypeNode get() = "Int".type
     val Boolean.lit: BoolLiteralExpr get() = BoolLiteralExpr(this)
     val Int.lit: IntLiteralExpr get() = IntLiteralExpr(this.toLong())
