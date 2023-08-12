@@ -7,3 +7,4 @@
 * Step 4: Recovery, LSP?
 * Step 5: New features: static if, Numeric coercion, etc.
 
+* [ ] Use a tokenizer to make it faster and simpler
