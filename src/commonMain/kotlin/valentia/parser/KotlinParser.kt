@@ -160,12 +160,12 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun declaration(): Decl {
         debug("TODO: declaration")
         NLs()
-        if (matches("fun")) return functionDeclaration()
         if (matches("typealias")) return typeAlias()
         if (matches("class")) return classDeclaration()
         if (matches("interface")) return classDeclaration()
         if (matches("object")) return objectDeclaration()
         if (matches("var") || matches("val")) return propertyDeclaration()
+        //if (matches("fun")) return functionDeclaration()
         return OR(
             { functionDeclaration() },
             { classDeclaration() },
@@ -583,6 +583,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun functionBody(): Stm? {
         NLs()
         if (expectOpt("=")) {
+            NLs()
             return ReturnStm(expression())
         } else if (matches("{")) {
             return block()
@@ -1044,6 +1045,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
                 MULT()
                 SimpleType("*")
             },
+            name = "typeProjection"
         )
     }
 
@@ -1247,7 +1249,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             expr = expression()
         }
         NLs()
-        val body = opt { controlStructureBody() }
+
+        val body = if (expectOpt(";")) null else opt { controlStructureBody() }
         //val body = controlStructureBody()
         ForLoopStm(expr, vardecl, body, annotations)
     }
@@ -1579,12 +1582,23 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun directlyAssignableExpression(): AssignableExpr {
         //println("TODO: directlyAssignableExpression")
-        return OR(
-            { parenthesizedDirectlyAssignableExpression() },
-            { assignableSuffix(postfixUnaryExpression()) },
-            { IdentifierExpr(simpleIdentifier()) },
-            name = "directlyAssignableExpression"
-        )
+        return if (matches("(")) {
+            parenthesizedDirectlyAssignableExpression()
+        } else {
+            val expr = postfixUnaryExpression()
+            if (expr is AssignableExpr) {
+                expr
+            } else {
+                assignableSuffix(expr)
+            }
+        }
+
+        //return OR(
+        //    { parenthesizedDirectlyAssignableExpression() },
+        //    { assignableSuffix(postfixUnaryExpression()) },
+        //    { IdentifierExpr(simpleIdentifier()) },
+        //    name = "directlyAssignableExpression"
+        //)
     }
 
     //parenthesizedDirectlyAssignableExpression
@@ -1630,11 +1644,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | indexingSuffix
     //    | navigationSuffix
     //    ;
-    fun assignableSuffix(expr: Expr): AssignableExpr = OR(
-        { TypeArgumentsAssignableSuffixExpr(expr, typeArguments()) },
-        { indexingSuffix(expr) },
-        { navigationSuffix(expr) }
-    )
+    fun assignableSuffix(expr: Expr): AssignableExpr {
+        return when {
+            matches("<") -> TypeArgumentsAssignableSuffixExpr(expr, typeArguments())
+            matches("[") -> indexingSuffix(expr)
+            matches("::") || matches("?.") || matches(".") -> navigationSuffix(expr)
+            else -> error("Not assignable suffix $this")
+        }
+    }
 
     //indexingSuffix
     //    : LSQUARE NL* expression (NL* COMMA NL* expression)* (NL* COMMA)? NL* RSQUARE
@@ -1696,14 +1713,13 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : LANGLE NL* typeProjection (NL* COMMA NL* typeProjection)* (NL* COMMA)? NL* RANGLE
     //    ;
     fun typeArguments(): List<TypeNode> {
-        return expectAndRecover("<", ">") {
+        //println("${this.tokens}")
+        return expectAndRecoverSure("<", ">") {
             NLs()
-            parseList(oneOrMore = true, separator = { expectOpt(",") }, doBreak = { matches(">") }) {
+            parseListNew(trailingSeparator = true) {
                 typeProjection()
-            }.also {
-                NLs()
-            }
-        } ?: error("")
+            }.also { NLs() }
+        }
     }
 
     //valueArguments
@@ -1762,7 +1778,6 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         if (matches("when")) return whenExpression()
         if (matches("try")) return tryExpression()
         if (matches("super")) return superExpression()
-        if (matches("this")) return thisExpression()
         if (matches("{")) return functionLiteral()
         //if (matches("suspend")) return functionLiteral()
         if (matches("fun")) return functionLiteral()
@@ -1953,25 +1968,27 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun lambdaLiteral(): Expr {
         debug("TODO: lambdaLiteral")
-        expectAndRecover("{", "}") {
-            opt {
+        val (params, stms) = expectAndRecoverSure("{", "}") {
+            val params = opt {
                 NLs()
-                opt { lambdaParameters() }
-                NLs()
-                ARROW()
-                NLs()
+                opt { lambdaParameters() }.also {
+                    NLs()
+                    ARROW()
+                    NLs()
+                }
             }
-            statements()
+            val stms = statements(oneOrMore = false)
             NLs()
+            params to stms
         }
-        return IncompleteExpr("lambdaLiteral")
+        return LambdaFunctionExpr(stms, params)
     }
 
     //lambdaParameters
     //    : lambdaParameter (NL* COMMA NL* lambdaParameter)* (NL* COMMA)?
     //    ;
     fun lambdaParameters(): List<Unit> {
-        return parseList(oneOrMore = true) { lambdaParameter() }
+        return parseListNew(trailingSeparator = true) { lambdaParameter() }
     }
 
     //lambdaParameter
@@ -1979,18 +1996,18 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | multiVariableDeclaration (NL* COLON NL* type)?
     //    ;
     fun lambdaParameter(): VariableDeclBase {
-        return OR(
-            {
-                val mvd = multiVariableDeclaration();
-                NLs(); COLON();
-                NLs();
-                val type = type()
-                mvd.copy(type = type)
-            },
-            {
-                variableDeclaration()
+        if (matches("(")) {
+            val mvd = multiVariableDeclaration();
+            val type = opt {
+                NLs()
+                COLON()
+                NLs()
+                type()
             }
-        )
+            return mvd.copy(type = type)
+        } else {
+            return variableDeclaration()
+        }
     }
 
     //anonymousFunction
@@ -2211,7 +2228,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val body = block()
         val catches = zeroOrMore { NLs(); catchBlock() }
         NLs()
-        val finally = finallyBlock()
+        val finally = opt { finallyBlock() }
         return TryCatchExpr(body, catches, finally)
     }
 
@@ -3688,6 +3705,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //mode DEFAULT_MODE;
     //
     //ErrorCharacter: .;
+
+    override fun EOF() {
+        NLs()
+        check(eof) { "Not EOF found but ${peek()}" }
+    }
 
     companion object {
         val HARD_KEYWORDS = setOf(

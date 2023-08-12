@@ -1,7 +1,6 @@
 package valentia.ast
 
 import valentia.parser.BaseConsumer
-import valentia.parser.BaseReader
 import valentia.sema.ResolutionContext
 import valentia.sema.SymbolProvider
 
@@ -315,6 +314,8 @@ data class Identifier(val parts: List<String>) : Expr() {
 
 abstract class Expr : ExprOrStm()
 
+data class LambdaFunctionExpr(val stms: List<Stm> = emptyList(), val params: List<Unit>? = null) : Expr()
+
 data class AnonymousFunctionExpr(val decl: FunDecl) : Expr()
 
 abstract class AssignableExpr : Expr()
@@ -338,7 +339,7 @@ data class WhenExpr(
     data class Condition(val op: String? = null, val expr: Expr = EmptyExpr())
 }
 data class CollectionLiteralExpr(val items: List<Expr>) : Expr()
-data class TryCatchExpr(val body: Node, val catches: List<Catch> = emptyList(), val finally: Stm = EmptyStm()) : Expr() {
+data class TryCatchExpr(val body: Node, val catches: List<Catch> = emptyList(), val finally: Stm? = null) : Expr() {
     data class Catch(val local: String, val type: TypeNode, val body: Stm)
 }
 data class Temp(val type: TypeNode) : Expr()

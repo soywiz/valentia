@@ -31,4 +31,12 @@ open class ValentiaParserTypeTest {
             ValentiaParser.type("(Int) -> T") as Any?
         )
     }
+
+    @Test
+    fun testTypeGenerics() {
+        assertEquals(
+            null,
+            ValentiaParser.type("LinkedHashMap<String, ArrayList<Decl>>") as Any?
+        )
+    }
 }

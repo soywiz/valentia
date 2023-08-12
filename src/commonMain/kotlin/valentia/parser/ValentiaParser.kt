@@ -20,7 +20,7 @@ open class ValentiaParser(
         fun assignment(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Stm =
             ValentiaParser(str).assignment()
         fun statement(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Stm =
-            ValentiaParser(str).statement()
+            ValentiaParser(str).let { parser -> parser.statement().also { parser.EOF() } }
         fun statements(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): List<Stm> =
             ValentiaParser(str).statements()
         fun type(@Language("kotlin", prefix = "typealias Example = ", suffix = "") str: String): TypeNode =

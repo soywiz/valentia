@@ -20,4 +20,13 @@ class ValentiaParserAssignTest : StmBuilder {
             ValentiaParser.assignment("""a[11] += 12""")
         )
     }
+
+    @Test
+    fun testAssignThis() {
+        assertEquals(
+            null,
+            ValentiaParser.assignment("""this.symbolProvider = parent""") as? Any?
+        )
+    }
+
 }

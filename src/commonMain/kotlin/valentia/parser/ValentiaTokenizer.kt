@@ -110,8 +110,10 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
                 }
                 return SymbolToken(expectAny("#"))
             }
-            '<' -> return SymbolToken(expectAny("<<<", "<<=", "<=", "<<", "<"))
-            '>' -> return SymbolToken(expectAny(">>>", ">>=", ">=", ">>", ">"))
+            //'<' -> return SymbolToken(expectAny("<<<", "<<=", "<=", "<<", "<"))
+            //'>' -> return SymbolToken(expectAny(">>>", ">>=", ">=", ">>", ">"))
+            '<' -> return SymbolToken(expectAny("<<=", "<=", "<"))
+            '>' -> return SymbolToken(expectAny(">>=", ">=", ">"))
             '-' -> return SymbolToken(expectAny("-=", "->", "--", "-"))
             '+' -> return SymbolToken(expectAny("+=", "++", "+"))
             '*' -> return SymbolToken(expectAny("*=", "*"))
