@@ -161,6 +161,7 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
 sealed class Token(val str: String) {
     //override fun toString(): String = str
 }
+object EOFToken : Token("")
 data class CommentToken(val comment: String) : Token(comment)
 data class SpacesToken(val spaces: String) : Token(spaces)
 data class SymbolToken(val symbol: String) : Token(symbol)

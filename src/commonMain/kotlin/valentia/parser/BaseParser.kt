@@ -9,6 +9,40 @@ import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 
+open class TokenReader(val tokens: List<Token>) : BaseTokenReader {
+    override var pos: Int = 0
+    override val len: Int get() = tokens.size
+    override fun peek(): Token = tokens.getOrElse(pos) { EOFToken }
+}
+
+interface BaseTokenReader {
+    var pos: Int
+    val len: Int
+    fun peek(): Token
+    fun read(): Token = peek().also { pos++ }
+    fun readAbsoluteRange(start: Int, end: Int): String {
+        val oldPos = pos
+        try {
+            val out = arrayListOf<String>()
+            for (p in start until end) {
+                pos = p
+                out += peek().str
+            }
+            return out.joinToString("")
+        } finally {
+            pos = oldPos
+        }
+    }
+
+    fun matches(str: String, consume: Boolean = false): Boolean {
+        if (peek().str == str) {
+            if (consume) pos++
+            return true
+        }
+        return false
+    }
+}
+
 open class StrReader(val str: String) : BaseReader {
     override var pos: Int = 0
     override val len: Int get() = str.length

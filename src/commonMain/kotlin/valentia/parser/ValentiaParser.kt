@@ -5,12 +5,7 @@ import valentia.ast.*
 
 open class ValentiaParser(
     str: String
-) : StrReader(str), KotlinParser {
-    override fun reportError(e: Throwable) {
-        debug("reportError: PARSER ERROR: $e")
-        e.printStackTrace()
-    }
-
+) : KotlinParser(str) {
     fun valentiaFile(): FileNode = kotlinFile()
 
     companion object {
