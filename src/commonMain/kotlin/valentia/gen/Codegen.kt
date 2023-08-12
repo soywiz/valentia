@@ -105,7 +105,7 @@ open class Codegen {
                 val res = generateExpr(expr.expr)
                 val paramsStr = "(" + expr.params.joinToString(", ") { generateExpr(it).toString() } + ")"
                 if (res is IdWithContext) {
-                    val funcType = FuncTypeNode(UnknownType, expr.params.map { it.getType(DummyResolutionContext) })
+                    val funcType = FuncTypeNode(UnknownType, expr.params.map { NamedTypeNode(it.getType(DummyResolutionContext)) })
                     val resolved = res.resolve(funcType) ?: error("Can't resolve $funcType")
                     println("RESOLVE: $funcType : $resolved")
                     resolved!!.jsName + paramsStr

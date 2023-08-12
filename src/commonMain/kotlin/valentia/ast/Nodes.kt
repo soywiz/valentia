@@ -9,7 +9,7 @@ abstract class Node {
     var spos: Int = -1
     var epos: Int = -1
     val rangeStr: String? get() = reader?.readAbsoluteRange(spos, epos)
-    var nodeAnnotations: List<AnnotationNodes>? = null
+    var nodeAnnotations: Annotations? = null
 
     private var _cachedType: TypeNode? = null
     protected open fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode =
@@ -20,11 +20,18 @@ abstract class Node {
     }
 }
 
+data class Annotations(val items: List<AnnotationNodes> = emptyList()) {
+    companion object {
+        val EMPTY = Annotations()
+    }
+}
+
 data class Modifiers(val items: List<Any> = emptyList()) {
     constructor(vararg items: Any) : this(items.toList())
-    val modifiers = items.filterIsInstance<Modifier>().toSet()
-    val annotations = items.filterIsInstance<AnnotationNodes>()
-
+    val modifiers by lazy { items.filterIsInstance<Modifier>().toSet() }
+    val annotations by lazy { Annotations(items.filterIsInstance<AnnotationNodes>()) }
+    val labels by lazy { items.filterIsInstance<LabelNode>() }
+    fun isEmpty(): Boolean = items.isEmpty()
     operator fun contains(item: Modifier): Boolean = item in modifiers
 }
 
@@ -39,12 +46,12 @@ abstract class ExprOrStm : Node() {
 data class TypeConstraint(
     val id: String,
     val type: TypeNode,
-    val annotations: List<AnnotationNodes> = emptyList(),
+    val annotations: Annotations = Annotations.EMPTY,
 ) : Node()
 
 data class LabelNode(val id: String) : Node()
 
-fun <T : Node> T.annotated(annotations: List<AnnotationNodes>): T {
+fun <T : Node> T.annotated(annotations: Annotations): T {
     this.nodeAnnotations = annotations
     return this
 }
@@ -108,10 +115,21 @@ data class BasicSubTypeInfo(val type: TypeNode) : SubTypeInfo()
 
 abstract class TypeNode : Node()
 
+data class DefinitelyNonNullableType(
+    val type1: TypeNode,
+    val mods1: Modifiers,
+    val type2: TypeNode,
+    val mods2: Modifiers,
+) : TypeNode()
+
+data class NamedTypeNode(val type: TypeNode, val name: String? = null) {
+    constructor(param: Parameter) : this(param.type, param.id)
+}
+
 data class UnificationExprType(val exprs: List<ExprOrStm>) : TypeNode() {
     constructor(vararg exprs: ExprOrStm?) : this(exprs.filterNotNull())
 }
-data class FuncTypeNode(val ret: TypeNode, val params: List<TypeNode>, val suspendable: Boolean = false) : TypeNode()
+data class FuncTypeNode(val ret: TypeNode, val params: List<NamedTypeNode>, val receiver: TypeNode? = null, val suspendable: Boolean = false) : TypeNode()
 data class MultiType(val types: List<TypeNode>) : TypeNode() {
     constructor(vararg types: TypeNode) : this(types.toList())
 }
@@ -252,13 +270,18 @@ data class FunDecl constructor(
     val isSuspend: Boolean get() = FunctionModifier.SUSPEND in modifiers
 
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
-        return FuncTypeNode(UnknownType, params.map { it.type })
+        return FuncTypeNode(UnknownType, params.map { NamedTypeNode(it.type) })
         //TODO("${this::class} $this")
     }
 }
 sealed abstract class VariableDeclBase(declName: String) : Decl(declName)
-data class VariableDecl(val id: String, val type: TypeNode? = null, val expr: Expr? = null, val delegation: Boolean = false) : VariableDeclBase(id)
-data class MultiVariableDecl(val decls: List<VariableDecl>, val expr: Expr? = null, val delegation: Boolean = false) : VariableDeclBase(decls.joinToString(",") { it.declName }) {
+data class VariableDecl(val id: String, val type: TypeNode? = null, val expr: Expr? = null, val delegation: Boolean = false, val annotations: Annotations = Annotations.EMPTY) : VariableDeclBase(id)
+data class MultiVariableDecl(
+    val decls: List<VariableDecl>,
+    val expr: Expr? = null,
+    val delegation: Boolean = false,
+    val type: TypeNode? = null,
+) : VariableDeclBase(decls.joinToString(",") { it.declName }) {
     constructor(vararg decls: VariableDecl, expr: Expr? = null) : this(decls.toList(), expr)
 }
 fun <T : VariableDeclBase> T.withAssignment(expr: Expr, delegation: Boolean = false): T {
@@ -312,7 +335,9 @@ data class BreakExpr(val label: String? = null) : Expr()
 data class ContinueExpr(val label: String? = null) : Expr()
 data class ReturnExpr(val expr: Expr?, val label: String? = null) : Expr()
 data class ThrowExpr(val expr: Expr) : Expr()
+
 data class Parameter(val id: String, val type: TypeNode)
+data class ParameterOptType(val id: String, val type: TypeNode?, val modifiers: Modifiers? = null, val expr: Expr? = null)
 data class FuncValueParam(val id: String, val type: TypeNode)
 data class TypeParameter(val id: String, val type: TypeNode?)
 
@@ -387,6 +412,17 @@ data class ThisExpr(val id: Identifier?) : Expr() {
 
 open class Stm : ExprOrStm()
 
+fun Stm.withModifiers(mods: Modifiers): Stm {
+    if (mods.isEmpty()) return this
+    return when (this) {
+        is WhileLoopStm -> this.copy(modifiers = mods)
+        else -> {
+            println("TODO: Stm.withModifiers: $mods")
+            this
+        }
+    }
+}
+
 /** JavaScript for example only supports try catch statements, not expressions */
 data class TryCatchStm(val body: Stm, val catches: List<Catch> = emptyList(), val finally: Stm = EmptyStm()) : Stm() {
     data class Catch(val local: String, val type: TypeNode, val body: Stm)
@@ -415,11 +451,11 @@ abstract class LoopStm : Stm() {
 }
 
 /** Iterates over a collection */
-data class ForLoopStm(val expr: Expr, val vardecl: VariableDeclBase?, val body: Stm? = null, val annotations: List<Node> = emptyList()) : LoopStm() {
+data class ForLoopStm(val expr: Expr, val vardecl: VariableDeclBase?, val body: Stm? = null, val annotations: Annotations = Annotations.EMPTY) : LoopStm() {
 }
 
 /** Executes 0 or more times */
-data class WhileLoopStm(val cond: Expr, val body: Stm) : LoopStm() {
+data class WhileLoopStm(val cond: Expr, val body: Stm, val modifiers: Modifiers? = null) : LoopStm() {
 }
 
 /** Executes 1 or more times */

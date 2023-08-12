@@ -277,8 +277,12 @@ interface KotlinParser : KotlinLexer {
             { constructorInvocation() },
             { explicitDelegation() },
             { BasicSubTypeInfo(userType()) },
-            { BasicSubTypeInfo(functionType()) },
-            { SUSPEND(); NLs(); BasicSubTypeInfo(functionType().suspendable()) },
+            {
+                val isSuspend = expectOpt("suspend")
+                NLs()
+                val res = functionType()
+                BasicSubTypeInfo(if (isSuspend) res.suspendable() else res)
+            },
         )
     }
 
@@ -521,16 +525,15 @@ interface KotlinParser : KotlinLexer {
     //    : annotation* NL* simpleIdentifier (NL* COLON NL* type)?
     //    ;
     fun variableDeclaration(): VariableDecl {
-        zeroOrMore { annotation() }
+        val annotations = annotations(atLeastOne = false)
         val id = simpleIdentifier()
-        var type: TypeNode? = null
-        opt {
+        val type = opt {
             NLs()
             COLON()
             NLs()
-            type = type()
+            type()
         }
-        return VariableDecl(id, type)
+        return VariableDecl(id, type, annotations = annotations)
     }
 
     //multiVariableDeclaration
@@ -693,22 +696,20 @@ interface KotlinParser : KotlinLexer {
     //functionValueParameterWithOptionalType
     //    : parameterModifiers? parameterWithOptionalType (NL* ASSIGNMENT NL* expression)?
     //    ;
-    fun functionValueParameterWithOptionalType() {
-        opt { parameterModifiers() }
-        parameterWithOptionalType()
-        opt { NLs(); ASSIGNMENT(); NLs(); expression() }
-        TODO("functionValueParameterWithOptionalType")
+    fun functionValueParameterWithOptionalType(): ParameterOptType {
+        val modifiers = parameterModifiers(atLeastOne = false)
+        val id = simpleIdentifier().also { NLs() }
+        val type = opt { COLON(); NLs(); type() }
+        val expr = opt { NLs(); ASSIGNMENT(); NLs(); expression() }
+        return ParameterOptType(id, type, modifiers = modifiers, expr = expr)
     }
 
     //parameterWithOptionalType
     //    : simpleIdentifier NL* (COLON NL* type)?
     //    ;
-    fun parameterWithOptionalType() {
-        simpleIdentifier()
-        NLs()
-        opt { COLON(); NLs(); type() }
-        TODO("parameterWithOptionalType")
-    }
+    //fun parameterWithOptionalType(): ParameterOptType {
+    //    return ParameterOptType(id, type)
+    //}
 
     //parameter
     //    : simpleIdentifier NL* COLON NL* type
@@ -952,38 +953,34 @@ interface KotlinParser : KotlinLexer {
     //    : (receiverType NL* DOT NL*)? functionTypeParameters NL* ARROW NL* type
     //    ;
     fun functionType(): FuncTypeNode {
-        opt {
-            receiverType()
-            NLs()
-            DOT().also { NLs() }
-        }
-        functionTypeParameters()
+        val receiver = opt { receiverType().also { NLs(); DOT(); NLs() } }
+        val typeParams = functionTypeParameters()
         NLs()
-        ARROW()
+        expect("->")
         NLs()
-        type()
-        TODO("functionType")
+        val ret = type()
+        return FuncTypeNode(ret, typeParams, receiver)
     }
 
     //functionTypeParameters
     //    : LPAREN NL* (parameter | type)? (NL* COMMA NL* (parameter | type))* (NL* COMMA)? NL* RPAREN
     //    ;
-    fun functionTypeParameters() {
-        expectAndRecoverSure("(", ")") {
-            opt { OR({ parameter() }, { type() }) }
-            zeroOrMore {
+    fun functionTypeParameters(): List<NamedTypeNode> {
+        return expectAndRecoverSure("(", ")") {
+            val first = opt { OR({ NamedTypeNode(parameter()) }, { NamedTypeNode(type()) }) }
+            val rest = zeroOrMore {
                 NLs()
                 COMMA()
                 NLs()
-                OR({ parameter() }, { type() })
+                OR({ NamedTypeNode(parameter()) }, { NamedTypeNode(type()) })
             }
             opt {
                 NLs()
                 COMMA()
             }
             NLs()
+            listOfNotNull(first) + rest
         }
-        TODO("functionTypeParameters")
     }
 
     //parenthesizedType
@@ -1000,7 +997,6 @@ interface KotlinParser : KotlinLexer {
     //    : typeModifiers? (parenthesizedType | nullableType | typeReference)
     //    ;
     fun receiverType(): TypeNode {
-        debug("TODO: receiverType")
         val modifiers = zeroOrMore { typeModifier() }
         //return nullableType().withModifiers(modifiers)
         return type().withModifiers(modifiers)
@@ -1009,8 +1005,8 @@ interface KotlinParser : KotlinLexer {
     //parenthesizedUserType
     //    : LPAREN NL* (userType | parenthesizedUserType) NL* RPAREN
     //    ;
-    fun parenthesizedUserType(): Any? {
-        return expectAndRecover("(", ")") {
+    fun parenthesizedUserType(): TypeNode {
+        return expectAndRecoverSure("(", ")") {
             NLs()
             OR({ userType() }, { parenthesizedUserType() }).also { NLs() }
         }
@@ -1019,15 +1015,15 @@ interface KotlinParser : KotlinLexer {
     //definitelyNonNullableType
     //    : typeModifiers? (userType | parenthesizedUserType) NL* AMP NL* typeModifiers? (userType | parenthesizedUserType)
     //    ;
-    fun definitelyNonNullableType(): TypeNode {
-        opt { typeModifiers() }
-        OR({ userType() }, { parenthesizedUserType() })
+    fun definitelyNonNullableType(): DefinitelyNonNullableType {
+        val mods1 = typeModifiers(atLeastOne = false)
+        val type1 = OR({ userType() }, { parenthesizedUserType() })
         NLs()
         expect("&")
         NLs()
-        opt { typeModifiers() }
-        OR({ userType() }, { parenthesizedUserType() })
-        TODO("definitelyNonNullableType")
+        val mods2 = typeModifiers(atLeastOne = false)
+        val type2 = OR({ userType() }, { parenthesizedUserType() })
+        return DefinitelyNonNullableType(type1, mods1, type2, mods2)
     }
 
 // SECTION: statements
@@ -1054,21 +1050,19 @@ interface KotlinParser : KotlinLexer {
     //    : (label | annotation)* ( declaration | assignment | loopStatement | expression)
     //    ;
     fun statement(): Stm {
-        debug("TODO: statement")
+        //NLs()
+        val modifiers = Modifiers(zeroOrMore { OR({ label() }, { annotation() }) })
         NLs()
-        zeroOrMore {
-            OR({ label() }, { annotation() })
-        }
-        NLs()
-        if (matches("var") || matches("val")) {
-            return DeclStm(declaration())
-        }
-        return OR(
-            { loopStatement() },
-            { DeclStm(declaration()) },
-            { assignment() },
-            { ExprStm(expression()) }
-        )
+        return if (matches("var") || matches("val")) {
+            DeclStm(declaration())
+        } else {
+            OR(
+                { loopStatement() },
+                { DeclStm(declaration()) },
+                { assignment() },
+                { ExprStm(expression()) }
+            )
+        }.withModifiers(modifiers)
     }
 
     //label
@@ -1126,7 +1120,7 @@ interface KotlinParser : KotlinLexer {
     fun forStatement(): ForLoopStm = enrich {
         expect("for")
         NLs()
-        var annotations: List<Node> = emptyList()
+        var annotations: Annotations = Annotations.EMPTY
         var expr: Expr = EmptyExpr()
         var vardecl: VariableDeclBase? = null
         expectAndRecoverSure("(", ")") {
@@ -1550,11 +1544,11 @@ interface KotlinParser : KotlinLexer {
         return NavigationExpr(op, expr, id)
     }
 
-    data class CallSuffix(
-        val typeArgs: List<TypeNode>? = null,
-        val args: List<Expr> = emptyList(),
-        val lambdaArg: Expr? = null,
-    )
+    //data class CallSuffix(
+    //    val typeArgs: List<TypeNode>? = null,
+    //    val args: List<Expr> = emptyList(),
+    //    val lambdaArg: Expr? = null,
+    //)
 
     //callSuffix
     //    : typeArguments? (valueArguments? annotatedLambda | valueArguments)
@@ -1828,6 +1822,7 @@ interface KotlinParser : KotlinLexer {
     //    : LCURL NL* (lambdaParameters? NL* ARROW NL*)? statements NL* RCURL
     //    ;
     fun lambdaLiteral(): Expr {
+        debug("TODO: lambdaLiteral")
         expectAndRecover("{", "}") {
             opt {
                 NLs()
@@ -1853,9 +1848,19 @@ interface KotlinParser : KotlinLexer {
     //    : variableDeclaration
     //    | multiVariableDeclaration (NL* COLON NL* type)?
     //    ;
-    fun lambdaParameter() {
-        OR({ multiVariableDeclaration(); NLs(); COLON(); NLs(); type() }, { variableDeclaration() })
-        TODO("lambdaParameter")
+    fun lambdaParameter(): VariableDeclBase {
+        return OR(
+            {
+                val mvd = multiVariableDeclaration();
+                NLs(); COLON();
+                NLs();
+                val type = type()
+                mvd.copy(type = type)
+            },
+            {
+                variableDeclaration()
+            }
+        )
     }
 
     //anonymousFunction
@@ -1869,15 +1874,15 @@ interface KotlinParser : KotlinLexer {
     //      (NL* functionBody)?
     //    ;
     fun anonymousFunction(): Expr {
-        val isSuspend = opt { expect("suspend") }
+        val isSuspend = expectOpt("suspend")
         NLs()
         expect("fun")
-        opt { NLs(); expect("type"); NLs(); DOT() }
+        val receiver = opt { NLs(); type().also { NLs(); DOT() } }
         NLs()
-        parametersWithOptionalType()
-        opt { NLs(); COLON(); NLs(); type() }
-        opt { NLs(); typeConstraints() }
-        opt { NLs(); functionBody() }
+        val paramsWithOptType = parametersWithOptionalType()
+        val type = opt { NLs(); COLON(); NLs(); type() }
+        val typeConstraints = opt { NLs(); typeConstraints() }
+        val body = opt { NLs(); functionBody() }
         TODO("anonymousFunction")
     }
 
@@ -2263,8 +2268,8 @@ interface KotlinParser : KotlinLexer {
     //parameterModifiers
     //    : (annotation | parameterModifier)+
     //    ;
-    fun parameterModifiers(atLeastOne: Boolean = true): List<Any> {
-        return multiple(atLeastOne = atLeastOne) { OR({ annotation() }, { parameterModifier() }) }
+    fun parameterModifiers(atLeastOne: Boolean = true): Modifiers {
+        return Modifiers(multiple(atLeastOne = atLeastOne) { OR({ annotation() }, { parameterModifier() }) })
     }
 
     //modifier
@@ -2295,8 +2300,8 @@ interface KotlinParser : KotlinLexer {
     //typeModifiers
     //    : typeModifier+
     //    ;
-    fun typeModifiers(): List<Any> {
-        return oneOrMore { typeModifier() }
+    fun typeModifiers(atLeastOne: Boolean = true): Modifiers {
+        return Modifiers(multiple(atLeastOne = atLeastOne) { typeModifier() })
     }
 
     //typeModifier
@@ -2305,7 +2310,7 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun typeModifier(): Any {
         return OR(
-            { expect("suspend"); NLs(); "suspend" },
+            { expect("suspend"); NLs(); FunctionModifier.SUSPEND },
             { annotation() },
         )
     }
@@ -2419,8 +2424,8 @@ interface KotlinParser : KotlinLexer {
         return AnnotationNodes(nodes.annotations.map { it.copy(useSite = useSite) })
     }
 
-    fun annotations(atLeastOne: Boolean = false): List<AnnotationNodes> {
-        return multiple(atLeastOne = atLeastOne) { annotation() }
+    fun annotations(atLeastOne: Boolean = false): Annotations {
+        return Annotations(multiple(atLeastOne = atLeastOne) { annotation() })
     }
 
     //singleAnnotation
