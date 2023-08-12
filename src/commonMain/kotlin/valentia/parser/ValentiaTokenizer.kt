@@ -217,8 +217,9 @@ sealed class Token(val str: String) {
     //override fun toString(): String = str
 }
 object EOFToken : Token("")
-data class CommentToken(val comment: String) : Token(comment)
-data class SpacesToken(val spaces: String) : Token(spaces)
+abstract class HiddenToken(str: String) : Token(str)
+data class CommentToken(val comment: String) : HiddenToken(comment)
+data class SpacesToken(val spaces: String) : HiddenToken(spaces)
 data class NLToken(val spaces: String) : Token(spaces)
 data class SymbolToken(val symbol: String) : Token(symbol)
 data class ShebangToken(val shebang: String) : Token(shebang)

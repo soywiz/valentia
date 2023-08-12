@@ -32,16 +32,24 @@ inline fun <reified T: Token> BaseTokenReader.expectOpt(consume: Boolean = true)
 
 interface BaseTokenReader : BaseConsumer {
     fun peek(offset: Int = 0): Token
-    fun read(): Token = peek().also { pos++ }
+    fun read(): Token {
+        while (peek() is HiddenToken) pos++
+        return peek().also { skip() }
+    }
     override fun EOF() {
         check(eof) { "Not EOF found but ${peek()}" }
+    }
+
+    override fun skip(count: Int) {
+        pos += count
+        while (peek() is HiddenToken) pos++
     }
 
     fun expectAnyOpt(strs: Set<String>, consume: Boolean = true): String? {
         val token = peek()
         if (token.str in strs) {
             if (consume) {
-                pos++
+                skip()
             }
             return token.str
         }
@@ -64,7 +72,7 @@ interface BaseTokenReader : BaseConsumer {
 
     override fun matches(str: String, consume: Boolean): Boolean {
         if (peek().str == str) {
-            if (consume) pos++
+            if (consume) skip()
             return true
         }
         return false

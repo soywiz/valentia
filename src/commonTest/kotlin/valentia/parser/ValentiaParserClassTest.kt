@@ -69,4 +69,20 @@ class ValentiaParserClassTest : StmBuilder {
             """.trimIndent())
         )
     }
+
+    @Test
+    fun testInterfaceWithEmptyMethod() {
+        assertEquals(
+            null,
+            ValentiaParser.file("""
+                package demo
+
+                interface Indenter {
+                    class Impl : Indenter { }
+                    fun indent()
+                }
+            """.trimIndent()) as? Any?
+        )
+
+    }
 }

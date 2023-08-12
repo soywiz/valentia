@@ -62,4 +62,12 @@ open class ValentiaParserVarStmTest : StmBuilder {
             ValentiaParser.statement("var a: Int = 10") as Any
         )
     }
+
+    @Test
+    fun testDestructuring() {
+        assertEquals(
+            null,
+            ValentiaParser.statement("var (a, b: Int) = 10 to 20") as? Any?
+        )
+    }
 }

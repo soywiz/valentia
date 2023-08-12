@@ -159,9 +159,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun declaration(): Decl {
         debug("TODO: declaration")
+        NLs()
         if (matches("fun")) return functionDeclaration()
         if (matches("typealias")) return typeAlias()
         if (matches("class")) return classDeclaration()
+        if (matches("interface")) return classDeclaration()
         if (matches("object")) return objectDeclaration()
         if (matches("var") || matches("val")) return propertyDeclaration()
         return OR(
@@ -212,6 +214,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         } else {
             null
         }
+        NLs()
         return ClassDecl(kind = kind, name = className, subTypes = subTypes, body = decls)
     }
 
@@ -493,9 +496,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : LPAREN NL* (functionValueParameter (NL* COMMA NL* functionValueParameter)* (NL* COMMA)?)? NL* RPAREN
     //    ;
     fun functionValueParameters(): List<FuncValueParam> {
-        return parseListWithStartEnd("(", ")", oneOrMore = false) {
-            functionValueParameter()
+        return expectAndRecoverSure("(", ")") {
+            parseListNew(trailingSeparator = true, oneOrMore = false) {
+                functionValueParameter()
+            }
         }
+        //return parseListWithStartEnd("(", ")", oneOrMore = false) {
+        //    functionValueParameter()
+        //}
     }
 
     //functionValueParameter
@@ -506,7 +514,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val param = parameter()
         opt {
             NLs()
-            assignment()
+            ASSIGNMENT()
             NLs()
             expression()
         }
@@ -525,6 +533,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun functionDeclaration(): Decl {
         debug("TODO: functionDeclaration")
         val modifiers = modifiers(atLeastOne = false)
+        //NLs()
         expect("fun")
         val typeParams = opt {
             NLs()
@@ -571,12 +580,15 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : block
     //    | ASSIGNMENT NL* expression
     //    ;
-    fun functionBody(): Stm {
+    fun functionBody(): Stm? {
+        NLs()
         if (expectOpt("=")) {
-            NLs()
             return ReturnStm(expression())
+        } else if (matches("{")) {
+            return block()
+        } else {
+            return null
         }
-        return block()
         //debug("TODO: functionBody")
         //return OR(
         //    { block() },
@@ -603,8 +615,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : LPAREN NL* variableDeclaration (NL* COMMA NL* variableDeclaration)* (NL* COMMA)? NL* RPAREN
     //    ;
     fun multiVariableDeclaration(): MultiVariableDecl {
-        val vars = arrayListOf<VariableDecl>()
-        expectAndRecover("(", ")") {
+        //val vars = arrayListOf<VariableDecl>()
+        val vars = expectAndRecoverSure("(", ")") {
+            parseListNew(trailingSeparator = true) { variableDeclaration() }
+            /*
             NLs()
             vars += variableDeclaration()
             while (hasMore) {
@@ -618,6 +632,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
                     vars += variableDeclaration()
                 }
             }
+
+             */
         }
         return MultiVariableDecl(vars)
     }
@@ -645,7 +661,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         opt { NLs(); typeParameters() }
         opt { NLs(); receiverType(); NLs(); DOT() }
         NLs()
-        val decl = OR({ multiVariableDeclaration() }, { variableDeclaration() })
+        val decl = OR({ multiVariableDeclaration() }, { variableDeclaration() }, name = "propertyDeclaration.decl")
         opt { typeConstraints() }
         var delegation = false
         NLs()
@@ -1291,7 +1307,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         if (matches(";")) {
             skip(1)
         }
-        while (peek() is SpacesToken || peek() is NLToken) {
+        while (peek() is HiddenToken || peek() is NLToken) {
             NLs()
         }
     }
@@ -2737,8 +2753,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         loop@while (hasMore) {
             val c = peek()
             when (c) {
-                is SpacesToken -> skip()
-                is CommentToken -> skip()
+                is HiddenToken -> skip()
                 else -> break@loop
             }
         }
