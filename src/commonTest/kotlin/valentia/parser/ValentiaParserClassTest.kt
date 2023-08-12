@@ -54,4 +54,19 @@ class ValentiaParserClassTest : StmBuilder {
         )
     }
 
+    @Test
+    fun testConstructorDelegation() {
+        assertEquals(
+            ClassDecl(kind = "class", name = "Hello", body = listOf(
+                ConstructorDecl(
+                    constructorDelegationCall = ConstructorDelegationCall("this", listOf(1.lit, 2.lit))
+                ),
+            )),
+            ValentiaParser.topLevelDecl("""
+                class Hello {
+                    constructor() : this(1, 2)
+                }
+            """.trimIndent())
+        )
+    }
 }

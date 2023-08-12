@@ -4,6 +4,7 @@ import valentia.ast.Node
 import valentia.ast.enrich
 import valentia.util.Disjunction2
 import valentia.util.Disjunction3
+import valentia.util.isLetterOrDigitOrUndescore
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
@@ -35,6 +36,12 @@ interface BaseReader {
     fun matches(str: String, consume: Boolean = false): Boolean {
         for (n in str.indices) {
             if (peekChar(n) != str[n]) return false
+        }
+        if (str[0].isLetter()) {
+            if (peekChar(str.length).isLetterOrDigitOrUndescore()) {
+                // Not a full identifier!!
+                return false
+            }
         }
         if (consume) skip(str.length)
         return true
@@ -141,7 +148,7 @@ interface BaseParser : BaseReader {
 
 }
 
-inline fun <T> BaseParser.OR(vararg funcs: () -> T?): T {
+inline fun <T> BaseParser.OR(vararg funcs: () -> T?, name: String? = null): T {
     val rpos = pos
     val exceptions = arrayListOf<Throwable>()
     for (func in funcs) {
@@ -152,7 +159,8 @@ inline fun <T> BaseParser.OR(vararg funcs: () -> T?): T {
             exceptions += e
         }
     }
-    error("Couldn't match any of OR [${funcs.size}]: ${exceptions.toList()}")
+    pos = rpos
+    error("Couldn't match any of OR[$name][$this] [${funcs.size}]: ${exceptions.toList()}")
 }
 
 inline fun <T1, T2> BaseParser.ORDis(func1: () -> T1?, func2: () -> T2?): Disjunction2<T1, T2> {

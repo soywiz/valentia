@@ -36,6 +36,7 @@ data class Modifiers(val items: List<Any> = emptyList()) {
     val labels by lazy { items.filterIsInstance<LabelNode>() }
     fun isEmpty(): Boolean = items.isEmpty()
     operator fun contains(item: Modifier): Boolean = item in modifiers
+    val isEnum: Boolean get() = ClassModifier.ENUM in this
 }
 
 abstract class ExprOrStm : Node() {
@@ -247,7 +248,12 @@ data class TypeAliasDecl(
     val types: List<TypeParameter>? = null,
     val modifiers: Modifiers = Modifiers(),
 ) : Decl(id)
-data class ConstructorDecl(val params: List<FuncValueParam>, val body: Stm?) : Decl("constructor")
+data class ConstructorDelegationCall(val kind: String, val exprs: List<Expr>)
+data class ConstructorDecl(
+    val params: List<FuncValueParam> = emptyList(),
+    val body: Stm? = null,
+    val constructorDelegationCall: ConstructorDelegationCall? = null,
+) : Decl("constructor")
 data class InitDecl(val stm: Stm) : Decl("init")
 data class CompanionObjectDecl(val name: String?) : Decl(name ?: "companion object")
 data class ClassDecl(

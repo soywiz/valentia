@@ -146,18 +146,18 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun declaration(): Decl {
         debug("TODO: declaration")
-        if (matches("typealias")) {
-            return typeAlias()
-        }
-        if (matches("var") || matches("val")) {
-            return propertyDeclaration()
-        }
+        if (matches("fun")) return functionDeclaration()
+        if (matches("typealias")) return typeAlias()
+        if (matches("class")) return classDeclaration()
+        if (matches("object")) return objectDeclaration()
+        if (matches("var") || matches("val")) return propertyDeclaration()
         return OR(
             { functionDeclaration() },
             { classDeclaration() },
             { objectDeclaration() },
             { propertyDeclaration() },
             { typeAlias() },
+            name = "declaration"
         )
     }
 
@@ -188,7 +188,17 @@ interface KotlinParser : KotlinLexer {
         val primaryConstructor = opt { NLs(); primaryConstructor() }
         val subTypes = opt { NLs(); COLON(); NLs(); delegationSpecifiers() }
         val typeConstraints = opt { NLs(); typeConstraints() }
-        val decls = opt { NLs(); OR({ classBody() }, { enumClassBody() }) }
+        NLs()
+        val decls = if (matches("{")) {
+            if (modifiers.isEnum) {
+                enumClassBody()
+            } else {
+                classBody()
+            }
+            //OR({ classBody() }, { enumClassBody() })
+        } else {
+            null
+        }
         return ClassDecl(kind = kind, name = className, subTypes = subTypes, body = decls)
     }
 
@@ -356,7 +366,7 @@ interface KotlinParser : KotlinLexer {
         val tc = typeConstraint()
         val more = zeroOrMore {
             NLs()
-            COMMA()
+            expect(",")
             NLs()
             typeConstraint()
         }
@@ -398,11 +408,21 @@ interface KotlinParser : KotlinLexer {
     //    | secondaryConstructor
     //    ;
     fun classMemberDeclaration(): Decl {
+        if (matches("constructor")) {
+            return secondaryConstructor()
+        }
+        if (matches("companion")) {
+            return companionObject()
+        }
+        if (matches("init")) {
+            return anonymousInitializer()
+        }
         return OR(
             { declaration() },
             { companionObject() },
             { anonymousInitializer() },
             { secondaryConstructor() },
+            name = "classMemberDeclaration"
         )
     }
 
@@ -424,7 +444,7 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun companionObject(): CompanionObjectDecl {
         debug("TODO: companionObject")
-        modifiers(atLeastOne = false)
+        val modifiers = modifiers(atLeastOne = false)
         expect("companion")
         NLs()
         val isData = expectOpt("data")
@@ -757,7 +777,7 @@ interface KotlinParser : KotlinLexer {
         CONSTRUCTOR()
         NLs()
         val params = functionValueParameters()
-        opt {
+        val constructorDelegationCall = opt {
             NLs()
             COLON()
             NLs()
@@ -765,17 +785,17 @@ interface KotlinParser : KotlinLexer {
         }
         NLs()
         val body = opt { block() }
-        return ConstructorDecl(params = params, body = body)
+        return ConstructorDecl(params = params, body = body, constructorDelegationCall = constructorDelegationCall)
     }
 
     //constructorDelegationCall
     //    : (THIS | SUPER) NL* valueArguments
     //    ;
-    fun constructorDelegationCall() {
-        val kind = expectAnyOpt("this", "super")
+    fun constructorDelegationCall(): ConstructorDelegationCall {
+        val kind = expectAny("this", "super")
         NLs()
-        valueArguments()
-        TODO("constructorDelegationCall")
+        val args = valueArguments()
+        return ConstructorDelegationCall(kind, args)
     }
 
     // SECTION: enumClasses
@@ -784,17 +804,17 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun enumClassBody(): List<Decl> {
         debug("TODO: enumClassBody")
-        expect("{")
-        NLs()
-        enumEntries(oneOrMore = false)
-        opt {
+        expectAndRecover("{", "}") {
             NLs()
-            SEMICOLON()
+            enumEntries(oneOrMore = false)
+            opt {
+                NLs()
+                SEMICOLON()
+                NLs()
+                classMemberDeclarations()
+            }
             NLs()
-            classMemberDeclarations()
         }
-        NLs()
-        expect("}")
         return emptyList()
     }
 
@@ -1608,7 +1628,11 @@ interface KotlinParser : KotlinLexer {
     //    : annotation? NL* (simpleIdentifier NL* ASSIGNMENT NL*)? MULT? NL* expression
     //    ;
     fun valueArgument(): Expr {
-        debug("TODO: valueArgument")
+        val annotations = opt { annotation() }
+        NLs()
+        val namedArgument = opt { simpleIdentifier().also { NLs();ASSIGNMENT();NLs() } }
+        val spread = opt { MULT() }
+        NLs()
         return expression()
     }
 
