@@ -4,8 +4,10 @@ import org.intellij.lang.annotations.Language
 import valentia.ast.*
 
 open class ValentiaParser(
-    str: String
-) : KotlinParser(str) {
+    tokens: List<Token>
+) : KotlinParser(tokens) {
+    constructor(str: String) : this(ValentiaTokenizer(str).tokenize())
+
     fun valentiaFile(): FileNode = kotlinFile()
 
     companion object {

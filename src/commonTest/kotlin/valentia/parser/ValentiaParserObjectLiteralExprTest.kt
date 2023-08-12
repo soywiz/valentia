@@ -18,4 +18,17 @@ open class ValentiaParserObjectLiteralExprTest : StmBuilder {
         )
     }
 
+    @Test
+    fun testObjectLiteral2() {
+        assertEquals(
+            //ObjectLiteralExpr(body = listOf(FunDecl(name="test", params=emptyList(), body= Stms()))),
+            null,
+            ValentiaParser.statements("""
+                val listener = object : KotlinParserBaseListener() { 
+                }
+                val stream = CharStreams
+            """.trimIndent()) as Any?
+        )
+    }
+
 }

@@ -23,4 +23,12 @@ open class ValentiaParserTypeTest {
             ValentiaParser.type("Map<Int, String>") as Any?
         )
     }
+
+    @Test
+    fun testTypeFunc() {
+        assertEquals(
+            null,
+            ValentiaParser.type("(Int) -> T") as Any?
+        )
+    }
 }

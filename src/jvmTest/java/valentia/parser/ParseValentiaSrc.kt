@@ -2,6 +2,8 @@ package valentia.parser
 
 import java.io.File
 import kotlin.test.Test
+import kotlin.time.measureTime
+import kotlin.time.measureTimedValue
 
 class ParseValentiaSrc {
     @Test
@@ -10,7 +12,9 @@ class ParseValentiaSrc {
         for (file in files) {
             println("FILE: $file : ")
             val text = file.readText()
-            val nodes = ValentiaParser(text).valentiaFile()
+            val (tokens, timeTokenize) = measureTimedValue { ValentiaTokenizer(text).tokenize() }
+            val (nodes, timeParse) = measureTimedValue { ValentiaParser(tokens).valentiaFile() }
+            println("   -> tokenize=$timeTokenize, parse=$timeParse")
             println("   -> topLevelDecls=${nodes.topLevelDecls.size}")
         }
     }
