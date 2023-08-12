@@ -676,21 +676,21 @@ interface KotlinParser : KotlinLexer {
     //      )?
     //      NL* RPAREN
     //    ;
-    fun parametersWithOptionalType() {
-        expectAndRecover("(", ")") {
+    fun parametersWithOptionalType(): List<ParameterOptType> {
+        return expectAndRecover("(", ")") {
             NLs()
             opt {
-                functionValueParameterWithOptionalType()
-                zeroOrMore {
+                val one = functionValueParameterWithOptionalType()
+                val rest = zeroOrMore {
                     NLs()
                     COMMA()
                     NLs()
                     functionValueParameterWithOptionalType()
                 }
                 opt { NLs(); COMMA() }
-            }
-            NLs()
-        }
+                listOfNotNull(one) + rest
+            }.also { NLs() }
+        } ?: emptyList()
     }
 
     //functionValueParameterWithOptionalType
@@ -1671,16 +1671,7 @@ interface KotlinParser : KotlinLexer {
     //    ;
     fun parenthesizedExpression(): Expr {
         Hidden()
-        return expectAndRecoverSure("(", ")") {
-            Hidden()
-            NLs()
-            Hidden()
-            val expr = expression()
-            Hidden()
-            NLs()
-            Hidden()
-            expr
-        }
+        return expectAndRecoverSure("(", ")") { NLs(); expression().also { NLs() } }
     }
 
     //collectionLiteral
@@ -1873,17 +1864,17 @@ interface KotlinParser : KotlinLexer {
     //      (NL* typeConstraints)?
     //      (NL* functionBody)?
     //    ;
-    fun anonymousFunction(): Expr {
+    fun anonymousFunction(): AnonymousFunctionExpr {
         val isSuspend = expectOpt("suspend")
         NLs()
         expect("fun")
         val receiver = opt { NLs(); type().also { NLs(); DOT() } }
         NLs()
         val paramsWithOptType = parametersWithOptionalType()
-        val type = opt { NLs(); COLON(); NLs(); type() }
+        val retType = opt { NLs(); COLON(); NLs(); type() }
         val typeConstraints = opt { NLs(); typeConstraints() }
         val body = opt { NLs(); functionBody() }
-        TODO("anonymousFunction")
+        return AnonymousFunctionExpr(FunDecl("", paramsWithOptType.map { FuncValueParam(it.id, it.type ?: UnknownType) }, retType, receiver = receiver, where = typeConstraints, body = body, modifiers = if (isSuspend) Modifiers(FunctionModifier.SUSPEND) else Modifiers.EMPTY))
     }
 
     //functionLiteral

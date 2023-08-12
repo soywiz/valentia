@@ -27,6 +27,9 @@ data class Annotations(val items: List<AnnotationNodes> = emptyList()) {
 }
 
 data class Modifiers(val items: List<Any> = emptyList()) {
+    companion object {
+        val EMPTY = Modifiers()
+    }
     constructor(vararg items: Any) : this(items.toList())
     val modifiers by lazy { items.filterIsInstance<Modifier>().toSet() }
     val annotations by lazy { Annotations(items.filterIsInstance<AnnotationNodes>()) }
@@ -260,6 +263,7 @@ data class FunDecl constructor(
     val retType: TypeNode? = null,
     val where: List<TypeConstraint>? = null,
     val body: Stm? = null,
+    val receiver: TypeNode? = null,
     val modifiers: Modifiers = Modifiers(),
 ) : Decl(name) {
     val jsHash by lazy { params.map { it.type }.hashCode() and 0x7FFFFFFF }
@@ -303,6 +307,8 @@ data class Identifier(val parts: List<String>) : Expr() {
 // Expressions
 
 abstract class Expr : ExprOrStm()
+
+data class AnonymousFunctionExpr(val decl: FunDecl) : Expr()
 
 abstract class AssignableExpr : Expr()
 
