@@ -3,7 +3,12 @@ package valentia.parser
 import valentia.ast.*
 import valentia.util.Disjunction3
 
-open class KotlinParser(str: String) : StrReader(str), BaseParser {
+open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenParser {
+    constructor(str: String) : this(ValentiaTokenizer(str).tokenize())
+
+    open fun createParser(str: String): KotlinParser = KotlinParser(str)
+    open fun createParser(tokens: List<Token>): KotlinParser = KotlinParser(tokens)
+
     override fun reportError(e: Throwable) {
         debug("reportError: PARSER ERROR: $e")
         e.printStackTrace()
@@ -29,6 +34,7 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
         val _package = packageHeader()
         val imports = importList()
         val topLevelDecls = zeroOrMore { topLevelObject() }
+        NLs()
         EOF()
         return FileNode(
             shebang = shebang,
@@ -94,7 +100,8 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
         var alias: String? = null
         opt {
             OR({
-                expect(".*")
+                expect(".")
+                expect("*")
                 all = true
             }, {
                 alias = importAlias()
@@ -118,6 +125,7 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    : declaration semis?
     //    ;
     fun topLevelObject(): Decl {
+        NLs()
         return declaration().also {
             semis(atLeastOne = false)
         }
@@ -260,7 +268,7 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    ;
     fun classParameter(): ClassParameter {
         debug("TODO: classParameter")
-        opt { modifiers() }
+        opt { modifiers(atLeastOne = false) }
         opt { expectAnyOpt("val", "var") }
         NLs()
         val id = simpleIdentifier()
@@ -602,7 +610,7 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    ;
     fun propertyDeclaration(): VariableDeclBase {
         debug("TODO: propertyDeclaration")
-        modifiers(atLeastOne = false)
+        val modifiers = modifiers(atLeastOne = false)
         expectAny("val", "var")
         opt { NLs(); typeParameters() }
         opt { NLs(); receiverType(); NLs(); DOT() }
@@ -621,10 +629,10 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
         NLs()
         zeroOrMore {
             modifiers(atLeastOne = false)
-            if (matches("get")) {
-                getter()
-            } else if (matches("set")) {
-                setter()
+            when {
+                matches("get") -> getter()
+                matches("set") -> setter()
+                else -> return@zeroOrMore null
             }
             NLs()
             semiOpt()
@@ -934,7 +942,7 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
         debug("TODO: simpleUserType")
         val id = simpleIdentifier()
         NLs()
-        val generic = if (peekChar() == '<') typeArguments() else null
+        val generic = if (matches("<")) typeArguments() else null
         val simple = SimpleType(id)
         return if (generic != null) GenericType(simple, generic) else simple
     }
@@ -1107,7 +1115,7 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     fun controlStructureBody(): Stm {
         Hidden()
         return when {
-            peekChar() == '{' -> block()
+            matches("{") -> block()
             else -> statement()
         }
     }
@@ -1200,7 +1208,8 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
         var op = "="
         val lvalue = OR(
             { directlyAssignableExpression().also { ASSIGNMENT(); op = "=" } },
-            { assignableExpression().also { Hidden(); op = assignmentAndOperator() } }
+            { assignableExpression().also { Hidden(); op = assignmentAndOperator() } },
+            name = "assignment"
         )
         NLs()
         val expr = expression()
@@ -1211,13 +1220,12 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    : (SEMICOLON | NL) NL*
     //    ;
     fun semi() {
-        val c = peekChar()
-        when (c) {
-            ';' -> skip(1)
-            '\r', '\n' -> NLs()
-            else -> error("semi")
+        if (matches(";")) {
+            skip(1)
         }
-        while (peekChar() == '\r' || peekChar() == '\n') NLs()
+        while (peek() is SpacesToken || peek() is NLToken) {
+            NLs()
+        }
     }
 
     fun semiOpt() {
@@ -1229,15 +1237,9 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    ;
     fun semis(atLeastOne: Boolean = true) {
         var count = 0
-        while (true) {
-            Hidden()
-            when (peekChar()) {
-                ';' -> expectChar(';')
-                '\n', '\r' -> NL()
-                else -> break
-            }
+        while (peek().str == ";" || peek() is SpacesToken) {
+            skip()
             count++
-            Hidden()
         }
         if (count == 0 && atLeastOne) error("Expected at least one semicolon or new line")
     }
@@ -1467,11 +1469,11 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
         }
         // valueArguments: LPAREN NL* (valueArgument (NL* COMMA NL* valueArgument)* (NL* COMMA)? NL*)? RPAREN
         // annotatedLambda: annotation* label? NL* lambdaLiteral
-        if (peekChar() == '<' || peekChar() == '(') {
+        if (matches("<") || matches("(")) {
             debug("TODO: postfixUnarySuffix.callSuffix")
             return callSuffix(expr)
         }
-        if (peekChar() == '[') {
+        if (matches("[")) {
             val params = expectAndRecoverSure("[", "]") {
                 parseList(separator = { expectOpt(",") }, doBreak = { matches("]") }) {
                     expression()
@@ -1497,6 +1499,7 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
             { parenthesizedDirectlyAssignableExpression() },
             { assignableSuffix(postfixUnaryExpression()) },
             { IdentifierExpr(simpleIdentifier()) },
+            name = "directlyAssignableExpression"
         )
     }
 
@@ -1515,11 +1518,15 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    | parenthesizedAssignableExpression
     //    ;
     fun assignableExpression(): AssignableExpr {
-        return OR({
-            val expr = prefixUnaryExpression()
-            //(expr as? AssignableExpr?) ?: TODO("expr=$expr !is AssignableExpr")
-            (expr as? AssignableExpr?) ?: error("expr=$expr !is AssignableExpr")
-        }, { parenthesizedAssignableExpression() })
+        return OR(
+            {
+                val expr = prefixUnaryExpression()
+                //(expr as? AssignableExpr?) ?: TODO("expr=$expr !is AssignableExpr")
+                (expr as? AssignableExpr?) ?: error("expr=$expr !is AssignableExpr")
+            },
+            { parenthesizedAssignableExpression() },
+            name = "assignableExpression"
+        )
     }
 
     //parenthesizedAssignableExpression
@@ -1659,12 +1666,12 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    ;
     fun primaryExpression(): Expr {
         Hidden()
-        if (peekChar() == '(') return parenthesizedExpression()
+        if (matches("(")) return parenthesizedExpression()
         literalConstantOpt()?.let { return it }
 
         debug("TODO: primaryExpression")
 
-        if (matches("\"")) return stringLiteral()
+        if (peek() is StringInterpolationToken) return stringLiteral()
         if (matches("[")) return collectionLiteral()
         if (matches("this")) return thisExpression()
         if (matches("if")) return ifExpression()
@@ -1724,20 +1731,26 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    | UnsignedLiteral
     //    ;
     fun literalConstantOpt(): LiteralExpr? {
-        if (matches("'", consume = false)) {
+        Hidden()
+        if (peek() is CharLiteralToken) {
             return CharacterLiteral()
         }
         expectAnyOpt("false", "true")?.let { return BoolLiteralExpr(it == "true") }
         if (expectOpt("null")) return NullLiteralExpr()
-        val numLit = when {
-            expectOpt("0x") || expectOpt("0X") -> numericLiteral(radix = 16) { HexDigit(it) }
-            expectOpt("0o") || expectOpt("0O") -> numericLiteral(radix = 8) { it in '0'..'7' }
-            expectOpt("0b") || expectOpt("0B") -> numericLiteral(radix = 2) { it in '0'..'1' }
-            else -> numericLiteral(radix = 10) { DecDigit(it) }
-        } ?: return null
-        val isUnsigned = expectAnyOpt("u", "U")
-        val isLong = expectAnyOpt("l", "L")
-        return numLit.copy(isLong = isLong != null, isUnsigned = isUnsigned != null)
+        val token = expectOpt<NumberToken>() ?: return null
+        if (!token.isFloat) {
+            return IntLiteralExpr(token.value.toLong(), token.isLong, token.isUnsigned)
+        }
+        TODO("literalConstantOpt: token=$token")
+        //val numLit = when {
+        //    expectOpt("0x") || expectOpt("0X") -> numericLiteral(radix = 16) { HexDigit(it) }
+        //    expectOpt("0o") || expectOpt("0O") -> numericLiteral(radix = 8) { it in '0'..'7' }
+        //    expectOpt("0b") || expectOpt("0B") -> numericLiteral(radix = 2) { it in '0'..'1' }
+        //    else -> numericLiteral(radix = 10) { DecDigit(it) }
+        //} ?: return null
+        //val isUnsigned = expectAnyOpt("u", "U")
+        //val isLong = expectAnyOpt("l", "L")
+        //return numLit.copy(isLong = isLong != null, isUnsigned = isUnsigned != null)
     }
 
     //stringLiteral
@@ -1745,6 +1758,24 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    | multiLineStringLiteral
     //    ;
     fun stringLiteral(): Expr = enrich {
+        val str = expect<StringInterpolationToken>()
+        val chunks = str.tokens.map { token ->
+            when (token) {
+                is EscapeStringPartToken -> InterpolatedStringExpr.StringChunk("${token.c}")
+                is ExpressionStringPartToken -> InterpolatedStringExpr.ExpressionChunk(createParser(token.expr).expression())
+                is LiteralStringPartToken -> InterpolatedStringExpr.StringChunk(token.str)
+            }
+        }
+        return@enrich if (chunks.isEmpty()) {
+            StringLiteralExpr("")
+        } else if (chunks.size == 1 && chunks.first() is InterpolatedStringExpr.StringChunk) {
+            StringLiteralExpr((chunks.first() as InterpolatedStringExpr.StringChunk).string)
+        } else {
+            InterpolatedStringExpr(chunks)
+        }
+
+        /*
+        TODO("stringLiteral $str")
         when (expectAnyOpt(TRIPLE_QUOTE, QUOTE)) {
             TRIPLE_QUOTE -> TODO("TRIPLE_QUOTE")
             QUOTE -> {
@@ -1779,64 +1810,59 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
                     }
                 }
                 flush()
-                if (chunks.isEmpty()) {
-                    StringLiteralExpr("")
-                } else if (chunks.size == 1 && chunks.first() is InterpolatedStringExpr.StringChunk) {
-                    StringLiteralExpr((chunks.first() as InterpolatedStringExpr.StringChunk).string)
-                } else {
-                    InterpolatedStringExpr(chunks)
-                }
             }
             else -> error("Not a string literal")
         }
+
+         */
     }
 
     //lineStringLiteral
     //    : QUOTE_OPEN (lineStringContent | lineStringExpression)* QUOTE_CLOSE
     //    ;
-    fun lineStringLiteral(): Expr {
-        QUOTE_OPEN()
-        TODO("lineStringLiteral")
-    }
+    //fun lineStringLiteral(): Expr {
+    //    QUOTE_OPEN()
+    //    TODO("lineStringLiteral")
+    //}
 
     //multiLineStringLiteral
     //    : TRIPLE_QUOTE_OPEN (multiLineStringContent | multiLineStringExpression | MultiLineStringQuote)* TRIPLE_QUOTE_CLOSE
     //    ;
-    fun multiLineStringLiteral(): Expr {
-        TODO("multiLineStringLiteral")
-    }
+    //fun multiLineStringLiteral(): Expr {
+    //    TODO("multiLineStringLiteral")
+    //}
 
     //lineStringContent
     //    : LineStrText
     //    | LineStrEscapedChar
     //    | LineStrRef
     //    ;
-    fun lineStringContent() {
-        TODO("lineStringContent")
-    }
+    //fun lineStringContent() {
+    //    TODO("lineStringContent")
+    //}
 
     //lineStringExpression
     //    : LineStrExprStart NL* expression NL* RCURL
     //    ;
-    fun lineStringExpression() {
-        TODO("lineStringExpression")
-    }
+    //fun lineStringExpression() {
+    //    TODO("lineStringExpression")
+    //}
 
     //multiLineStringContent
     //    : MultiLineStrText
     //    | MultiLineStringQuote
     //    | MultiLineStrRef
     //    ;
-    fun multiLineStringContent() {
-        TODO("multiLineStringContent")
-    }
+    //fun multiLineStringContent() {
+    //    TODO("multiLineStringContent")
+    //}
 
     //multiLineStringExpression
     //    : MultiLineStrExprStart NL* expression NL* RCURL
     //    ;
-    fun multiLineStringExpression() {
-        TODO("multiLineStringExpression")
-    }
+    //fun multiLineStringExpression() {
+    //    TODO("multiLineStringExpression")
+    //}
 
     //lambdaLiteral
     //    : LCURL NL* (lambdaParameters? NL* ARROW NL*)? statements NL* RCURL
@@ -2025,9 +2051,17 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     fun whenExpression(): WhenExpr {
         expect("when")
         NLs()
-        val subject = opt { whenSubject() }
+        val subject = when {
+            matches("(") -> whenSubject()
+            else -> null
+        }
         NLs()
-        val entries = expectAndRecover("{", "}") { zeroOrMore { NLs(); whenEntry() }.also { NLs() } } ?: emptyList()
+        val entries = expectAndRecover("{", "}") {
+            zeroOrMore {
+                NLs()
+                whenEntry()
+            }.also { NLs() }
+        } ?: emptyList()
         return WhenExpr(subject, entries)
     }
 
@@ -2103,14 +2137,11 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     fun catchBlock(): TryCatchExpr.Catch {
         expect("catch")
         NLs()
-        var localName: String = "unknown"
-        var type: TypeNode = SimpleType("unknown")
-        expectAndRecover("(", ")") {
-            annotations()
-            localName = simpleIdentifier()
-            COLON()
-            type = type()
-            opt { NLs(); COMMA() }
+        val (annotations, localName, type) = expectAndRecoverSure("(", ")") {
+            val annotations = annotations()
+            val localName = simpleIdentifier().also { COLON() }
+            val type = type().also { opt { NLs(); COMMA() } }
+            Triple(annotations, localName, type)
         }
         NLs()
         val block = block()
@@ -2278,11 +2309,14 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //modifiers
     //    : (annotation | modifier)+
     //    ;
-    fun modifiers(atLeastOne: Boolean = true): Modifiers {
-        val items: List<Any> = multiple(atLeastOne = atLeastOne) {
-            OR({ annotation() }, { modifier() })
-        }
-        return Modifiers(items)
+    fun modifiers(atLeastOne: Boolean): Modifiers {
+        return Modifiers(multiple(atLeastOne = atLeastOne) {
+            NLs()
+            when {
+                matches("@") -> annotation()
+                else -> modifier()
+            }
+        })
     }
 
     //parameterModifiers
@@ -2302,19 +2336,10 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    | parameterModifier
     //    | platformModifier) NL*
     //    ;
-    fun modifier(): Modifier {
-        return OR(
-            { classModifier() },
-            { memberModifier() },
-            { visibilityModifier() },
-            { functionModifier() },
-            { propertyModifier() },
-            { inheritanceModifier() },
-            { parameterModifier() },
-            { platformModifier() },
-        ).also {
-            NLs()
-        }
+    fun modifier(): Modifier? {
+        Hidden()
+        val token = read()
+        return ALL_MODIFIERS[token.str].also { NLs() }
     }
 
     //typeModifiers
@@ -2368,17 +2393,19 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //typeParameterModifiers
     //    : typeParameterModifier+
     //    ;
-    fun typeParameterModifiers() {
-        multiple(atLeastOne = true) { typeParameterModifier() }
-    }
+    fun typeParameterModifiers(): Modifiers = Modifiers(multiple(atLeastOne = true) { typeParameterModifier() })
 
     //typeParameterModifier
     //    : reificationModifier NL*
     //    | varianceModifier NL*
     //    | annotation
     //    ;
-    fun typeParameterModifier() {
-        TODO("typeParameterModifier")
+    fun typeParameterModifier(): Any {
+        return OR(
+            { reificationModifier(); NLs() },
+            { varianceModifier(); NLs() },
+            { annotation() },
+        )
     }
 
     //functionModifier
@@ -2434,7 +2461,7 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
             NLs()
             expect(":")
         }
-        val nodes = if (peekChar() == '[') {
+        val nodes = if (matches("[")) {
             expectAndRecoverSure("[", "]") {
                 AnnotationNodes(oneOrMore { unescapedAnnotation() })
             }
@@ -2469,9 +2496,9 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //annotationUseSiteTarget
     //    : (AT_NO_WS | AT_PRE_WS) (FIELD | PROPERTY | GET | SET | RECEIVER | PARAM | SETPARAM | DELEGATE) NL* COLON
     //    ;
-    fun annotationUseSiteTarget() {
-        TODO("annotationUseSiteTarget")
-    }
+    //fun annotationUseSiteTarget() {
+    //    println("TODO: annotationUseSiteTarget")
+    //}
 
     //unescapedAnnotation
     //    : constructorInvocation
@@ -2539,13 +2566,7 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    ;
     fun simpleIdentifier(): String {
         Hidden()
-        val res = expectAnyOpt(
-            "abstract", "annotation", "by", "catch", "companion", "constructor", "crossinline", "data", "dynamic",
-            "enum", "external", "final", "finally", "get", "import", "infix", "init", "inline", "inner", "internal",
-            "lateinit", "noinline", "open", "operator", "out", "override", "private", "protected", "public",
-            "reified", "sealed", "tailrec", "set", "vararg", "where", "field", "property", "receiver", "param",
-            "setparam", "delegate", "file", "expect", "actual", "const", "suspend", "value"
-        ) ?: Identifier()
+        val res = expectAnyOpt(SIMPLE_IDENTIFIER) ?: Identifier()
         Hidden()
         return res
     }
@@ -2592,59 +2613,50 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    : '#!' ~[\r\n]*
     //    ;
     fun ShebangLine(): String {
-        expect("#!")
-        return "#!" + readUntil { it == '\r' || it == '\n' }
+        return expect<ShebangToken>().str
     }
 
     //DelimitedComment
     //    : '/*' ( DelimitedComment | . )*? '*/'
     //      -> channel(HIDDEN)
     //    ;
-    fun DelimitedComment(): Unit {
-        expect("/*")
-        while (hasMore) {
-            if (matches("/*")) DelimitedComment()
-            if (expectOpt("*/")) break
-            skip(1)
-        }
-    }
+    //fun DelimitedComment(): Unit {
+    //    expect("/*")
+    //    while (hasMore) {
+    //        if (matches("/*")) DelimitedComment()
+    //        if (expectOpt("*/")) break
+    //        skip(1)
+    //    }
+    //}
 
     //LineComment
     //    : '//' ~[\r\n]*
     //      -> channel(HIDDEN)
     //    ;
-    fun LineComment(): Unit {
-        expect("//")
-        readUntil { it == '\r' || it == '\n' }
-    }
+    //fun LineComment(): Unit {
+    //    expect("//")
+    //    readUntil { it == '\r' || it == '\n' }
+    //}
 
     //WS
     //    : [\u0020\u0009\u000C]
     //      -> channel(HIDDEN)
     //    ;
     /** WhiteSpace */
-    fun WS(): Unit = TODO("WS")
+    //fun WS(): Unit = TODO("WS")
 
     //NL: '\n' | '\r' '\n'?;
     fun NL(): Unit {
-        when (peekChar()) {
-            '\n' -> skip()
-            '\r' -> {
-                skip()
-                expectChar('\n')
-            }
-            else -> TODO("Expected New Line")
+        if (peek() is NLToken) {
+            skip()
         }
     }
 
     // NL*
     fun NLs(): Unit {
-        loop@while (!eof) {
+        loop@while (hasMore) {
             Hidden()
-            when (peekChar()) {
-                '\r', '\n' -> NL()
-                else -> break@loop
-            }
+            if (peek() is NLToken) NL() else break@loop
         }
         Hidden()
     }
@@ -2653,11 +2665,10 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //override
     fun Hidden(): Unit {
         loop@while (hasMore) {
-            val c = peekChar()
-            when {
-                c == ' ' || c == '\t' || c == '\u000c' -> skip()
-                matches("/*", consume = false) -> DelimitedComment()
-                matches("//", consume = false) -> LineComment()
+            val c = peek()
+            when (c) {
+                is SpacesToken -> skip()
+                is CommentToken -> skip()
                 else -> break@loop
             }
         }
@@ -2729,10 +2740,10 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     fun DISJ(): String = expectAny("||")
 
     //EXCL_WS: '!' Hidden;
-    fun EXCL_WS(): Unit = TODO("! Hidden")
+    //fun EXCL_WS(): Unit = TODO("! Hidden")
 
     //EXCL_NO_WS: '!';
-    fun EXCL_NO_WS(): Unit = TODO("!")
+    //fun EXCL_NO_WS(): Unit = TODO("!")
 
     //COLON: ':';
     fun COLON(): Unit = expect(":")
@@ -2783,16 +2794,16 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     fun AT_NO_WS(): Unit = expect("@")
 
     //AT_POST_WS: '@' (Hidden | NL);
-    fun AT_POST_WS(): Unit = TODO("'@' (Hidden | NL)")
+    //fun AT_POST_WS(): Unit = TODO("'@' (Hidden | NL)")
 
     //AT_PRE_WS: (Hidden | NL) '@' ;
-    fun AT_PRE_WS(): Unit = TODO("(Hidden | NL) '@'")
+    //fun AT_PRE_WS(): Unit = TODO("(Hidden | NL) '@'")
 
     //AT_BOTH_WS: (Hidden | NL) '@' (Hidden | NL);
-    fun AT_BOTH_WS(): Unit = TODO("(Hidden | NL) '@' (Hidden | NL)")
+    //fun AT_BOTH_WS(): Unit = TODO("(Hidden | NL) '@' (Hidden | NL)")
 
     //QUEST_WS: '?' Hidden;
-    fun QUEST_WS(): Unit = TODO("'?' Hidden")
+    //fun QUEST_WS(): Unit = TODO("'?' Hidden")
 
     //QUEST_NO_WS: '?';
     fun QUEST_NO_WS(): Unit = expect("?")
@@ -2833,19 +2844,19 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
 // SECTION: keywords
 
     //RETURN_AT: 'return@' Identifier;
-    fun RETURN_AT(): Unit = TODO("return@ Identifier")
+    //fun RETURN_AT(): Unit = TODO("return@ Identifier")
 
     //CONTINUE_AT: 'continue@' Identifier;
-    fun CONTINUE_AT(): Unit = TODO("continue@ Identifier")
+    //fun CONTINUE_AT(): Unit = TODO("continue@ Identifier")
 
     //BREAK_AT: 'break@' Identifier;
-    fun BREAK_AT(): Unit = TODO("break@ Identifier")
+    //fun BREAK_AT(): Unit = TODO("break@ Identifier")
 
     //THIS_AT: 'this@' Identifier;
-    fun THIS_AT(): Unit = TODO("this@ Identifier")
+    //fun THIS_AT(): Unit = TODO("this@ Identifier")
 
     //SUPER_AT: 'super@' Identifier;
-    fun SUPER_AT(): Unit = TODO("super@' Identifier")
+    //fun SUPER_AT(): Unit = TODO("super@' Identifier")
 
     //FILE: 'file';
     fun FILE(): Unit = expect("file")
@@ -2854,7 +2865,7 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     fun FIELD(): Unit = expect("field")
 
     //PROPERTY: 'property';
-    fun PROPERTY(): Unit = TODO()
+    fun PROPERTY(): Unit = expect("property")
 
     //GET: 'get';
     fun GET(): Unit = expect("get")
@@ -2974,10 +2985,10 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     fun IN(): Unit = expect("in")
 
     //NOT_IS: '!is' (Hidden | NL);
-    fun NOT_IS(): Unit = TODO()
+    //fun NOT_IS(): Unit = TODO()
 
     //NOT_IN: '!in' (Hidden | NL);
-    fun NOT_IN(): Unit = TODO()
+    //fun NOT_IN(): Unit = TODO()
 
     //OUT: 'out';
     fun OUT(): Unit = expect("out")
@@ -3085,28 +3096,28 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    : DecDigit DecDigitOrSeparator* DecDigit
     //    | DecDigit
     //    ;
-    fun DecDigits(): Unit = TODO("DecDigits")
+    //fun DecDigits(): Unit = TODO("DecDigits")
 
     //fragment DoubleExponent: [eE] [+-]? DecDigits;
-    fun DoubleExponent(): Unit = TODO("DoubleExponent")
+    //fun DoubleExponent(): Unit = TODO("DoubleExponent")
 
     //RealLiteral
     //    : FloatLiteral
     //    | DoubleLiteral
     //    ;
-    fun RealLiteral(): Unit = TODO("RealLiteral")
+    //fun RealLiteral(): Unit = TODO("RealLiteral")
 
     //FloatLiteral
     //    : DoubleLiteral [fF]
     //    | DecDigits [fF]
     //    ;
-    fun FloatLiteral(): Unit = TODO("FloatLiteral")
+    //fun FloatLiteral(): Unit = TODO("FloatLiteral")
 
     //DoubleLiteral
     //    : DecDigits? '.' DecDigits DoubleExponent?
     //    | DecDigits DoubleExponent
     //    ;
-    fun DoubleLiteral(): Unit = TODO("DoubleLiteral")
+    //fun DoubleLiteral(): Unit = TODO("DoubleLiteral")
 
     //IntegerLiteral
     //    : DecDigitNoZero DecDigitOrSeparator* DecDigit
@@ -3128,30 +3139,30 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //fragment HexDigitOrSeparator: HexDigit | '_';
     fun HexDigitOrSeparator(c: Char): Boolean = c == '_' || HexDigit(c)
 
-    fun numericLiteralSure(radix: Int, isDigit: (Char) -> Boolean): IntLiteralExpr {
-        return numericLiteral(radix, isDigit) ?: error("Not a base-$radix literal in $this")
-    }
+    //fun numericLiteralSure(radix: Int, isDigit: (Char) -> Boolean): IntLiteralExpr {
+    //    return numericLiteral(radix, isDigit) ?: error("Not a base-$radix literal in $this")
+    //}
 
-    fun numericLiteral(radix: Int, isDigit: (Char) -> Boolean): IntLiteralExpr? {
-        var n = 0
-        val c = peekChar(n)
-        var lastC = c
-        if (!isDigit(c)) return null
-        while (hasMore) {
-            n++
-            val c = peekChar(n)
-            lastC = c
-            if (!(isDigit(c) || c == '_')) break
-        }
-        if (lastC == '_') return null
-        return IntLiteralExpr(read(n).replace("_", "").toLong(radix = radix))
-    }
+    //fun numericLiteral(radix: Int, isDigit: (Char) -> Boolean): IntLiteralExpr? {
+    //    var n = 0
+    //    val c = peekChar(n)
+    //    var lastC = c
+    //    if (!isDigit(c)) return null
+    //    while (hasMore) {
+    //        n++
+    //        val c = peekChar(n)
+    //        lastC = c
+    //        if (!(isDigit(c) || c == '_')) break
+    //    }
+    //    if (lastC == '_') return null
+    //    return IntLiteralExpr(read(n).replace("_", "").toLong(radix = radix))
+    //}
 
     //HexLiteral
     //    : '0' [xX] HexDigit HexDigitOrSeparator* HexDigit
     //    | '0' [xX] HexDigit
     //    ;
-    fun HexLiteral(c: Char): Unit = TODO("HexLiteral")
+    //fun HexLiteral(c: Char): Unit = TODO("HexLiteral")
     //fun HexLiteralOpt(): IntLiteralExpr? = enrichOpt {
     //    if (expectAnyOpt("0x", "0X") == null) return@enrichOpt null
     //    numericLiteral(radix = 16) { HexDigit(it) }
@@ -3202,19 +3213,21 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //CharacterLiteral
     //    : '\'' (EscapeSeq | ~[\n\r'\\]) '\''
     //    ;
-    fun CharacterLiteral(): LiteralExpr {
-        expect("'")
-        val str = StringBuilder()
-        loop@while (hasMore) {
-            val c = peekChar()
-            when (c) {
-                '\\' -> TODO("Not implemented character escaping")
-                '\'' -> break@loop
-                else -> str.append(readChar())
-            }
-        }
-        expect("'")
-        return CharLiteralExpr(str.toString().firstOrNull() ?: '\u0000')
+    fun CharacterLiteral(): CharLiteralExpr {
+        val c = expect<CharLiteralToken>()
+        return CharLiteralExpr(c.char)
+        //expect("'")
+        //val str = StringBuilder()
+        //loop@while (hasMore) {
+        //    val c = peekChar()
+        //    when (c) {
+        //        '\\' -> TODO("Not implemented character escaping")
+        //        '\'' -> break@loop
+        //        else -> str.append(readChar())
+        //    }
+        //}
+        //expect("'")
+        //return CharLiteralExpr(str.toString().firstOrNull() ?: '\u0000')
     }
 
     // SECTION: lexicalIdentifiers
@@ -3264,28 +3277,33 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    | '`' ~([\r\n] | '`')+ '`'
     //    ;
     fun Identifier(): String {
-        var n = 0
-        val c = peekChar()
-        if (c == '`') {
-            error("backticked identifier")
+        val idToken = expect<IDToken>()
+        if (idToken.str in HARD_KEYWORDS) {
+            error("not an identifier")
         }
-        if (!(Letter(c) || c == '_')) {
-            error("Not a valid identifier starting with '$c'")
-        }
-        while (hasMore) {
-            n++
-            val c = peekChar(n)
-            if (!(Letter(c) || c == '_' || UnicodeDigit(c))) {
-                break
-            }
-        }
-        val str = peek(n)
-        when (str) {
-            "return", "for", "while", "do", "else", "when", "if", "super", "is", "in", "class", "interface", "fun", "var", "val"
-            -> error("not an identifier")
-        }
-        skip(n)
-        return str
+        return idToken.str
+        //var n = 0
+        //val c = peekChar()
+        //if (c == '`') {
+        //    error("backticked identifier")
+        //}
+        //if (!(Letter(c) || c == '_')) {
+        //    error("Not a valid identifier starting with '$c'")
+        //}
+        //while (hasMore) {
+        //    n++
+        //    val c = peekChar(n)
+        //    if (!(Letter(c) || c == '_' || UnicodeDigit(c))) {
+        //        break
+        //    }
+        //}
+        //val str = peek(n)
+        //when (str) {
+        //    "return", "for", "while", "do", "else", "when", "if", "super", "is", "in", "class", "interface", "fun", "var", "val"
+        //    -> error("not an identifier")
+        //}
+        //skip(n)
+        //return str
     }
 
     //IdentifierOrSoftKey
@@ -3340,38 +3358,32 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    | CONST
     //    | SUSPEND
     //    ;
-    fun IdentifierOrSoftKey() {
-        TODO("IdentifierOrSoftKey")
-    }
+    //fun IdentifierOrSoftKey() {
+    //    TODO("IdentifierOrSoftKey")
+    //}
 
     //FieldIdentifier
     //    : '$' IdentifierOrSoftKey
     //    ;
-    fun FieldIdentifier() {
-        TODO("FieldIdentifier")
-    }
+    //fun FieldIdentifier() {
+    //    TODO("FieldIdentifier")
+    //}
 
     //fragment UniCharacterLiteral
     //    : '\\' 'u' HexDigit HexDigit HexDigit HexDigit
     //    ;
-    fun UniCharacterLiteral() {
-        TODO()
-    }
+    //fun UniCharacterLiteral(): Unit = TODO()
 
     //fragment EscapedIdentifier
     //    : '\\' ('t' | 'b' | 'r' | 'n' | '\'' | '"' | '\\' | '$')
     //    ;
-    fun EscapedIdentifier() {
-        TODO()
-    }
+    //fun EscapedIdentifier(): Unit = TODO()
 
     //fragment EscapeSeq
     //    : UniCharacterLiteral
     //    | EscapedIdentifier
     //    ;
-    fun EscapeSeq() {
-        TODO()
-    }
+    //fun EscapeSeq(): Unit = TODO()
 
     // SECTION: characters
     //fragment Letter
@@ -3381,97 +3393,71 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //    | UNICODE_CLASS_LM
     //    | UNICODE_CLASS_LO
     //    ;
-    fun Letter(c: Char): Boolean {
-        return c in 'a'..'z' || c in 'A'..'Z'
-    }
+    //fun Letter(c: Char): Boolean = c in 'a'..'z' || c in 'A'..'Z'
 
     // SECTION: strings
     //QUOTE_OPEN: '"' -> pushMode(LineString);
     val QUOTE: String get() = "\""
-    fun QUOTE_OPEN() {
-        TODO()
-    }
+    //fun QUOTE_OPEN(): Unit = TODO()
 
     //TRIPLE_QUOTE_OPEN: '"""' -> pushMode(MultiLineString);
     val TRIPLE_QUOTE: String get() = "\"\"\""
-    fun TRIPLE_QUOTE_OPEN() {
-        TODO()
-    }
+    //fun TRIPLE_QUOTE_OPEN(): Unit = TODO()
 
     //mode LineString;
     //
     //QUOTE_CLOSE
     //    : '"' -> popMode
     //    ;
-    fun QUOTE_CLOSE() {
-        TODO()
-    }
+    //fun QUOTE_CLOSE(): Unit = TODO()
 
     //LineStrRef
     //    : FieldIdentifier
     //    ;
-    fun LineStrRef() {
-        TODO()
-    }
+    //fun LineStrRef(): Unit = TODO()
 
     //LineStrText
     //    : ~('\\' | '"' | '$')+ | '$'
     //    ;
-    fun LineStrText() {
-        TODO()
-    }
+    //fun LineStrText(): Unit = TODO()
 
     //LineStrEscapedChar
     //    : EscapedIdentifier
     //    | UniCharacterLiteral
     //    ;
-    fun LineStrEscapedChar() {
-        TODO()
-    }
+    //fun LineStrEscapedChar(): Unit = TODO()
 
     //LineStrExprStart
     //    : '${' -> pushMode(DEFAULT_MODE)
     //    ;
-    fun LineStrExprStart() {
-        TODO()
-    }
+    //fun LineStrExprStart(): Unit = TODO()
 
     //mode MultiLineString;
     //
     //TRIPLE_QUOTE_CLOSE
     //    : MultiLineStringQuote? '"""' -> popMode
     //    ;
-    fun TRIPLE_QUOTE_CLOSE() {
-        TODO()
-    }
+    //fun TRIPLE_QUOTE_CLOSE(): Unit = TODO()
 
     //MultiLineStringQuote
     //    : '"'+
     //    ;
-    fun MultiLineStringQuote() {
-        TODO()
-    }
+    //fun MultiLineStringQuote(): Unit = TODO()
 
     //MultiLineStrRef
     //    : FieldIdentifier
     //    ;
-    fun MultiLineStrRef() {
-        TODO()
-    }
+    //fun MultiLineStrRef(): Unit = TODO()
 
     //MultiLineStrText
     //    :  ~('"' | '$')+ | '$'
     //    ;
-    fun MultiLineStrText() {
-        TODO()
-    }
+    //fun MultiLineStrText(): Unit = TODO()
 
     //MultiLineStrExprStart
     //    : '${' -> pushMode(DEFAULT_MODE)
     //    ;
-    fun MultiLineStrExprStart() {
-        TODO()
-    }
+    //fun MultiLineStrExprStart(): Unit = TODO()
 
 // SECTION: inside
     //
@@ -3617,4 +3603,32 @@ open class KotlinParser(str: String) : StrReader(str), BaseParser {
     //mode DEFAULT_MODE;
     //
     //ErrorCharacter: .;
+
+    companion object {
+        val HARD_KEYWORDS = setOf(
+            "return", "for", "while", "do", "else", "when", "if", "super", "is", "in", "class", "interface", "fun", "var", "val"
+        )
+
+        val SIMPLE_IDENTIFIER = setOf(
+            "abstract", "annotation", "by", "catch", "companion", "constructor", "crossinline", "data", "dynamic",
+            "enum", "external", "final", "finally", "get", "import", "infix", "init", "inline", "inner", "internal",
+            "lateinit", "noinline", "open", "operator", "out", "override", "private", "protected", "public",
+            "reified", "sealed", "tailrec", "set", "vararg", "where", "field", "property", "receiver", "param",
+            "setparam", "delegate", "file", "expect", "actual", "const", "suspend", "value"
+        )
+
+        val VARIANCE_MODIFIERS = VarianceModifier.entries.map { it.id }.toSet()
+        val REIFICATION_MODIFIERS = ReificationModifier.entries.map { it.id }.toSet()
+
+        val CLASS_MODIFIERS = ClassModifier.entries.associateBy { it.id }
+        val MEMBER_MODIFIERS = MemberModifier.entries.associateBy { it.id }
+        val VISIBILITY_MODIFIERS = VisibilityModifier.entries.associateBy { it.id }
+        val FUNCTION_MODIFIERS = FunctionModifier.entries.associateBy { it.id }
+        val PROPERTY_MODIFIERS = PropertyModifier.entries.associateBy { it.id }
+        val INHERITANCE_MODIFIERS = InheritanceModifier.entries.associateBy { it.id }
+        val PARAMETER_MODIFIERS = ParameterModifier.entries.associateBy { it.id }
+        val PLATFORM_MODIFIERS = PlatformModifier.entries.associateBy { it.id }
+
+        val ALL_MODIFIERS: Map<String, Modifier> = CLASS_MODIFIERS + MEMBER_MODIFIERS + VISIBILITY_MODIFIERS + FUNCTION_MODIFIERS + PROPERTY_MODIFIERS + INHERITANCE_MODIFIERS + PARAMETER_MODIFIERS + PLATFORM_MODIFIERS
+    }
 }

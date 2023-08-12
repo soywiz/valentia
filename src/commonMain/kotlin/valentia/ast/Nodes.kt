@@ -1,11 +1,12 @@
 package valentia.ast
 
+import valentia.parser.BaseConsumer
 import valentia.parser.BaseReader
 import valentia.sema.ResolutionContext
 import valentia.sema.SymbolProvider
 
 abstract class Node {
-    var reader: BaseReader? = null
+    var reader: BaseConsumer? = null
     var spos: Int = -1
     var epos: Int = -1
     val rangeStr: String? get() = reader?.readAbsoluteRange(spos, epos)
@@ -100,8 +101,8 @@ data class EnumEntry(val id: String) : Node()
 data class DummyNode(val dummy: Unit = Unit) : Node()
 
 fun <T : Node> T.enrich(node: Node): T = enrich(node.reader, node.spos, node.epos)
-fun <T : Node> T.enrich(reader: BaseReader, spos: Int): T = enrich(reader, spos, reader.pos)
-fun <T : Node> T.enrich(reader: BaseReader?, spos: Int, epos: Int): T {
+fun <T : Node> T.enrich(reader: BaseConsumer, spos: Int): T = enrich(reader, spos, reader.pos)
+fun <T : Node> T.enrich(reader: BaseConsumer?, spos: Int, epos: Int): T {
     this.reader = reader
     this.spos = spos
     this.epos = epos

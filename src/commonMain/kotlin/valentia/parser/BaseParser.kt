@@ -12,15 +12,43 @@ import kotlin.contracts.contract
 open class TokenReader(val tokens: List<Token>) : BaseTokenReader {
     override var pos: Int = 0
     override val len: Int get() = tokens.size
-    override fun peek(): Token = tokens.getOrElse(pos) { EOFToken }
+    override fun peek(offset: Int): Token = tokens.getOrElse(pos + offset) { EOFToken }
+    override fun toString(): String = "TokenReader(peek=${peek()}, pos=$pos, len=$len)"
 }
 
-interface BaseTokenReader {
-    var pos: Int
-    val len: Int
-    fun peek(): Token
+inline fun <reified T: Token> BaseTokenReader.expect(): T {
+    val token = read()
+    if (token !is T) error("Not a ${T::class} but $token")
+    return token
+}
+
+inline fun <reified T: Token> BaseTokenReader.expectOpt(consume: Boolean = true): T? {
+    val token = peek()
+    return if (token is T) {
+        skip()
+        token
+    } else null
+}
+
+interface BaseTokenReader : BaseConsumer {
+    fun peek(offset: Int = 0): Token
     fun read(): Token = peek().also { pos++ }
-    fun readAbsoluteRange(start: Int, end: Int): String {
+    override fun EOF() {
+        check(eof) { "Not EOF found but ${peek()}" }
+    }
+
+    fun expectAnyOpt(strs: Set<String>, consume: Boolean = true): String? {
+        val token = peek()
+        if (token.str in strs) {
+            if (consume) {
+                pos++
+            }
+            return token.str
+        }
+        return null
+    }
+
+    override fun readAbsoluteRange(start: Int, end: Int): String {
         val oldPos = pos
         try {
             val out = arrayListOf<String>()
@@ -34,13 +62,16 @@ interface BaseTokenReader {
         }
     }
 
-    fun matches(str: String, consume: Boolean = false): Boolean {
+    override fun matches(str: String, consume: Boolean): Boolean {
         if (peek().str == str) {
             if (consume) pos++
             return true
         }
         return false
     }
+}
+
+interface BaseTokenParser : BaseTokenReader {
 }
 
 open class StrReader(val str: String) : BaseReader {
@@ -53,21 +84,85 @@ open class StrReader(val str: String) : BaseReader {
     override fun toString(): String = "StrReader(pos=$pos, len=$len, peek='${peek(8)}')"
 }
 
-interface BaseReader {
+interface BaseConsumer {
     var pos: Int
     val len: Int
     val eof: Boolean get() = pos >= len
     val hasMore: Boolean get() = !eof
-
     fun readAbsoluteRange(start: Int, end: Int): String
-
     fun skip(count: Int = 1) { pos += count }
+    fun matches(str: String, consume: Boolean = false): Boolean
+
+    fun reportError(e: Throwable) {
+    }
+
+    fun debug(message: Any?) {
+        //kotlin.io.println(message)
+    }
+
+    fun unexpected(reason: String? = null): Nothing = TODO("reason=$reason")
+
+    //open fun Hidden() {
+    //}
+
+    fun expect(str: String) {
+        if (!matches(str, consume = true)) error("Expected '$str' but found $this")
+    }
+
+    fun expectAny(vararg strs: String): String {
+        return expectAnyOpt(*strs) ?: error("Couldn't find ${strs.toList()} in $this")
+    }
+
+    fun expectAnyOpt(vararg strs: String, consume: Boolean = true): String? {
+        for (str in strs) if (matches(str, consume = consume)) return str
+        return null
+    }
+
+
+    fun expectOpt(str: String): Boolean {
+        return matches(str, consume = true)
+    }
+
+    fun <T> expectAndRecoverSure(start: String, end: String, block: () -> T): T {
+        return expectAndRecover(start, end, block) ?: TODO("expectAndRecoverSure recovery")
+    }
+
+    //@OptIn(ExperimentalContracts::class)
+    fun <T> expectAndRecover(start: String, end: String, block: () -> T): T? {
+        //contract { callsInPlace(block, InvocationKind.EXACTLY_ONCE) }
+        expect(start)
+        try {
+            val res = block()
+            expect(end)
+            return res
+        } catch (e: IllegalStateException) {
+            debug("RECOVERING NOT IMPLEMENTED!")
+            throw e
+        }
+        return null
+    }
+
+    fun EOF() {
+        check(eof) { "Not EOF found" }
+    }
+
+}
+
+interface BaseReader : BaseConsumer {
     fun peekChar(offset: Int = 0): Char
     fun readChar(): Char = peekChar().also { skip(1) }
     fun peek(count: Int): String
     fun read(count: Int): String = peek(count).also { skip(it.length) }
 
-    fun matches(str: String, consume: Boolean = false): Boolean {
+    fun expectChar(char: Char) {
+        val c = peekChar()
+        when (c) {
+            char -> skip(1)
+            else -> error("Expected '$char' but found '·c'")
+        }
+    }
+
+    override fun matches(str: String, consume: Boolean): Boolean {
         for (n in str.indices) {
             if (peekChar(n) != str[n]) return false
         }
@@ -110,7 +205,7 @@ data class StringSet(val strings: List<String>) {
     constructor(vararg strings: String) : this(strings.toList())
 }
 
-inline fun <T> BaseReader.resetOnException(block: () -> T): Boolean {
+inline fun <T> BaseConsumer.resetOnException(block: () -> T): Boolean {
     val oldPos = pos
     try {
         block()
@@ -122,67 +217,10 @@ inline fun <T> BaseReader.resetOnException(block: () -> T): Boolean {
 }
 
 interface BaseParser : BaseReader {
-    fun reportError(e: Throwable)
-
-    fun debug(message: Any?) {
-        //kotlin.io.println(message)
-    }
-
-    fun unexpected(reason: String? = null): Nothing = TODO("reason=$reason")
-
-    //open fun Hidden() {
-    //}
-
-    fun expect(str: String) {
-        if (!matches(str, consume = true)) error("Expected '$str' but found $this")
-    }
-    fun expectChar(char: Char) {
-        val c = peekChar()
-        when (c) {
-            char -> skip(1)
-            else -> error("Expected '$char' but found '·c'")
-        }
-    }
-
-    fun expectAny(vararg strs: String): String {
-        return expectAnyOpt(*strs) ?: error("Couldn't find ${strs.toList()} in $this")
-    }
-
-    fun expectAnyOpt(vararg strs: String, consume: Boolean = true): String? {
-        for (str in strs) if (matches(str, consume = consume)) return str
-        return null
-    }
-
-    fun expectOpt(str: String): Boolean {
-        return matches(str, consume = true)
-    }
-
-    fun <T> expectAndRecoverSure(start: String, end: String, block: () -> T): T {
-        return expectAndRecover(start, end, block) ?: TODO("expectAndRecoverSure recovery")
-    }
-
-    //@OptIn(ExperimentalContracts::class)
-    fun <T> expectAndRecover(start: String, end: String, block: () -> T): T? {
-        //contract { callsInPlace(block, InvocationKind.EXACTLY_ONCE) }
-        expect(start)
-        try {
-            val res = block()
-            expect(end)
-            return res
-        } catch (e: IllegalStateException) {
-            debug("RECOVERING NOT IMPLEMENTED!")
-            throw e
-        }
-        return null
-    }
-
-    fun EOF() {
-        check(eof) { "Not EOF found" }
-    }
 
 }
 
-inline fun <T> BaseParser.OR(vararg funcs: () -> T?, name: String? = null): T {
+inline fun <T> BaseConsumer.OR(vararg funcs: () -> T?, name: String? = null): T {
     val rpos = pos
     val exceptions = arrayListOf<Throwable>()
     for (func in funcs) {
@@ -197,7 +235,7 @@ inline fun <T> BaseParser.OR(vararg funcs: () -> T?, name: String? = null): T {
     error("Couldn't match any of OR[$name][$this] [${funcs.size}]: ${exceptions.toList()}")
 }
 
-inline fun <T1, T2> BaseParser.ORDis(func1: () -> T1?, func2: () -> T2?): Disjunction2<T1, T2> {
+inline fun <T1, T2> BaseConsumer.ORDis(func1: () -> T1?, func2: () -> T2?): Disjunction2<T1, T2> {
     val rpos = pos
     val exceptions = arrayListOf<Throwable>()
     for (n in 0 until 2) {
@@ -215,7 +253,7 @@ inline fun <T1, T2> BaseParser.ORDis(func1: () -> T1?, func2: () -> T2?): Disjun
     error("Couldn't match any of OR [2]: ${exceptions.toList()}")
 }
 
-inline fun <T1, T2, T3> BaseParser.ORDis(func1: () -> T1?, func2: () -> T2?, func3: () -> T3?): Disjunction3<T1, T2, T3> {
+inline fun <T1, T2, T3> BaseConsumer.ORDis(func1: () -> T1?, func2: () -> T2?, func3: () -> T3?): Disjunction3<T1, T2, T3> {
     val rpos = pos
     val exceptions = arrayListOf<Throwable>()
     for (n in 0 until 2) {
@@ -235,43 +273,48 @@ inline fun <T1, T2, T3> BaseParser.ORDis(func1: () -> T1?, func2: () -> T2?, fun
 }
 
 @OptIn(ExperimentalContracts::class)
-inline fun <T> BaseParser.opt(block: () -> T): T? {
+inline fun <T> BaseConsumer.opt(block: () -> T): T? {
     contract { callsInPlace(block, InvocationKind.EXACTLY_ONCE) }
     var res: T? = null
     resetOnException { res = block() }
     return res
 }
 
-inline fun <T> BaseParser.multiple(atLeastOne: Boolean, block: () -> T?): List<T> {
+inline fun <T> BaseConsumer.multiple(atLeastOne: Boolean, block: () -> T?): List<T> {
     val out = arrayListOf<T>()
     if (atLeastOne) {
-        out += block() ?: TODO("multiple")
+        out += block() ?: TODO("multiple atLeastOne=$atLeastOne")
     }
-    while (hasMore) {
+    loop@while (hasMore) {
         val oldPos = pos
         try {
-            out += block() ?: break
+            val res = block()
+            if (res == null) {
+                pos = oldPos
+                break@loop
+            }
+            out += res
         } catch (e: IllegalStateException) {
             pos = oldPos
-            break
+            break@loop
         }
     }
     return out
 }
 
-inline fun <T> BaseParser.oneOrMore(block: () -> T?): List<T> = multiple(atLeastOne = true, block)
-inline fun <T> BaseParser.zeroOrMore(block: () -> T?): List<T> = multiple(atLeastOne = false, block)
+inline fun <T> BaseConsumer.oneOrMore(block: () -> T?): List<T> = multiple(atLeastOne = true, block)
+inline fun <T> BaseConsumer.zeroOrMore(block: () -> T?): List<T> = multiple(atLeastOne = false, block)
 
-inline fun BaseParser.recoverWithExpect(token: String, block: () -> Unit) {
+inline fun BaseConsumer.recoverWithExpect(token: String, block: () -> Unit) {
     TODO("recoverWithExpect")
 }
 
-inline fun <T : Node> BaseParser.enrich(crossinline block: () -> T): T {
+inline fun <T : Node> BaseConsumer.enrich(crossinline block: () -> T): T {
     val spos = pos
     return block().also { it.enrich(this@enrich, spos) }
 }
 
-inline fun <T : Node> BaseParser.enrichOpt(crossinline block: () -> T?): T? {
+inline fun <T : Node> BaseConsumer.enrichOpt(crossinline block: () -> T?): T? {
     val spos = pos
     return block()?.also { it.enrich(this@enrichOpt, spos) }
 }

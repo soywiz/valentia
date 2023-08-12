@@ -21,7 +21,7 @@ class ValentiaParserFunTest : StmBuilder {
                         2 -> 'b'
                     }
                 }
-            """) as? Any?
+            """)
         )
     }
 
