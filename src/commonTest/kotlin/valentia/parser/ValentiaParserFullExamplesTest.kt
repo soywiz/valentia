@@ -420,6 +420,14 @@ class ValentiaParserFullExamplesTest : StmBuilder {
     }
 
     @Test
+    fun test9b() {
+        ValentiaParser.file("""
+            object EOFToken : Token("")
+            abstract class HiddenToken(str: String) : Token(str) 
+        """.trimIndent())
+    }
+
+    @Test
     fun test9() {
         //while (true)
         ValentiaParser.file(

@@ -1,7 +1,10 @@
 package valentia.parser
 
+import valentia.ast.Decl
+import valentia.ast.FileNode
 import java.io.File
 import kotlin.test.Test
+import kotlin.time.Duration
 import kotlin.time.measureTimedValue
 
 class ParseValentiaSrc {
@@ -11,9 +14,18 @@ class ParseValentiaSrc {
         for (file in files) {
             println("FILE: $file : ")
             val text = file.readText()
-            val (tokens, timeTokenize) = measureTimedValue { ValentiaTokenizer(text).tokenize() }
-            val (nodes, timeParse) = measureTimedValue { ValentiaParser(tokens).valentiaFile() }
-            println("   -> tokenize=$timeTokenize, parse=$timeParse, topLevelDecls=${nodes.topLevelDecls.size}")
+            var _timeTokenize: Duration? = null
+            var _timeParse: Duration? = null
+            var _nodes: FileNode? = null
+            try {
+                val (tokens, timeTokenize) = measureTimedValue { ValentiaTokenizer(text).tokenize() }
+                _timeTokenize = timeTokenize
+                val (nodes, timeParse) = measureTimedValue { ValentiaParser(tokens).valentiaFile() }
+                _nodes = nodes
+                _timeParse = timeParse
+            } finally {
+                println("   -> tokenize=$_timeTokenize, parse=$_timeParse, topLevelDecls=${_nodes?.topLevelDecls?.size}")
+            }
         }
     }
 }

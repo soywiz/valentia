@@ -231,9 +231,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun classBody(): List<Decl>? {
         if (!matches("{")) return null
         return expectAndRecover("{", "}", reason = "classBody") {
-            NLs()
-            classMemberDeclarations().also { NLs() }
-        } ?: emptyList()
+            NLs(); classMemberDeclarations().also { NLs() }
+        }
     }
 
     //classParameters
@@ -286,9 +285,9 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         while (hasMore) {
             NLs()
             if (end()) break
-            separator()
             NLs()
             out += block() ?: break
+            if (!separator()) break
         }
         if (trailingSeparator) {
             separator()
@@ -306,7 +305,9 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : annotatedDelegationSpecifier (NL* COMMA NL* annotatedDelegationSpecifier)*
     //    ;
     fun delegationSpecifiers(): List<SubTypeInfo>? {
-        return parseListNew({ expectOpt(",") }, end = { matches("{") }, trailingSeparator = false) { annotatedDelegationSpecifier() }
+        return parseListNew({ expectOpt(",") }, end = { matches("{") }, oneOrMore = true, trailingSeparator = false) {
+            annotatedDelegationSpecifier()
+        }
     }
 
     //delegationSpecifier
@@ -423,7 +424,6 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun classMemberDeclarations(): List<Decl> {
         return zeroOrMore {
-            NLs()
             if (matches("}")) return@zeroOrMore null
             classMemberDeclaration().also {
                 //println("DECL: $it")
@@ -686,51 +686,46 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : modifiers? GET
     //      (NL* LPAREN NL* RPAREN (NL* COLON NL* type)? NL* functionBody)?
     //    ;
-    fun getter() {
-        modifiers()
-        GET()
+    fun getter(modifiers: Modifiers = modifiers()): Any? {
+        if (!expectOpt("get")) return null
         opt {
             NLs()
             expectAndRecover("(", ")") {
                 NLs()
             }
             opt {
-                NLs()
-                COLON()
+                if (!expectOptNLs(":")) return@opt null
                 NLs()
                 type()
             }
             NLs()
             functionBody()
         }
+        return Unit
     }
 
     //setter
     //    : modifiers? SET
     //      (NL* LPAREN NL* functionValueParameterWithOptionalType (NL* COMMA)? NL* RPAREN (NL* COLON NL* type)? NL* functionBody)?
     //    ;
-    fun setter() {
-        modifiers()
-        SET()
+    fun setter(modifiers: Modifiers = modifiers()): Any? {
+        if (!expectOpt("set")) return null
         opt {
             NLs()
             expectAndRecover("(", ")") {
                 NLs()
                 functionValueParameterWithOptionalType()
-                opt {
-                    NLs()
-                    COMMA()
-                }
+                expectOptNLs(",")
             }
             opt {
-                NLs()
-                COLON()
+                if (!expectOptNLs(":")) return@opt null
                 NLs()
                 type()
             }
             NLs()
             functionBody()
         }
+        return Unit
     }
 
     //parametersWithOptionalType
@@ -798,15 +793,21 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //      (NL* COLON NL* delegationSpecifiers)?
     //      (NL* classBody)?
     //    ;
-    fun objectDeclaration(modifiers: Modifiers): Decl {
+    fun objectDeclaration(modifiers: Modifiers): Decl? {
         debug("TODO: objectDeclaration")
-        expect("object")
+        if (!expectOpt("object")) return null
         NLs()
         val name = simpleIdentifier()
-        NLs()
-        if (expectOpt(":")) { NLs(); delegationSpecifiers() } else null
-        NLs()
-        classBody()
+        val delegations = if (expectOptNLs(":")) {
+            NLs()
+            delegationSpecifiers()
+        } else {
+            null
+        }
+        val body = opt {
+            NLs()
+            classBody()
+        }
         return ObjectDecl(name)
     }
 
@@ -2013,8 +2014,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             val params = opt {
                 NLs()
                 val params = lambdaParameters(oneOrMore = false)
-                NLs()
-                if (!expectOpt("->")) return@opt null
+                if (!expectOptNLs("->")) return@opt null
                 NLs()
                 params
             }
@@ -2098,15 +2098,12 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun objectLiteral(): ObjectLiteralExpr? {
         val spos = pos
         val isData = expectOpt("data")
-        NLs()
-        if (!expectOpt("object")) {
+        if (!expectOptNLs("object")) {
             pos = spos
             return null
         }
-        NLs()
-
         val delegationSpecifiers: List<SubTypeInfo>? = when {
-            expectOpt(":") -> delegationSpecifiers().also { NLs() }
+            expectOptNLs(":") -> delegationSpecifiers().also { NLs() }
             else -> null
         }
         val body = opt {
@@ -2132,13 +2129,9 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun superExpression(): SuperExpr? {
         if (!expectOpt("super")) return null
-        val type = if (matches("<")) {
-            expectAndRecover("<", ">") {
-                NLs()
-                type().also { NLs() }
-            }
-        } else {
-            null
+        val type = when {
+            matches("<") -> expectAndRecover("<", ">") { NLs(); type().also { NLs() } }
+            else -> null
         }
         val label = if (expectOpt("@")) Identifier() else null
         return SuperExpr(label = label, type = type)
@@ -2280,9 +2273,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             NLs()
             val peek = peek().str
             when (peek) {
-                "catch" -> {
-                    catches += catchBlock()
-                }
+                "catch" -> catches += catchBlock()
                 "finally" -> break@loop
                 else -> break@loop
             }
@@ -2314,8 +2305,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //finallyBlock
     //    : FINALLY NL* block
     //    ;
-    fun finallyBlock(): Stm {
-        expect("finally")
+    fun finallyBlock(): Stm? {
+        if (!expectOpt("finally")) return null
         NLs()
         return block() ?: error("Expect block after finally")
     }
