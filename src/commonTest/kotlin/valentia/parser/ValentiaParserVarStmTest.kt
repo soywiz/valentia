@@ -15,13 +15,21 @@ open class ValentiaParserVarStmTest : StmBuilder {
         )
     }
 
-    //@Test
-    //fun testVarLazyDelegatedStatement() {
-    //    assertEquals(
-    //        STM(VariableDecl("a", expr = 1.lit, delegation = true)),
-    //        ValentiaParser.statement("var a by lazy { 1 }") as Any
-    //    )
-    //}
+    @Test
+    fun testVarLazyDelegatedDecl() {
+        assertEquals(
+            STM(VariableDecl("a", expr = 1.lit, delegation = true)),
+            ValentiaParser.topLevelDecl("var a by lazy { 1 }") as Any
+        )
+    }
+
+    @Test
+    fun testVarLazyDelegatedStatement() {
+        assertEquals(
+            STM(VariableDecl("a", expr = 1.lit, delegation = true)),
+            ValentiaParser.statement("var a by lazy { 1 }") as Any
+        )
+    }
 
     @Test
     fun testVarStatement() {
@@ -68,6 +76,18 @@ open class ValentiaParserVarStmTest : StmBuilder {
         assertEquals(
             null,
             ValentiaParser.statement("var (a, b: Int) = 10 to 20") as? Any?
+        )
+    }
+
+    @Test
+    fun testDelegated1() {
+        assertEquals(
+            null,
+            ValentiaParser.file("""
+                data class NumberToken(val number: String) : Token(number) {
+                    val numberCleanedUp: String by lazy { "" }
+                }
+            """.trimIndent()) as? Any?
         )
     }
 }
