@@ -11,20 +11,24 @@ open class ValentiaParser(
     fun valentiaFile(): FileNode = kotlinFile()
 
     companion object {
+        private fun <T> parserEOF(str: String, block: ValentiaParser.() -> T): T {
+            return ValentiaParser(str).let { parser -> block(parser).also { parser.EOF() } }
+        }
+
         fun topLevelDecl(@Language("kotlin") str: String): Decl =
-            ValentiaParser(str).topLevelObject()
+            parserEOF(str) { topLevelObject() }
         fun file(@Language("kotlin") str: String): FileNode =
-            ValentiaParser(str).valentiaFile()
+            parserEOF(str) { valentiaFile() }
         fun expression(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Expr =
-            ValentiaParser(str).expression()
+            parserEOF(str) { expression() }
         fun assignment(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Stm =
-            ValentiaParser(str).assignment()
+            parserEOF(str) { assignment() }
         fun statement(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Stm =
-            ValentiaParser(str).let { parser -> parser.statement().also { parser.EOF() } }
+            parserEOF(str) { statement() }
         fun statements(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): List<Stm> =
-            ValentiaParser(str).statements()
+            parserEOF(str) { statements() }
         fun type(@Language("kotlin", prefix = "typealias Example = ", suffix = "") str: String): TypeNode =
-            ValentiaParser(str).type()
+            parserEOF(str) { type() }
 
     }
 }
