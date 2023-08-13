@@ -53,5 +53,13 @@ class ValentiaTokenizerTest {
         """.trimIndent()).tokenize())
     }
 
+    @Test
+    fun testComments2() {
+        println(ValentiaTokenizer("""
+            // hello
+            world
+        """.trimIndent()).tokenize())
+    }
+
     val TRIPLE = "\"\"\""
 }

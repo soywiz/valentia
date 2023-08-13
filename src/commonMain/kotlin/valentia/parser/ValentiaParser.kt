@@ -11,18 +11,18 @@ open class ValentiaParser(
     fun valentiaFile(): FileNode = kotlinFile()
 
     companion object {
-        private fun <T> parserEOF(str: String, block: ValentiaParser.() -> T): T {
-            return ValentiaParser(str).let { parser -> block(parser).also { parser.EOF() } }
+        private fun <T> parserEOF(str: String, checkEOF: Boolean = true, block: ValentiaParser.() -> T): T {
+            return ValentiaParser(str).let { parser -> block(parser).also { if (checkEOF) parser.EOF() } }
         }
 
         fun topLevelDecl(@Language("kotlin") str: String): Decl =
-            parserEOF(str) { topLevelObject() }
+            parserEOF(str) { topLevelObject() ?: error("Not a topLevelObject") }
         fun file(@Language("kotlin") str: String): FileNode =
             parserEOF(str) { valentiaFile() }
-        fun expression(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Expr =
-            parserEOF(str) { expression() }
+        fun expression(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String, checkEOF: Boolean = true): Expr =
+            parserEOF(str, checkEOF) { expression() }
         fun assignment(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Stm =
-            parserEOF(str) { assignment() }
+            parserEOF(str) { assignment() ?: error("Not an assignment") }
         fun statement(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Stm =
             parserEOF(str) { statement() }
         fun statements(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): List<Stm> =

@@ -41,6 +41,7 @@ open class ValentiaParserTypealiasTest {
                 modifiers = Modifiers(VisibilityModifier.PRIVATE)
             ),
             ValentiaParser.topLevelDecl("private typealias Example<T> = Map<Int, T>") as Any?
+            //ValentiaParser.topLevelDecl("private typealias Example<T> = Int") as Any?
         )
     }
 }

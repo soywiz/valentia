@@ -90,4 +90,23 @@ open class ValentiaParserVarStmTest : StmBuilder {
             """.trimIndent()) as? Any?
         )
     }
+
+    @Test
+    fun test2() {
+        assertEquals(
+            null,
+            ValentiaParser.statement("""
+                val falseBody = if (expectOpt("else")) {
+                    opt { controlStructureBody() }.also {
+                        NLs()
+                        opt { SEMICOLON() }
+                        NLs()
+                    }
+                } else {
+                    null
+                }
+            """.trimIndent()) as? Any?
+        )
+
+    }
 }

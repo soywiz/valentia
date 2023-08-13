@@ -5,6 +5,8 @@ import valentia.util.isLetterOrUndescore
 import valentia.util.whileMap
 
 class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
+    var currentLine = 1
+
     fun tokenize(): List<Token> {
         val out = arrayListOf<Token>()
         while (hasMore) {
@@ -13,11 +15,19 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
         return out
     }
 
+    fun String.countLineBreaks(): Int {
+        // @TODO: \r or \r\n sequences should match too
+        return this.count { it == '\n' }
+    }
+
     fun readToken(): Token {
-        when (val c = peekChar()) {
+        val line = currentLine
+        return when (val c = peekChar()) {
             ' ', '\t', '\r', '\n', '\u000c' -> {
                 val res = readWhile { it == ' ' || it == '\t' || it == '\r' || it == '\n' || it == '\u000c' }
-                return if (res.contains('\n') || res.contains('\r')) NLToken(res) else SpacesToken(res)
+                val nlines = res.countLineBreaks()
+                currentLine += nlines
+                (if (nlines >= 1) NLToken(res, nlines) else SpacesToken(res))
             }
             in '0'..'9' -> {
                 //while (hasMore) {
@@ -49,17 +59,20 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
                 }
                 //println("N=${"$baseNum$extra"}")
                 //println(" -> ${peekChar()}")
-                return NumberToken("$baseNum${extra ?: ""}")
+                NumberToken("$baseNum${extra ?: ""}")
             }
             in 'a'..'z', in 'A'..'Z', '_' -> {
                 if (expectOpt("as?")) {
                     return IDToken("as?")
                 }
-                return IDToken(readWhile { it.isLetterOrDigitOrUndescore() })
+                IDToken(readWhile { it.isLetterOrDigitOrUndescore() })
             }
             '`' -> {
                 val c = readChar()
-                return IDToken("$c" + readUntil { it == '`' })
+                IDToken("$c" + readUntil {
+                    if (it == '\r' || it == '\n') error("Invalid token")
+                    it == '`'
+                })
             }
             '\'' -> {
                 val spos = pos
@@ -68,7 +81,7 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
                 }
                 val str = readAbsoluteRange(spos, pos)
 
-                return when (val token = tokens.firstOrNull()) {
+                when (val token = tokens.firstOrNull()) {
                     null -> CharLiteralToken(str, '\u0000')
                     is LiteralStringPartToken -> CharLiteralToken(str, token.string.first())
                     is EscapeStringPartToken -> CharLiteralToken(str, token.c)
@@ -86,51 +99,52 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
                         whileMap({ hasMore && peekChar() != '"' }) { readStringToken('"') }
                     }
                 }
-                return StringInterpolationToken(readAbsoluteRange(spos, pos), tokens, if (triple) "\"\"\"" else "\"")
+                StringInterpolationToken(readAbsoluteRange(spos, pos), tokens, if (triple) "\"\"\"" else "\"")
             }
-            '?' -> return SymbolToken(expectAny("?:", "?.", "?"))
-            '&' -> return SymbolToken(expectAny("&&", "&"))
-            '|' -> return SymbolToken(expectAny("||", "|"))
-            '^' -> return SymbolToken(expectAny("^"))
-            '=' -> return SymbolToken(expectAny("===", "==", "=>", "="))
+            '?' -> SymbolToken(expectAny("?:", "?.", "?"))
+            '&' -> SymbolToken(expectAny("&&", "&"))
+            '|' -> SymbolToken(expectAny("||", "|"))
+            '^' -> SymbolToken(expectAny("^"))
+            '=' -> SymbolToken(expectAny("===", "==", "=>", "="))
             '!' -> {
                 if (!peekChar(3).isLetterOrDigitOrUndescore()) {
                     if (expectOpt("!in")) return SymbolToken("!in")
                     if (expectOpt("!is")) return SymbolToken("!is")
                 }
-                return SymbolToken(expectAny("!==", "!=", "!!", "!"))
+                SymbolToken(expectAny("!==", "!=", "!!", "!"))
             }
-            '~' -> return SymbolToken(expectAny("~"))
-            //'.' -> return SymbolToken(expectAny(".*", "..>", "..", "."))
-            '.' -> return SymbolToken(expectAny("..>", "..", "."))
-            '@' -> return SymbolToken(expectAny("@"))
+            '~' -> SymbolToken(expectAny("~"))
+            //'.' -> SymbolToken(expectAny(".*", "..>", "..", "."))
+            '.' -> SymbolToken(expectAny("..>", "..", "."))
+            '@' -> SymbolToken(expectAny("@"))
             '#' -> {
                 if (matches("#!")) {
-                    return ShebangToken(readUntil { it == '\r' || it == '\n' })
+                    ShebangToken(readUntil { it == '\r' || it == '\n' })
+                } else {
+                    SymbolToken(expectAny("#"))
                 }
-                return SymbolToken(expectAny("#"))
             }
-            //'<' -> return SymbolToken(expectAny("<<<", "<<=", "<=", "<<", "<"))
-            //'>' -> return SymbolToken(expectAny(">>>", ">>=", ">=", ">>", ">"))
-            '<' -> return SymbolToken(expectAny("<<=", "<=", "<"))
-            '>' -> return SymbolToken(expectAny(">>=", ">=", ">"))
-            '-' -> return SymbolToken(expectAny("-=", "->", "--", "-"))
-            '+' -> return SymbolToken(expectAny("+=", "++", "+"))
-            '*' -> return SymbolToken(expectAny("*=", "*"))
-            '%' -> return SymbolToken(expectAny("%=", "%"))
-            ',' -> return SymbolToken(expectAny(","))
-            ';' -> return SymbolToken(expectAny(";"))
-            ':' -> return SymbolToken(expectAny("::", ":"))
-            '[' -> return SymbolToken(expectAny("["))
-            ']' -> return SymbolToken(expectAny("]"))
-            '(' -> return SymbolToken(expectAny("("))
-            ')' -> return SymbolToken(expectAny(")"))
-            '{' -> return SymbolToken(expectAny("{"))
-            '}' -> return SymbolToken(expectAny("}"))
+            //'<' -> SymbolToken(expectAny("<<<", "<<=", "<=", "<<", "<"))
+            //'>' -> SymbolToken(expectAny(">>>", ">>=", ">=", ">>", ">"))
+            '<' -> SymbolToken(expectAny("<<=", "<=", "<"))
+            '>' -> SymbolToken(expectAny(">>=", ">=", ">"))
+            '-' -> SymbolToken(expectAny("-=", "->", "--", "-"))
+            '+' -> SymbolToken(expectAny("+=", "++", "+"))
+            '*' -> SymbolToken(expectAny("*=", "*"))
+            '%' -> SymbolToken(expectAny("%=", "%"))
+            ',' -> SymbolToken(expectAny(","))
+            ';' -> SymbolToken(expectAny(";"))
+            ':' -> SymbolToken(expectAny("::", ":"))
+            '[' -> SymbolToken(expectAny("["))
+            ']' -> SymbolToken(expectAny("]"))
+            '(' -> SymbolToken(expectAny("("))
+            ')' -> SymbolToken(expectAny(")"))
+            '{' -> SymbolToken(expectAny("{"))
+            '}' -> SymbolToken(expectAny("}"))
             '/' -> {
                 val spos = pos
                 if (matches("//")) {
-                    return CommentToken(readUntil { it == '\n' || it == '\r' })
+                    CommentToken(readUntil { it == '\n' || it == '\r' })
                 } else if (matches("/*")) {
                     var open = 0
                     while (hasMore) {
@@ -143,15 +157,19 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
                         }
                         skip()
                     }
-                    return CommentToken(readAbsoluteRange(spos, pos))
+                    CommentToken(readAbsoluteRange(spos, pos).also {
+                        currentLine += it.countLineBreaks()
+                    })
+                } else {
+                    SymbolToken(expectAny("/=", "/"))
                 }
-                return SymbolToken(expectAny("/=", "/"))
             }
             else -> TODO("unknown '$c'")
-        }
+        }.also { it.line = line }
     }
 
     fun readStringTripleToken(): StringPartToken {
+        val line = currentLine
         return when (peekChar()) {
             '\$' -> {
                 val spos = pos
@@ -164,9 +182,11 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
                 ExpressionStringPartToken(readAbsoluteRange(spos, pos), tokens)
             }
             else -> {
-                LiteralStringPartToken(readUntil { it == '\$' || matches("\"\"\"") })
+                LiteralStringPartToken(readUntil { it == '\$' || matches("\"\"\"") }.also {
+                    currentLine += it.countLineBreaks()
+                })
             }
-        }
+        }.also { it.line = line }
     }
 
     fun readEscapeSequence(): EscapeStringPartToken {
@@ -185,10 +205,11 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
             'b' -> '\b'
             else -> c
         }
-        return EscapeStringPartToken(readAbsoluteRange(spos, pos), rc)
+        return EscapeStringPartToken(readAbsoluteRange(spos, pos), rc).also { it.line = currentLine }
     }
 
     fun readStringToken(end: Char): StringPartToken {
+        val line = currentLine
         return when (peekChar()) {
             end -> unexpected()
             '\$' -> {
@@ -205,9 +226,11 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
                 readEscapeSequence()
             }
             else -> {
-                LiteralStringPartToken(readUntil { it == '\$' || it == '\\' || it == end })
+                LiteralStringPartToken(readUntil { it == '\$' || it == '\\' || it == end }.also {
+                    currentLine += it.countLineBreaks()
+                })
             }
-        }
+        }.also { it.line = line }
     }
 
     override fun reportError(e: Throwable) {
@@ -216,13 +239,14 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
 }
 
 sealed class Token(val str: String) {
+    var line = -1
     //override fun toString(): String = str
 }
 object EOFToken : Token("")
 abstract class HiddenToken(str: String) : Token(str)
 data class CommentToken(val comment: String) : HiddenToken(comment)
 data class SpacesToken(val spaces: String) : HiddenToken(spaces)
-data class NLToken(val spaces: String) : Token(spaces)
+data class NLToken(val spaces: String, val nlines: Int) : Token(spaces)
 data class SymbolToken(val symbol: String) : Token(symbol)
 data class ShebangToken(val shebang: String) : Token(shebang)
 data class NumberToken(val number: String) : Token(number) {

@@ -1,9 +1,13 @@
 package valentia.parser
 
+import valentia.ast.FuncTypeNode
+import valentia.ast.GenericType
+import valentia.ast.NamedTypeNode
 import valentia.ast.NodeBuilder.Companion.generic
 import valentia.ast.NodeBuilder.Companion.type
 import valentia.ast.NodeBuilder.Companion.multi
 import valentia.ast.NodeBuilder.Companion.multiType
+import valentia.ast.SimpleType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -27,15 +31,19 @@ open class ValentiaParserTypeTest {
     @Test
     fun testTypeFunc() {
         assertEquals(
-            null,
+            FuncTypeNode(ret = SimpleType(name = "T"), params = listOf(NamedTypeNode("Int".type))),
             ValentiaParser.type("(Int) -> T") as Any?
         )
     }
 
     @Test
     fun testTypeGenerics() {
+
         assertEquals(
-            null,
+            GenericType(
+                "LinkedHashMap".type,
+                generics = listOf("String".type, GenericType("ArrayList".type, generics = listOf("Decl".type)))
+            ),
             ValentiaParser.type("LinkedHashMap<String, ArrayList<Decl>>") as Any?
         )
     }

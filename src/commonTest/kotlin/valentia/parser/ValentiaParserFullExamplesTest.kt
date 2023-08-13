@@ -8,7 +8,8 @@ class ValentiaParserFullExamplesTest : StmBuilder {
 
     @Test
     fun test1() {
-        ValentiaParser.file("""
+        ValentiaParser.file(
+            """
             package valentia.parser
             
             import java.io.File
@@ -30,12 +31,14 @@ class ValentiaParserFullExamplesTest : StmBuilder {
                     }
                 }
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
     }
 
     @Test
     fun test2() {
-        ValentiaParser.file("""
+        ValentiaParser.file(
+            """
             package kotlins.parser
 
             import org.antlr.v4.runtime.*
@@ -66,23 +69,27 @@ class ValentiaParserFullExamplesTest : StmBuilder {
                     println(ctx.packageHeader())
                 }
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
     }
 
     @Test
     fun test3() {
-        ValentiaParser.file("""
+        ValentiaParser.file(
+            """
             package valentia.util
 
             fun Char.isLetterOrUndescore(): Boolean = isLetter() || this == '_'
             fun Char.isLetterOrDigitOrUndescore(): Boolean = isLetter() || isDigit() || this == '_'
             fun Char.isHexDigit(): Boolean = isDigit() || this in 'a'..'f' || this in 'A'..'F'
-        """.trimIndent())
+        """.trimIndent()
+        )
     }
 
     @Test
     fun test4() {
-        ValentiaParser.file("""
+        ValentiaParser.file(
+            """
             package valentia.util
 
             fun <T> whileMap(cond: (Int) -> Boolean, gen: () -> T): List<T> {
@@ -91,12 +98,14 @@ class ValentiaParserFullExamplesTest : StmBuilder {
                 while (cond(out.size)) out += gen()
                 return out
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
     }
 
     @Test
     fun test5() {
-        ValentiaParser.file("""
+        ValentiaParser.file(
+            """
             package valentia.util
 
             interface Indenter {
@@ -155,23 +164,27 @@ class ValentiaParserFullExamplesTest : StmBuilder {
                     unindent()
                 }
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
     }
 
     @Test
     fun test5a() {
-        ValentiaParser.file("""
+        ValentiaParser.file(
+            """
             package valentia.util
 
             interface Indenter {
                 fun line(str: String, suffix: String = " {", newline: String = "}", block: () -> Unit): Line
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
     }
 
     @Test
     fun test5b() {
-        ValentiaParser.file("""
+        ValentiaParser.file(
+            """
             package valentia.util
 
             interface Indenter {
@@ -194,12 +207,14 @@ class ValentiaParserFullExamplesTest : StmBuilder {
                 }
                 fun unindent2()
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
     }
 
     @Test
     fun test6() {
-        ValentiaParser.file("""
+        ValentiaParser.file(
+            """
             package valentia.sema
             
             import valentia.ast.Decl
@@ -230,12 +245,14 @@ class ValentiaParserFullExamplesTest : StmBuilder {
             
             object DummyResolutionContext : ResolutionContext {
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
     }
 
     @Test
     fun test7() {
-        ValentiaParser.file("""
+        ValentiaParser.file(
+            """
             package valentia.sema
 
             import valentia.ast.Decl
@@ -255,12 +272,14 @@ class ValentiaParserFullExamplesTest : StmBuilder {
                     }
                 }
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
     }
 
     @Test
     fun test8() {
-        ValentiaParser.file("""
+        ValentiaParser.file(
+            """
             package valentia.gen
 
             import valentia.ast.*
@@ -388,12 +407,15 @@ class ValentiaParserFullExamplesTest : StmBuilder {
                     }
                 }
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
     }
-    
+
     @Test
     fun test9() {
-        ValentiaParser.file("""
+        //while (true)
+        ValentiaParser.file(
+            """
             package valentia.parser
 
             import valentia.util.isLetterOrDigitOrUndescore
@@ -527,13 +549,13 @@ class ValentiaParserFullExamplesTest : StmBuilder {
                             val spos = pos
                             if (matches("//")) {
                                 return CommentToken(readUntil { it == '\n' || it == '\r' })
-                            } else if (matches("/*")) {
+                            } else if (matches("/"+"*")) {
                                 var open = 0
                                 while (hasMore) {
-                                    if (expectOpt("/*")) {
+                                    if (expectOpt("/"+"*")) {
                                         open++
                                     }
-                                    if (expectOpt("*/")) {
+                                    if (expectOpt("*"+"/")) {
                                         open--
                                         if (open == 0) break
                                     }
@@ -610,19 +632,19 @@ class ValentiaParserFullExamplesTest : StmBuilder {
                     TODO("Not yet implemented")
                 }
             }
-
             sealed class Token(val str: String) {
                 //override fun toString(): String = str
             }
             object EOFToken : Token("")
             abstract class HiddenToken(str: String) : Token(str)
+
             data class CommentToken(val comment: String) : HiddenToken(comment)
             data class SpacesToken(val spaces: String) : HiddenToken(spaces)
             data class NLToken(val spaces: String) : Token(spaces)
             data class SymbolToken(val symbol: String) : Token(symbol)
             data class ShebangToken(val shebang: String) : Token(shebang)
             data class NumberToken(val number: String) : Token(number) {
-                val numberCleanedUp by lazy 10
+                //val numberCleanedUp: String by lazy 10
                 val numberCleanedUp: String by lazy {
                     number.replace("_", "").replace(Regex("\\D+\${'$'}"), "")
                 }
@@ -643,7 +665,7 @@ class ValentiaParserFullExamplesTest : StmBuilder {
                                 numberCleanedUp.toLongOrNull()
                             }
                         }
-                    } //?: error("Number '${DOLLAR}number' : '${DOLLAR}numberCleanedUp'")
+                    } ?: error("Number '${DOLLAR}number' : '${DOLLAR}numberCleanedUp'")
                 }
             }
 
@@ -656,7 +678,59 @@ class ValentiaParserFullExamplesTest : StmBuilder {
             data class ExpressionStringPartToken(val string: String, val expr: List<Token>) : StringPartToken(string)
             data class LiteralStringPartToken(val string: String) : StringPartToken(string)
             data class EscapeStringPartToken(val string: String, val c: Char) : StringPartToken(string)
+        """.trimIndent()
+        )
+    }
 
+    @Test
+    fun test10a() {
+        val str = """
+            package valentia.parser
+
+            import valentia.ast.*
+            import valentia.util.Disjunction3
+
+            open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenParser {
+                fun <T> parseListNew(
+                    separator: () -> Unit = { COMMA() },
+                    trailingSeparator: Boolean = false,
+                    oneOrMore: Boolean = true,
+                    block: () -> T
+                ): List<T> {
+                }
+            }
+        """
+        ValentiaParser.file(str)
+    }
+
+    @Test
+    fun test10b() {
+        ValentiaParser.file("""
+            fun functionDeclaration(): Decl {
+                debug("TODO: functionDeclaration")
+                val modifiers = modifiers(atLeastOne = false)
+                var funcNameOpt: String? = null
+                val spos = pos
+                expect("fun")
+                try {
+                } catch (e: Throwable) {
+                }
+            }
         """.trimIndent())
     }
+
+    @Test
+    fun test11a() {
+        ValentiaParser.file("""
+            fun functionDeclaration(): Decl {
+                return try {
+                    1
+                } catch (e: Throwable) {
+                    2
+                }
+            }
+        """.trimIndent())
+    }
+
+    //val a by lazy { 10 }
 }

@@ -13,7 +13,7 @@ open class TokenReader(val tokens: List<Token>) : BaseTokenReader {
     override var pos: Int = 0
     override val len: Int get() = tokens.size
     override fun peek(offset: Int): Token = tokens.getOrElse(pos + offset) { EOFToken }
-    override fun toString(): String = "TokenReader(peek=${peek()}, pos=$pos, len=$len)"
+    override fun toString(): String = "TokenReader(line=${peek().line}, pos=$pos/$len, peek=${(0 until 12).map { peek(it) }.filter { it !is NLToken }.joinToString("") { it.str }})"
 }
 
 inline fun <reified T: Token> BaseTokenReader.expect(): T {
@@ -28,6 +28,21 @@ inline fun <reified T: Token> BaseTokenReader.expectOpt(consume: Boolean = true)
         skip()
         token
     } else null
+}
+
+fun BaseTokenReader.peekSkipping(count: Int): Token {
+    var n = 0
+    var remaining = count
+    while (hasMore) {
+        while (peek(n) is HiddenToken || peek(n) is NLToken) n++
+        if (remaining > 0) {
+            remaining--
+            n++
+        } else {
+            break
+        }
+    }
+    return peek(n)
 }
 
 interface BaseTokenReader : BaseConsumer {
@@ -126,41 +141,28 @@ interface BaseConsumer {
     //open fun Hidden() {
     //}
 
-    fun expect(str: String) {
-        if (!matches(str, consume = true)) error("Expected '$str' but found $this")
+    fun expect(str: String, reason: String? = null) {
+        if (!matches(str, consume = true)) error("Expected '$str' in '$reason' but found $this")
     }
 
+    fun expectRet(str: String, reason: String? = null): String {
+        expect(str, reason)
+        return str
+    }
+
+    @Deprecated("")
     fun expectAny(vararg strs: String): String {
         return expectAnyOpt(*strs) ?: error("Couldn't find ${strs.toList()} in $this")
     }
 
+    @Deprecated("")
     fun expectAnyOpt(vararg strs: String, consume: Boolean = true): String? {
         for (str in strs) if (matches(str, consume = consume)) return str
         return null
     }
 
-
     fun expectOpt(str: String): Boolean {
         return matches(str, consume = true)
-    }
-
-    fun <T> expectAndRecoverSure(start: String, end: String, block: () -> T): T {
-        return expectAndRecover(start, end, block) ?: TODO("expectAndRecoverSure recovery")
-    }
-
-    //@OptIn(ExperimentalContracts::class)
-    fun <T> expectAndRecover(start: String, end: String, block: () -> T): T? {
-        //contract { callsInPlace(block, InvocationKind.EXACTLY_ONCE) }
-        expect(start)
-        try {
-            val res = block()
-            expect(end)
-            return res
-        } catch (e: IllegalStateException) {
-            debug("RECOVERING NOT IMPLEMENTED!")
-            throw e
-        }
-        return null
     }
 
     fun EOF() {
@@ -168,6 +170,26 @@ interface BaseConsumer {
     }
 
 }
+
+inline fun <T> BaseConsumer.expectAndRecoverSure(start: String, end: String, reason: String? = null, block: () -> T): T {
+    return expectAndRecover(start, end, reason, block) ?: TODO("expectAndRecoverSure recovery reason=$reason")
+}
+
+//@OptIn(ExperimentalContracts::class)
+inline fun <T> BaseConsumer.expectAndRecover(start: String, end: String, reason: String? = null, block: () -> T): T? {
+    //contract { callsInPlace(block, InvocationKind.EXACTLY_ONCE) }
+    expect(start, reason)
+    try {
+        val res = block()
+        expect(end, reason)
+        return res
+    } catch (e: IllegalStateException) {
+        debug("RECOVERING NOT IMPLEMENTED!")
+        throw e
+    }
+    return null
+}
+
 
 interface BaseReader : BaseConsumer {
     fun peekChar(offset: Int = 0): Char
@@ -241,19 +263,30 @@ interface BaseParser : BaseReader {
 
 }
 
+@Deprecated("slow")
 inline fun <T> BaseConsumer.OR(vararg funcs: () -> T?, name: String? = null): T {
     val rpos = pos
     val exceptions = arrayListOf<Throwable>()
     for (func in funcs) {
         pos = rpos
-        try {
+        //try {
             return func() ?: continue
-        } catch (e: IllegalStateException) {
-            exceptions += e
-        }
+        //} catch (e: IllegalStateException) {
+        //    exceptions += e
+        //}
     }
     pos = rpos
-    error("Couldn't match any of OR[$name][$this] [${funcs.size}]: ${exceptions.toList()}")
+    error("  Couldn't match any of OR[$name][$this] [${funcs.size}]:  \n${exceptions.joinToString("\n  ")}")
+}
+
+inline fun <T> BaseConsumer.ORNullable(vararg funcs: () -> T?, name: String? = null): T? {
+    val rpos = pos
+    for (func in funcs) {
+        pos = rpos
+        return func() ?: continue
+    }
+    pos = rpos
+    return null
 }
 
 inline fun <T1, T2> BaseConsumer.ORDis(func1: () -> T1?, func2: () -> T2?): Disjunction2<T1, T2> {
@@ -274,30 +307,36 @@ inline fun <T1, T2> BaseConsumer.ORDis(func1: () -> T1?, func2: () -> T2?): Disj
     error("Couldn't match any of OR [2]: ${exceptions.toList()}")
 }
 
-inline fun <T1, T2, T3> BaseConsumer.ORDis(func1: () -> T1?, func2: () -> T2?, func3: () -> T3?): Disjunction3<T1, T2, T3> {
+inline fun <T1, T2, T3> BaseConsumer.ORDis(func1: () -> T1?, func2: () -> T2?, func3: () -> T3?): Disjunction3<T1, T2, T3>? {
     val rpos = pos
-    val exceptions = arrayListOf<Throwable>()
+    //val exceptions = arrayListOf<Throwable>()
     for (n in 0 until 2) {
         pos = rpos
-        try {
+        //try {
             return Disjunction3(when (n) {
                 0 -> func1()
                 1 -> func2()
                 2 -> func3()
                 else -> TODO()
             } ?: continue)
-        } catch (e: IllegalStateException) {
-            exceptions += e
-        }
+        //} catch (e: IllegalStateException) {
+        //    exceptions += e
+        //}
     }
-    error("Couldn't match any of OR [2]: ${exceptions.toList()}")
+    //error("Couldn't match any of OR [2]: ${exceptions.toList()}")
+    //error("Couldn't match any of OR")
+    return null
 }
 
 @OptIn(ExperimentalContracts::class)
+@Deprecated("")
 inline fun <T> BaseConsumer.opt(block: () -> T): T? {
     contract { callsInPlace(block, InvocationKind.EXACTLY_ONCE) }
     var res: T? = null
-    resetOnException { res = block() }
+    val spos = pos
+    res = block()
+    if (res == null) pos = spos
+    //resetOnException { res = block() }
     return res
 }
 
@@ -307,19 +346,22 @@ inline fun <T> BaseConsumer.multiple(atLeastOne: Boolean, catch: Boolean = true,
         out += block() ?: TODO("multiple atLeastOne=$atLeastOne")
     }
     loop@while (hasMore) {
+        if (out.size >= 1000) {
+            TODO("Too long")
+        }
         val oldPos = pos
-        try {
+        //try {
             val res = block()
             if (res == null) {
                 pos = oldPos
                 break@loop
             }
             out += res
-        } catch (e: IllegalStateException) {
-            if (!catch) throw e
-            pos = oldPos
-            break@loop
-        }
+        //} catch (e: IllegalStateException) {
+        //    if (!catch) throw e
+        //    pos = oldPos
+        //    break@loop
+        //}
     }
     return out
 }

@@ -82,4 +82,13 @@ open class ValentiaParserExprTest : StmBuilder {
             ValentiaParser.expression("1 as Float")
         )
     }
+
+    @Test
+    fun testExpressionFail() {
+        val invalid = "}"
+        assertEquals(
+            null,
+            ValentiaParser.expression(invalid, checkEOF = false) as? Any?
+        )
+    }
 }

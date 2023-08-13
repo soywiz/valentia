@@ -314,7 +314,7 @@ data class Identifier(val parts: List<String>) : Expr() {
 
 abstract class Expr : ExprOrStm()
 
-data class LambdaFunctionExpr(val stms: List<Stm> = emptyList(), val params: List<Unit>? = null) : Expr()
+data class LambdaFunctionExpr(val stms: List<Stm> = emptyList(), val params: List<VariableDeclBase>? = null) : Expr()
 
 data class AnonymousFunctionExpr(val decl: FunDecl) : Expr()
 
