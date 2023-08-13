@@ -171,20 +171,29 @@ interface BaseConsumer {
 
 }
 
-inline fun <T> BaseConsumer.expectAndRecoverSure(start: String, end: String, reason: String? = null, block: () -> T): T {
-    return expectAndRecover(start, end, reason, block) ?: TODO("expectAndRecoverSure recovery reason=$reason : $this")
+inline fun <T> BaseConsumer.expectAndRecoverSure(start: String, end: String, reason: String? = null, nullIfNotMatching: Boolean = false, block: () -> T): T {
+    return expectAndRecover(start, end, reason, nullIfNotMatching, block) ?: TODO("expectAndRecoverSure recovery reason=$reason : $this")
 }
 
 //@OptIn(ExperimentalContracts::class)
-inline fun <T> BaseConsumer.expectAndRecover(start: String, end: String, reason: String? = null, block: () -> T): T? {
+inline fun <T> BaseConsumer.expectAndRecover(start: String, end: String, reason: String? = null, nullIfNotMatching: Boolean = false, block: () -> T): T? {
     //contract { callsInPlace(block, InvocationKind.EXACTLY_ONCE) }
-    expect(start, reason)
+    val spos = pos
+    if (nullIfNotMatching) {
+        if (!expectOpt(start)) return null.also { pos = spos }
+    } else {
+        expect(start, reason)
+    }
     try {
         val res = block()
-        expect(end, reason)
+        if (nullIfNotMatching) {
+            if (!expectOpt(end)) return null.also { pos = spos }
+        } else {
+            expect(end, reason)
+        }
         return res
     } catch (e: IllegalStateException) {
-        debug("RECOVERING NOT IMPLEMENTED!")
+        println("RECOVERING NOT IMPLEMENTED!")
         throw e
     }
     return null

@@ -4,7 +4,7 @@ import valentia.ast.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class ValentiaParserFunTest : StmBuilder {
+class ValentiaParserFunTest : DeclBuilder, StmBuilder {
     @Test
     fun testFun() {
         assertEquals(

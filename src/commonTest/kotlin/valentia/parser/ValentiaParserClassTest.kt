@@ -4,7 +4,7 @@ import valentia.ast.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class ValentiaParserClassTest : StmBuilder {
+class ValentiaParserClassTest : DeclBuilder, StmBuilder {
 
     @Test
     fun testAnnotatedClass() {
@@ -73,7 +73,15 @@ class ValentiaParserClassTest : StmBuilder {
     @Test
     fun testInterfaceWithEmptyMethod() {
         assertEquals(
-            null,
+            FILE(
+                _package = Identifier("demo"),
+            ) {
+                INTERFACE("Indenter") {
+                    CLASS("Impl", BasicSubTypeInfo("Impl".type)) {
+                    }
+                    FUN("indent")
+                }
+            },
             ValentiaParser.file("""
                 package demo
 

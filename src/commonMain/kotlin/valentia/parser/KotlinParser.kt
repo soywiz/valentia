@@ -608,7 +608,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun multiVariableDeclaration(): MultiVariableDecl? {
         if (!matches("(")) return null
-        val vars = expectAndRecover("(", ")") {
+        val vars = expectAndRecover("(", ")", nullIfNotMatching = true) {
             parseListNew(trailingSeparator = true, end = { matches(")") }) {
                 variableDeclaration()
             }
@@ -742,21 +742,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //      )?
     //      NL* RPAREN
     //    ;
-    fun parametersWithOptionalType(): List<ParameterOptType> {
+    fun parametersWithOptionalType(): List<ParameterOptType>? {
+        if (!matches("(")) return null
         return expectAndRecover("(", ")") {
             NLs()
-            opt {
-                val one = functionValueParameterWithOptionalType()
-                val rest = zeroOrMore {
-                    NLs()
-                    COMMA()
-                    NLs()
-                    functionValueParameterWithOptionalType()
-                }
-                opt { NLs(); COMMA() }
-                listOfNotNull(one) + rest
-            }.also { NLs() }
-        } ?: emptyList()
+            parseListNew({ expectOpt(",") }, trailingSeparator = true, end = { matches(")") }) {
+                functionValueParameterWithOptionalType()
+            }
+        }
     }
 
     //functionValueParameterWithOptionalType
@@ -765,8 +758,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun functionValueParameterWithOptionalType(): ParameterOptType {
         val modifiers = parameterModifiers(atLeastOne = false)
         val id = simpleIdentifier().also { NLs() }
-        val type = opt { COLON(); NLs(); type() }
-        val expr = opt { NLs(); ASSIGNMENT(); NLs(); expression() }
+
+        val type = optionalTypeWithColon()
+        val expr = opt {
+            NLs()
+            if (!expectOpt("=")) return@opt null
+            NLs()
+            expression()
+        }
         return ParameterOptType(id, type, modifiers = modifiers, expr = expr)
     }
 
@@ -880,6 +879,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         NLs()
         val body = classBody()
         return EnumEntry(id)
+    }
+
+    fun optionalTypeWithColon(): TypeNode? {
+        return if (expectOpt(":")) { NLs(); type() } else null
     }
 
     // SECTION: types
@@ -1360,7 +1363,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             val expr = next()
             if (expr == null) {
                 pos = spos
-                TODO("expr=null")
+                TODO("expr=null :: $this")
             }
             Hidden()
             ops += op
@@ -1386,12 +1389,12 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //disjunction
     //    : conjunction (NL* DISJ NL* conjunction)*
     //    ;
-    fun disjunction(): Expr? = binop({ expectAnyOpt("||") }) { conjunction() }
+    fun disjunction(): Expr? = binop({ expectAnyOpt("||") }, initialNLs = true) { conjunction() }
 
     //conjunction
     //    : equality (NL* CONJ NL* equality)*
     //    ;
-    fun conjunction(): Expr? = binop({ expectAnyOpt("&&") }) { equality() }
+    fun conjunction(): Expr? = binop({ expectAnyOpt("&&") }, initialNLs = true) { equality() }
 
     //equality
     //    : comparison (equalityOperator NL* comparison)*
@@ -1435,7 +1438,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //elvisExpression
     //    : infixFunctionCall (NL* elvis NL* infixFunctionCall)*
     //    ;
-    fun elvisExpression(): Expr? = binop({ expectAnyOpt("?:") }) { infixFunctionCall() }
+    fun elvisExpression(): Expr? = binop({ expectAnyOpt("?:") }, initialNLs = true) { infixFunctionCall() }
 
     //elvis
     //    : QUEST_NO_WS COLON
@@ -1453,21 +1456,21 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : additiveExpression ((RANGE | RANGE_UNTIL) NL* additiveExpression)*
     //    ;
     fun rangeExpression(): Expr? {
-        return binop({ expectAnyOpt(RANGE_OPS) }) { additiveExpression() }
+        return binop({ expectAnyOpt(RANGE_OPS) }, initialNLs = false) { additiveExpression() }
     }
 
     //additiveExpression
     //    : multiplicativeExpression (additiveOperator NL* multiplicativeExpression)*
     //    ;
     fun additiveExpression(): Expr? {
-        return binop({ additiveOperator() }) { multiplicativeExpression() }
+        return binop({ additiveOperator() }, initialNLs = false) { multiplicativeExpression() }
     }
 
     //multiplicativeExpression
     //    : asExpression (multiplicativeOperator NL* asExpression)*
     //    ;
     fun multiplicativeExpression(): Expr? {
-        return binop({ multiplicativeOperator() }) { asExpression() }
+        return binop({ multiplicativeOperator() }, initialNLs = false) { asExpression() }
     }
 
     //asExpression
@@ -1743,7 +1746,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun typeArguments(): List<TypeNode>? {
         //println("${this.tokens}")
         if (!matches("<")) return null
-        return expectAndRecoverSure("<", ">") {
+        return expectAndRecover("<", ">", nullIfNotMatching = true) {
             NLs()
             parseListNew(trailingSeparator = true, end = { matches(">") }) {
                 typeProjection()
@@ -1819,7 +1822,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         //if (matches("object")) return objectLiteral()
         //if (matches("throw") || matches("return") || matches("continue") || matches("break")) return jumpExpression()
         return when (peek().str) {
-            "(" -> parenthesizedExpression() ?: error("Not a parenthesized expression")
+            "(" -> parenthesizedExpression()
             "this" -> thisExpression() ?: error("Not a this")
             "super" -> superExpression() ?: error("Not a super")
             "if" -> ifExpression() ?: error("Not a if")
@@ -1845,7 +1848,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun parenthesizedExpression(): Expr? {
         if (!matches("(")) return null
-        return expectAndRecoverSure("(", ")") { NLs(); expression().also { NLs() } }
+        return expectAndRecover("(", ")", nullIfNotMatching = true) { NLs(); expression().also { NLs() } }
     }
 
     //collectionLiteral
@@ -2065,11 +2068,16 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             return null
         }
         NLs()
-        val receiver = opt { type().also { NLs(); DOT() } }
+        val receiver = opt {
+            val type = type()
+            NLs()
+            if (!expectOpt(".")) return@opt null
+            type
+        }
         NLs()
-        val paramsWithOptType = parametersWithOptionalType()
+        val paramsWithOptType = parametersWithOptionalType() ?: error("Expected parameters")
         NLs()
-        val retType = opt { COLON(); NLs(); type() }
+        val retType = if (expectOpt(":")) { NLs(); type() } else null
         NLs()
         val typeConstraints = typeConstraints()
         NLs()

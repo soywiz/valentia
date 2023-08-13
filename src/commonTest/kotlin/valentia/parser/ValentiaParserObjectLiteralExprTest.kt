@@ -22,7 +22,10 @@ open class ValentiaParserObjectLiteralExprTest : StmBuilder {
     fun testObjectLiteral2() {
         assertEquals(
             //ObjectLiteralExpr(body = listOf(FunDecl(name="test", params=emptyList(), body= Stms()))),
-            null,
+            listOf(
+                STM(VAR("listener", expr = OBJECT_LIT(ConstructorInvocation("KotlinParserBaseListener".type)) { })),
+                STM(VAR("stream", expr = "CharStreams".id)),
+            ),
             ValentiaParser.statements("""
                 val listener = object : KotlinParserBaseListener() { 
                 }

@@ -16,7 +16,7 @@ open class ValentiaParserLambdaLiteralExprTest : StmBuilder {
     @Test
     fun testLambdaNoArgs() {
         assertEquals(
-            DeclStm(decl=VariableDecl(id="a", annotations=Annotations())),
+            DeclStm(decl=VariableDecl(id="a", expr = LAMBDA { STM(1.lit) })),
             ValentiaParser.statement("val a = { 1 }") as? Any?
         )
     }
@@ -24,7 +24,7 @@ open class ValentiaParserLambdaLiteralExprTest : StmBuilder {
     @Test
     fun testLambdaNoArgsEmpty() {
         assertEquals(
-            DeclStm(decl=VariableDecl(id="a", annotations=Annotations())),
+            DeclStm(decl=VariableDecl(id="a", expr = LAMBDA { })),
             ValentiaParser.statement("val a = { }") as? Any?
         )
     }
@@ -32,7 +32,7 @@ open class ValentiaParserLambdaLiteralExprTest : StmBuilder {
     @Test
     fun testLambdaArgs() {
         assertEquals(
-            DeclStm(decl=VariableDecl(id="a", annotations=Annotations())),
+            DeclStm(decl=VariableDecl(id="a", expr = LAMBDA(VariableDecl("a"), VariableDecl("b")) { STM(1.lit) })),
             ValentiaParser.statement("val a = { a, b -> 1 }") as? Any?
         )
     }
@@ -40,7 +40,7 @@ open class ValentiaParserLambdaLiteralExprTest : StmBuilder {
     @Test
     fun testLambdaArgsEmpty() {
         assertEquals(
-            DeclStm(decl=VariableDecl(id="a", annotations=Annotations())),
+            DeclStm(decl=VariableDecl(id="a", expr = LAMBDA(VariableDecl("a"), VariableDecl("b")) {  })),
             ValentiaParser.statement("val a = { a, b -> }") as? Any?
         )
     }
@@ -48,7 +48,7 @@ open class ValentiaParserLambdaLiteralExprTest : StmBuilder {
     @Test
     fun testLambdaDestructuring() {
         assertEquals(
-            DeclStm(decl=VariableDecl(id="a", annotations=Annotations())),
+            DeclStm(decl=VariableDecl(id="a", expr = LAMBDA(MultiVariableDecl(VariableDecl("a"), VariableDecl("b")), MultiVariableDecl(VariableDecl("c"), VariableDecl("d"))) { STM(1.lit) })),
             ValentiaParser.statement("val a = { (a, b), (c, d) -> 1 }") as? Any?
         )
     }
@@ -56,7 +56,7 @@ open class ValentiaParserLambdaLiteralExprTest : StmBuilder {
     @Test
     fun testLambdaDestructuringEmpty() {
         assertEquals(
-            DeclStm(decl=VariableDecl(id="a", annotations=Annotations())),
+            DeclStm(decl=VariableDecl(id="a", expr = LAMBDA(MultiVariableDecl(VariableDecl("a"), VariableDecl("b")), MultiVariableDecl(VariableDecl("c"), VariableDecl("d"))) { })),
             ValentiaParser.statement("val a = { (a, b), (c, d) -> }") as? Any?
         )
     }

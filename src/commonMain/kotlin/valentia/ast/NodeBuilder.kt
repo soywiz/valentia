@@ -1,6 +1,51 @@
 package valentia.ast
 
-interface StmBuilder : NodeBuilder {
+interface DeclBuilder : NodeBuilder {
+    companion object {
+        fun buildDeclList(block: DeclBuilder.() -> Unit): List<Decl> {
+            val decls = arrayListOf<Decl>()
+            val builder = object : DeclBuilder {
+                override fun addDecl(decl: Decl) {
+                    decls += decl
+                }
+            }
+            block(builder)
+            return decls
+        }
+    }
+
+    fun addDecl(decl: Decl) {
+    }
+
+    fun VAL(name: String, expr: Expr? = null, type: TypeNode? = null): VariableDecl = VariableDecl(name, type, expr).also { addDecl(it) }
+    fun VAR(name: String, expr: Expr? = null, type: TypeNode? = null): VariableDecl = VariableDecl(name, type, expr).also { addDecl(it) }
+    fun CLASS(name: String, vararg subTypes: SubTypeInfo, block: DeclBuilder.() -> Unit = {}): ClassDecl =
+        ClassDecl("class", name, if (subTypes.isNotEmpty()) subTypes.toList() else emptyList(), buildDeclList { block() }).also { addDecl(it) }
+    fun INTERFACE(name: String, vararg subTypes: SubTypeInfo, block: DeclBuilder.() -> Unit = {}): ClassDecl =
+        ClassDecl("interface", name, subTypes.toList(), buildDeclList { block() }).also { addDecl(it) }
+    fun FUN(
+        name: String,
+        ret: TypeNode? = null,
+        vararg params: Pair<String, TypeNode>,
+        block: StmBuilder.() -> Unit = {}
+    ): FunDecl =
+        FunDecl(name, params.map { FuncValueParam(it.first, it.second) }, retType = ret, body = StmBuilder.buildStms { block() }).also { addDecl(it) }
+
+    fun FILE(
+        shebang: String? = null,
+        _package: Identifier? = null,
+        fileAnnotations: List<AnnotationNodes> = emptyList(),
+        imports: List<ImportNode> = emptyList(),
+        block: DeclBuilder.() -> Unit
+    ): FileNode {
+        return FileNode(
+            shebang, _package, fileAnnotations, imports,
+            topLevelDecls = buildDeclList { block() },
+        )
+    }
+}
+
+interface StmBuilder : DeclBuilder {
     companion object {
         fun buildStms(block: StmBuilder.() -> Unit): Stms = Stms(buildStmList(block))
         fun buildStm(compact: Boolean, block: StmBuilder.() -> Unit): Stm = if (compact) buildStmCompact(block) else buildStms(block)
@@ -29,25 +74,20 @@ interface StmBuilder : NodeBuilder {
         return this
     }
 
+    fun ASSIGN(lvalue: AssignableExpr, expr: Expr, op: String = "="): AssignStm = AssignStm(lvalue, op, expr).addStm()
+
     fun STM(expr: Expr): ExprStm = ExprStm(expr).addStm()
     fun STM(decl: Decl): DeclStm = DeclStm(decl).addStm()
     fun WHILE(expr: Expr, compact: Boolean = true, block: StmBuilder.() -> Unit): WhileLoopStm = WhileLoopStm(expr, buildStm(compact) { block() }).addStm()
     fun FOR(id: String, expr: Expr, block: (StmBuilder.() -> Unit)? = null): ForLoopStm =
         ForLoopStm(expr, VariableDecl(id), body = block?.let { buildStmCompact { block() } })
-    fun FUN(
-        name: String,
-        ret: TypeNode? = null,
-        vararg params: Pair<String, TypeNode>,
-        block: StmBuilder.() -> Unit = {}
-    ): FunDecl =
-        FunDecl(name, params.map { FuncValueParam(it.first, it.second) }, retType = ret, body = buildStms { block() })
     fun RETURN(expr: Expr? = null, label: String? = null): ReturnExpr = ReturnExpr(expr, label).addStm()
     fun WHEN(expr: Expr? = null, block: WhenBuilder.() -> Unit): WhenExpr {
         val builder = WhenBuilder().also(block)
         return WhenExpr(WhenExpr.Subject(expr), builder.entries)
     }
-    fun LAMBDA(block: StmBuilder.() -> Unit): LambdaFunctionExpr {
-        return LambdaFunctionExpr(buildStmList { block() })
+    fun LAMBDA(vararg params: VariableDeclBase, block: StmBuilder.() -> Unit = {}): LambdaFunctionExpr {
+        return LambdaFunctionExpr(buildStmList { block() }, if (params.isNotEmpty()) params.toList() else null)
     }
 
 }
@@ -110,4 +150,7 @@ interface NodeBuilder {
     infix fun Expr._notIn(that: Expr): Expr = RangeTestExpr(this, "!in", that)
     infix fun Expr._is(that: TypeNode): Expr = TypeTestExpr(this, "is", that)
     infix fun Expr._notIs(that: TypeNode): Expr = TypeTestExpr(this, "!is", that)
+    val THIS: ThisExpr get() = ThisExpr(null)
+    fun OBJECT_LIT(vararg subtypes: SubTypeInfo, isData: Boolean = false, block: DeclBuilder.() -> Unit): ObjectLiteralExpr =
+        ObjectLiteralExpr(subtypes.toList(), body = DeclBuilder.buildDeclList { block() }, isData = isData)
 }

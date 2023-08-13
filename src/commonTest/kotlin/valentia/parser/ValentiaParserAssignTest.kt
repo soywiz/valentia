@@ -24,7 +24,7 @@ class ValentiaParserAssignTest : StmBuilder {
     @Test
     fun testAssignThis() {
         assertEquals(
-            null,
+            ASSIGN(THIS["symbolProvider"], "parent".id),
             ValentiaParser.assignment("""this.symbolProvider = parent""") as? Any?
         )
     }

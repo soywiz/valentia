@@ -112,7 +112,7 @@ fun <T : Node> T.enrich(reader: BaseConsumer?, spos: Int, epos: Int): T {
 
 abstract class SubTypeInfo : Node()
 data class ExplicitDelegation(val type: TypeNode, val delegate: Expr) : SubTypeInfo()
-data class ConstructorInvocation(val type: TypeNode, val args: List<Expr>) : SubTypeInfo()
+data class ConstructorInvocation(val type: TypeNode, val args: List<Expr> = listOf()) : SubTypeInfo()
 data class BasicSubTypeInfo(val type: TypeNode) : SubTypeInfo()
 
 // Type
