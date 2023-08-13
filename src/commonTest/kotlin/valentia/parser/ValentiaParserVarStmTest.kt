@@ -97,23 +97,6 @@ open class ValentiaParserVarStmTest : StmBuilder {
 
     @Test
     fun test2() {
-        //assertEquals(
-        //    STM(VAL("falseBody", IF("expectOpt".id("else".lit)) {
-        //
-        //    })),
-        //    ValentiaParser.statement("""
-        //        val falseBody = if (expectOpt("else")) {
-        //            opt { controlStructureBody() }.also {
-        //                NLs()
-        //                opt { SEMICOLON() }
-        //                NLs()
-        //            }
-        //        } else {
-        //            null
-        //        }
-        //    """.trimIndent()) as? Any?
-        //)
-
         ValentiaParser.statement("""
             val falseBody = if (expectOpt("else")) {
                 opt { controlStructureBody() }.also {
@@ -125,5 +108,17 @@ open class ValentiaParserVarStmTest : StmBuilder {
                 null
             }
         """.trimIndent())
+    }
+
+    @Test
+    fun test3() {
+        assertEquals(
+            null,
+            ValentiaParser.file("""
+                val IntType: TypeNode get() = "Int".type
+                val Boolean.lit: BoolLiteralExpr get() = BoolLiteralExpr(this)
+            """.trimIndent()) as? Any?
+        )
+
     }
 }

@@ -4,6 +4,7 @@ import valentia.ast.FuncTypeNode
 import valentia.ast.GenericType
 import valentia.ast.NamedTypeNode
 import valentia.ast.NodeBuilder.Companion.generic
+import valentia.ast.NodeBuilder.Companion.id
 import valentia.ast.NodeBuilder.Companion.type
 import valentia.ast.NodeBuilder.Companion.multi
 import valentia.ast.NodeBuilder.Companion.multiType
@@ -38,13 +39,20 @@ open class ValentiaParserTypeTest {
 
     @Test
     fun testTypeGenerics() {
-
         assertEquals(
             GenericType(
                 "LinkedHashMap".type,
                 generics = listOf("String".type, GenericType("ArrayList".type, generics = listOf("Decl".type)))
             ),
             ValentiaParser.type("LinkedHashMap<String, ArrayList<Decl>>") as Any?
+        )
+    }
+
+    @Test
+    fun testFun1() {
+        assertEquals(
+            FuncTypeNode("T".type, listOf(), receiver = "ValentiaParser".type),
+            ValentiaParser.type("ValentiaParser.() -> T") as? Any?
         )
     }
 }

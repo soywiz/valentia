@@ -100,4 +100,9 @@ open class ValentiaParserExprTest : StmBuilder {
         //}
         //assertTrue(e.message!!.contains("Not an expression"))
     }
+
+    @Test
+    fun test2() {
+        ValentiaParser.statement("(c - 'a') + 10")
+    }
 }

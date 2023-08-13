@@ -850,10 +850,12 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             NLs()
             enumEntries(oneOrMore = false)
             opt {
-                NLs()
-                SEMICOLON()
-                NLs()
-                classMemberDeclarations()
+                if (expectOptNLs(";")) {
+                    NLs()
+                    classMemberDeclarations()
+                } else {
+                    null
+                }
             }
             NLs()
         }
@@ -863,8 +865,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //enumEntries
     //    : enumEntry (NL* COMMA NL* enumEntry)* NL* COMMA?
     //    ;
-    fun enumEntries(oneOrMore: Boolean = true): List<EnumEntry> {
-        return parseList(oneOrMore = oneOrMore, separator = { expectOpt(",") }, doBreak = { false }) {
+    fun enumEntries(oneOrMore: Boolean = true): List<EnumEntry>? {
+        return parseListNew(oneOrMore = oneOrMore, separator = { expectOpt(",") }, end = { matches("}") || matches(";") }) {
             enumEntry()
         }
     }
@@ -898,6 +900,12 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
 
         // @TODO: Receiver here
 
+        val receiver = opt {
+            val ref = typeReference()
+            if (!expectOptNLs(".")) return@opt null
+            ref
+        }
+
         val type: TypeNode = if (matches("(")) {
             val types = functionTypeParameters()
             //val types = expectAndRecoverSure("(", ")") {
@@ -906,14 +914,13 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             //        type()
             //    }
             //}
-            NLs()
-            val retType = if (expectOpt("->")) {
+            val retType = if (expectOptNLs("->")) {
                 type()
             } else {
                 null
             }
             if (retType != null) {
-                FuncTypeNode(retType, types)
+                FuncTypeNode(retType, types, receiver)
             } else {
                 types.first().type
             }
@@ -991,10 +998,16 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val base = simpleUserType() ?: return null
         val more = arrayListOf<TypeNode>()
         while (hasMore) {
+            val spos = pos
             NLs()
             if (!expectOpt(".")) break
             NLs()
-            more += simpleUserType() ?: error("Expected simpleUserType")
+            val stype = simpleUserType()
+            if (stype == null) {
+                pos = spos
+                break
+            }
+            more += stype
         }
         return if (more.isNotEmpty()) MultiType(listOf(base, *more.toTypedArray())) else base
         //val types = parseList(oneOrMore = true, separator = { expectOpt(".") }) {
@@ -1063,8 +1076,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             type
         }
         val typeParams = functionTypeParameters()
-        NLs()
-        if (!expectOpt("->")) return null.also { pos = spos }
+        if (!expectOptNLs("->")) return null.also { pos = spos }
         NLs()
         val ret = type() ?: error("Expected type")
         return FuncTypeNode(ret, typeParams, receiver)
@@ -1196,7 +1208,6 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | statement
     //    ;
     fun controlStructureBody(): Stm {
-        Hidden()
         return when {
             matches("{") -> block()!!
             else -> statement()
@@ -1314,9 +1325,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun semi() {
         expectOpt(";")
-        while (peek() is HiddenToken || peek() is NLToken) {
-            NLs()
-        }
+        NLs()
     }
 
     fun semiOpt() {
@@ -1628,7 +1637,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun parenthesizedDirectlyAssignableExpression(): AssignableExpr? {
         if (!matches("(")) return null
-        return expectAndRecoverSure("(", ")") {
+        return expectAndRecover("(", ")", nullIfNotMatching = true) {
             NLs()
             directlyAssignableExpression().also { NLs() }
         }
@@ -1651,12 +1660,12 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun parenthesizedAssignableExpression(): AssignableExpr? {
         if (!matches("(")) return null
-        return expectAndRecover("(", ")") {
+        return expectAndRecover("(", ")", nullIfNotMatching = true) {
             NLs()
             assignableExpression().also {
                 NLs()
             }
-        } ?: TODO("parenthesizedAssignableExpression.null")
+        }
     }
 
     //assignableSuffix
@@ -1881,7 +1890,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         if (!token.isFloat) {
             return IntLiteralExpr(token.value.toLong(), token.isLong, token.isUnsigned)
         }
-        TODO("literalConstantOpt: token=$token")
+        TODO("literalConstantOpt: token=$token : ${token.isFloat}")
         //val numLit = when {
         //    expectOpt("0x") || expectOpt("0X") -> numericLiteral(radix = 16) { HexDigit(it) }
         //    expectOpt("0o") || expectOpt("0O") -> numericLiteral(radix = 8) { it in '0'..'7' }
@@ -2217,14 +2226,18 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | ELSE NL* ARROW NL* controlStructureBody semi?
     //    ;
     fun whenEntry(): WhenExpr.Entry? {
+        val spos = pos
         val conditions = when {
             expectOpt("else") -> null
             else -> parseList(separator = { expectOpt(",") }, doBreak = { matches("->") }) {
                 whenCondition()
             }
         }
-        NLs()
-        expect("->")
+        if (!expectOptNLs("->")) {
+            error("When entry expected arrow")
+            pos = spos
+            return null
+        }
         NLs()
         val body = controlStructureBody()
         semiOpt()

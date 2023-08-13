@@ -748,5 +748,17 @@ class ValentiaParserFullExamplesTest : StmBuilder {
         """.trimIndent())
     }
 
+    @Test
+    fun test12a() {
+        ValentiaParser.file("""
+            fun HexDigitValue(c: Char): Int = when (c) {
+                in '0'..'9' -> c - '0'
+                in 'a'..'f' -> (c - 'a') + 10
+                in 'A'..'F' -> (c - 'A') + 10
+                else -> -1
+            }
+        """.trimIndent())
+    }
+
     //val a by lazy { 10 }
 }

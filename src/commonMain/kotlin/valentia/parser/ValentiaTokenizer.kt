@@ -283,17 +283,21 @@ data class SymbolToken(val symbol: String) : Token(symbol)
 data class ShebangToken(val shebang: String) : Token(shebang)
 data class NumberToken(val number: String) : Token(number) {
     val numberCleanedUp: String by lazy {
-        number.replace("_", "").replace(Regex("\\D+\$"), "")
+        number.replace("_", "").replace(Regex("\\D+\$"), "").lowercase()
     }
-    val isFloat: Boolean get() = number.endsWith('f') || number.endsWith('F')
-    val isLong: Boolean get() = number.endsWith('l') || number.endsWith('L')
-    val isDecimal: Boolean get() = number.contains('.') || number.contains('e') || number.contains('E')
-    val isUnsigned: Boolean get() = number.contains('u') || number.contains('U')
+    val isHexPrefix: Boolean get() = numberCleanedUp.startsWith("0x")
+    val isOctPrefix: Boolean get() = numberCleanedUp.startsWith("0o")
+    val isBinPrefix: Boolean get() = numberCleanedUp.startsWith("0b")
+
+    val isFloat: Boolean get() = !isHexPrefix && numberCleanedUp.endsWith('f')
+    val isLong: Boolean get() = numberCleanedUp.endsWith('l')
+    val isDecimal: Boolean get() = numberCleanedUp.contains('.') || numberCleanedUp.contains('e')
+    val isUnsigned: Boolean get() = numberCleanedUp.contains('u')
 
     val value: Number by lazy {
         when {
-            numberCleanedUp.startsWith("0x") -> numberCleanedUp.substring(2).toLong(16)
-            numberCleanedUp.startsWith("0o") -> numberCleanedUp.substring(2).toLong(8)
+            isHexPrefix -> numberCleanedUp.substring(2).toLong(16)
+            isOctPrefix -> numberCleanedUp.substring(2).toLong(8)
             numberCleanedUp.startsWith("0b") -> numberCleanedUp.substring(2).toLong(2)
             else -> {
                 if (isDecimal) {

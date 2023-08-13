@@ -56,4 +56,12 @@ class ValentiaParserFunTest : DeclBuilder, StmBuilder {
         )
     }
 
+    @Test
+    fun testFun2() {
+        ValentiaParser.topLevelDecl("""
+            private inline fun <T> parserEOF(str: String, checkEOF: Boolean = true, block: ValentiaParser.() -> T): T {
+                return ValentiaParser(str).let { parser -> block(parser).also { if (checkEOF) parser.EOF() } }
+            }
+        """.trimIndent())
+    }
 }
