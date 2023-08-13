@@ -412,6 +412,14 @@ class ValentiaParserFullExamplesTest : StmBuilder {
     }
 
     @Test
+    fun test9a() {
+        ValentiaParser.statements("""
+            if (expectOpt("*"+"/")) ;
+            skip()
+        """.trimIndent())
+    }
+
+    @Test
     fun test9() {
         //while (true)
         ValentiaParser.file(

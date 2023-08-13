@@ -17,9 +17,9 @@ interface DeclBuilder : NodeBuilder {
     fun addDecl(decl: Decl) {
     }
 
-    fun VAL(name: String, expr: Expr? = null, type: TypeNode? = null): VariableDecl = VariableDecl(name, type, expr).also { addDecl(it) }
-    fun VAR(name: String, expr: Expr? = null, type: TypeNode? = null): VariableDecl = VariableDecl(name, type, expr).also { addDecl(it) }
-    fun CLASS(name: String, vararg subTypes: SubTypeInfo, block: DeclBuilder.() -> Unit = {}): ClassDecl =
+    fun VAL(name: String, expr: Expr? = null, type: TypeNode? = null, delegation: Boolean = false): VariableDecl = VariableDecl(name, type, expr, delegation = delegation).also { addDecl(it) }
+    fun VAR(name: String, expr: Expr? = null, type: TypeNode? = null, delegation: Boolean = false): VariableDecl = VariableDecl(name, type, expr, delegation = delegation).also { addDecl(it) }
+    fun CLASS(name: String, vararg subTypes: SubTypeInfo, data: Boolean = false, block: DeclBuilder.() -> Unit = {}): ClassDecl =
         ClassDecl("class", name, if (subTypes.isNotEmpty()) subTypes.toList() else emptyList(), buildDeclList { block() }).also { addDecl(it) }
     fun INTERFACE(name: String, vararg subTypes: SubTypeInfo, block: DeclBuilder.() -> Unit = {}): ClassDecl =
         ClassDecl("interface", name, subTypes.toList(), buildDeclList { block() }).also { addDecl(it) }
@@ -153,4 +153,8 @@ interface NodeBuilder {
     val THIS: ThisExpr get() = ThisExpr(null)
     fun OBJECT_LIT(vararg subtypes: SubTypeInfo, isData: Boolean = false, block: DeclBuilder.() -> Unit): ObjectLiteralExpr =
         ObjectLiteralExpr(subtypes.toList(), body = DeclBuilder.buildDeclList { block() }, isData = isData)
+    fun IF(cond: Expr, trueBody: Stm): IfExpr = IfExpr(cond, trueBody)
+    fun IF(cond: Expr, trueBody: StmBuilder.() -> Unit): IfExpr = IfExpr(cond, StmBuilder.buildStmCompact { trueBody() })
+    infix fun IfExpr.ELSE(falseBody: Stm): IfExpr = copy(falseBody = falseBody)
+    infix fun IfExpr.ELSE(falseBody: StmBuilder.() -> Unit): IfExpr = copy(falseBody = StmBuilder.buildStmCompact { falseBody() })
 }

@@ -13,8 +13,12 @@ open class ValentiaParserExprTest : StmBuilder {
     fun testSimplestExpr() {
         assertEquals(
             OpSeparatedExprs(listOf("+"), listOf(IntLiteralExpr(1), IntLiteralExpr(5))),
-            ValentiaParser.expression("1 \n + 5")
+            ValentiaParser.expression("1 + \n 5")
         )
+    }
+    @Test
+    fun testSimplestExprInvalid() {
+        assertFailsWith<EofNotFoundException> { ValentiaParser.expression("1 \n + 5") }
     }
 
     @Test

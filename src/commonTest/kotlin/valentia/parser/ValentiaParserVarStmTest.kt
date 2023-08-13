@@ -16,7 +16,7 @@ open class ValentiaParserVarStmTest : StmBuilder {
     @Test
     fun testVarLazyDelegatedDecl() {
         assertEquals(
-            STM(VariableDecl("a", expr = 1.lit, delegation = true)),
+            VAR("a", expr = "lazy".id(lambdaArg = LAMBDA { STM(1.lit) }), delegation = true),
             ValentiaParser.topLevelDecl("var a by lazy { 1 }") as Any
         )
     }
@@ -24,7 +24,7 @@ open class ValentiaParserVarStmTest : StmBuilder {
     @Test
     fun testVarLazyDelegatedStatement() {
         assertEquals(
-            STM(VariableDecl("a", expr = CallExpr("lazy".id, lambdaArg = LambdaFunctionExpr(listOf(STM(1.lit)))), delegation = true)),
+            STM(VAR("a", expr = CallExpr("lazy".id, lambdaArg = LAMBDA { STM(1.lit) }), delegation = true)),
             ValentiaParser.statement("var a by lazy { 1 }") as Any
         )
     }
@@ -72,7 +72,9 @@ open class ValentiaParserVarStmTest : StmBuilder {
     @Test
     fun testDestructuring() {
         assertEquals(
-            null,
+            STM(
+                MultiVariableDecl(VariableDecl("a"), VariableDecl("b", IntType), expr = 10.lit.infix("to", 20.lit))
+            ),
             ValentiaParser.statement("var (a, b: Int) = 10 to 20") as? Any?
         )
     }
@@ -80,7 +82,11 @@ open class ValentiaParserVarStmTest : StmBuilder {
     @Test
     fun testDelegated1() {
         assertEquals(
-            null,
+            FILE {
+                 CLASS("NumberToken", ConstructorInvocation("Token".type, "number".id), data = true) {
+                     VAL("numberCleanedUp", type = StringType, expr = "lazy".id(lambdaArg = LAMBDA { STM("".lit) }), delegation = true)
+                 }
+            },
             ValentiaParser.file("""
                 data class NumberToken(val number: String) : Token(number) {
                     val numberCleanedUp: String by lazy { "" }
@@ -91,20 +97,33 @@ open class ValentiaParserVarStmTest : StmBuilder {
 
     @Test
     fun test2() {
-        assertEquals(
-            null,
-            ValentiaParser.statement("""
-                val falseBody = if (expectOpt("else")) {
-                    opt { controlStructureBody() }.also {
-                        NLs()
-                        opt { SEMICOLON() }
-                        NLs()
-                    }
-                } else {
-                    null
-                }
-            """.trimIndent()) as? Any?
-        )
+        //assertEquals(
+        //    STM(VAL("falseBody", IF("expectOpt".id("else".lit)) {
+        //
+        //    })),
+        //    ValentiaParser.statement("""
+        //        val falseBody = if (expectOpt("else")) {
+        //            opt { controlStructureBody() }.also {
+        //                NLs()
+        //                opt { SEMICOLON() }
+        //                NLs()
+        //            }
+        //        } else {
+        //            null
+        //        }
+        //    """.trimIndent()) as? Any?
+        //)
 
+        ValentiaParser.statement("""
+            val falseBody = if (expectOpt("else")) {
+                opt { controlStructureBody() }.also {
+                    NLs()
+                    opt { SEMICOLON() }
+                    NLs()
+                }
+            } else {
+                null
+            }
+        """.trimIndent())
     }
 }

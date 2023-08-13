@@ -4,13 +4,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ValentiaTokenizerTest {
+    fun chunks(str: String): List<String> = ValentiaTokenizer(str).tokenize().map { it.str }
+
     @Test
     fun test() {
-        println(ValentiaTokenizer("1 == 2").tokenize())
+        assertEquals(listOf("1", " ", "==", " ", "2"), chunks("1 == 2"))
     }
     @Test
     fun test2() {
-        fun chunks(str: String): List<String> = ValentiaTokenizer(str).tokenize().map { it.str }
         assertEquals(listOf("0x10", "+"), chunks("0x10+"))
         assertEquals(listOf("0o10", "+"), chunks("0o10+"))
         assertEquals(listOf("0b10", "+"), chunks("0b10+"))

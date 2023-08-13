@@ -1164,16 +1164,13 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             if (matches("@")) annotation() else label()
         })
         NLs()
-        return if (matches("var") || matches("val")) {
-            DeclStm(propertyDeclaration(modifiers) ?: error("var-val"))
-        } else {
-            OR(
-                { loopStatement() },
+        return when (val ftoken = peek().str) {
+            "var", "val" -> DeclStm(propertyDeclaration(modifiers) ?: error("var-val"))
+            "for", "while", "do" -> loopStatement() ?: error("Couldn't parse loop: '$ftoken'")
+            else -> OR(
                 { declaration()?.let { DeclStm(it) } },
                 { assignment() },
-                {
-                    expression()?.let { ExprStm(it) }
-                },
+                { expression()?.let { ExprStm(it) } },
                 name = "statement"
             )
         }.withModifiers(modifiers)
@@ -1363,7 +1360,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             val expr = next()
             if (expr == null) {
                 pos = spos
-                TODO("expr=null :: $this")
+                //TODO("expr=null :: $this")
+                return null
             }
             Hidden()
             ops += op
@@ -2159,20 +2157,18 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             NLs()
             expression().also { NLs() } ?: error("Expression expected")
         }
-        NLs()
-        val trueBody = if (expectOpt(";")) {
+        val trueBody = if (expectOptNLs(";")) {
             EmptyStm()
         } else {
             controlStructureBody()
         }
-        NLs()
-        expectOpt(";")
-        NLs()
-        val falseBody = if (expectOpt("else")) {
-            opt { controlStructureBody() }.also {
+        expectOptNLs(";")
+        val falseBody = if (expectOptNLs("else")) {
+            opt {
                 NLs()
-                expectOpt(";")
-                NLs()
+                controlStructureBody()
+            }.also {
+                expectOptNLs(";")
             }
         } else {
             null
@@ -3801,7 +3797,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
 
     override fun EOF() {
         NLs()
-        check(eof) { "Not EOF found but ${peek()} at $this" }
+        if (!eof) throw EofNotFoundException("Not EOF found but ${peek()} at $this")
     }
 
     companion object {
@@ -3843,4 +3839,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
 
         val ALL_MODIFIERS: Map<String, Modifier> = CLASS_MODIFIERS + MEMBER_MODIFIERS + VISIBILITY_MODIFIERS + FUNCTION_MODIFIERS + PROPERTY_MODIFIERS + INHERITANCE_MODIFIERS + PARAMETER_MODIFIERS + PLATFORM_MODIFIERS
     }
+
+    fun expectOptNLs(str: String): Boolean {
+        val spos = pos
+        NLs()
+        return matches(str, consume = true).also {
+            if (!it) pos = spos
+        }
+    }
 }
+
+class EofNotFoundException(message: String) : IllegalStateException(message)

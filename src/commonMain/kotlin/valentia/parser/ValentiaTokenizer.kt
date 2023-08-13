@@ -30,15 +30,33 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
                 (if (nlines >= 1) NLToken(res, nlines) else SpacesToken(res))
             }
             in '0'..'9' -> {
-                //while (hasMore) {
-                //    val c = peekChar()
-                //    when {
-                //        c == 'e' || c == 'E' -> {
-                //        }
-                //        c.isLetterOrDigitOrUndescore() -> {
-                //        }
-                //    }
-                //}
+                val spos = pos
+                loop@while (hasMore) {
+                    val c = peekChar()
+                    when {
+                        c == 'e' || c == 'E' -> {
+                            readChar()
+                            when (peekChar()) {
+                                '-', '+' -> readChar()
+                            }
+                        }
+                        c == '.' -> {
+                            if (peekChar(1).isDigit()) {
+                                readChar()
+                            } else {
+                                break@loop
+                            }
+                        }
+                        c.isLetterOrDigitOrUndescore() -> {
+                            readChar()
+                        }
+                        else -> {
+                            break@loop
+                        }
+                    }
+                }
+                NumberToken(readAbsoluteRange(spos, pos))
+                /*
                 val baseNum = readWhile { it.isLetterOrDigitOrUndescore() }
                 //println(" || ${peekChar()}")
                 val spos = pos
@@ -57,9 +75,10 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
                 if (extra == null) {
                     pos = spos
                 }
+                */
                 //println("N=${"$baseNum$extra"}")
                 //println(" -> ${peekChar()}")
-                NumberToken("$baseNum${extra ?: ""}")
+                //NumberToken("$baseNum${extra ?: ""}")
             }
             in 'a'..'z', in 'A'..'Z', '_' -> {
                 if (expectOpt("as?")) {
