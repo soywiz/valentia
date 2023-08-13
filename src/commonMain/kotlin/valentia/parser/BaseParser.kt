@@ -46,14 +46,12 @@ interface BaseTokenReader : BaseConsumer {
     }
 
     fun expectAny(strs: Set<String>): String {
-        val str = peek().str
-        if (str !in strs) error("Couldn't find ${strs} in $this")
-        return str
+        return expectAnyOpt(strs) ?: error("Couldn't find ${strs} in $this")
     }
 
     fun <T> expectAnyOpt(strs: Map<String, T>): T? {
         val str = peek().str
-        return strs[str]
+        return strs[str]?.also { skip() }
     }
 
     fun <T> expectAny(strs: Map<String, T>): T {

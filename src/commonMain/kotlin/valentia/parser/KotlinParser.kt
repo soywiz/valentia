@@ -2308,7 +2308,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | DIV_ASSIGNMENT
     //    | MOD_ASSIGNMENT
     //    ;
-    fun assignmentAndOperator(): String = expectAny("+=", "-=", "*=", "/=", "%=")
+    fun assignmentAndOperator(): String = expectAny(ASSIGNMENT_OPERATOR)
 
     //equalityOperator
     //    : EXCL_EQ
@@ -2316,7 +2316,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | EQEQ
     //    | EQEQEQ
     //    ;
-    fun equalityOperator(): String = expectAny("!==", "===", "!=", "==")
+    fun equalityOperator(): String = expectAny(EQUALITY_OPERATOR)
 
     //comparisonOperator
     //    : LANGLE
@@ -2324,40 +2324,40 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | LE
     //    | GE
     //    ;
-    fun comparisonOperator(): String = expectAny(">=", "<=", "<", ">")
+    fun comparisonOperator(): String = expectAny(COMPARISON_OPERATOR)
 
-    fun inIsOperator(): String = expectAny("!in", "!is", "in", "is")
+    fun inIsOperator(): String = expectAny(IN_IS_OPERATOR)
 
     //inOperator
     //    : IN
     //    | NOT_IN
     //    ;
-    fun inOperator(): String = expectAny("!in", "in")
+    fun inOperator(): String = expectAny(IN_OPERATOR)
 
     //isOperator
     //    : IS
     //    | NOT_IS
     //    ;
-    fun isOperator(): String = expectAny("!is", "is")
+    fun isOperator(): String = expectAny(IS_OPERATOR)
 
     //additiveOperator
     //    : ADD
     //    | SUB
     //    ;
-    fun additiveOperator(): String = expectAny("+", "-")
+    fun additiveOperator(): String = expectAny(ADDITIVE_OPERATOR)
 
     //multiplicativeOperator
     //    : MULT
     //    | DIV
     //    | MOD
     //    ;
-    fun multiplicativeOperator(): String = expectAny("*", "/", "%")
+    fun multiplicativeOperator(): String = expectAny(MULTIPLICATIVE_OPERATOR)
 
     //asOperator
     //    : AS
     //    | AS_SAFE
     //    ;
-    fun asOperator(): String = expectAny("as?", "as")
+    fun asOperator(): String = expectAny(AS_OPERATOR)
 
     //prefixUnaryOperator
     //    : INCR
@@ -2366,14 +2366,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | ADD
     //    | excl
     //    ;
-    fun prefixUnaryOperator(): UnaryPreOp = UnaryPreOp.BY_ID[expectAny("++", "--", "-", "+", "!")]!!
+    fun prefixUnaryOperator(): UnaryPreOp = expectAny(UnaryPreOp.BY_ID)
 
     //postfixUnaryOperator
     //    : INCR
     //    | DECR
     //    | EXCL_NO_WS excl
     //    ;
-    fun postfixUnaryOperator(): UnaryPostOp = UnaryPostOp.BY_ID[expectAny("++", "--", "!!")]!!
+    fun postfixUnaryOperator(): UnaryPostOp = expectAny(UnaryPostOp.BY_ID)
 
     //excl
     //    : EXCL_NO_WS
@@ -2471,13 +2471,13 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | INNER
     //    | VALUE
     //    ;
-    fun classModifier(): ClassModifier? = ClassModifier.BY_ID[expectAnyOpt("enum", "sealed", "annotation", "data", "inner", "value")]
+    fun classModifier(): ClassModifier? = expectAnyOpt(ClassModifier.BY_ID)
 
     //memberModifier
     //    : OVERRIDE
     //    | LATEINIT
     //    ;
-    fun memberModifier(): MemberModifier? = MemberModifier.BY_ID[expectAnyOpt("override", "lateinit")]
+    fun memberModifier(): MemberModifier? = expectAnyOpt(MemberModifier.BY_ID)
 
     //visibilityModifier
     //    : PUBLIC
@@ -2485,13 +2485,13 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | INTERNAL
     //    | PROTECTED
     //    ;
-    fun visibilityModifier(): VisibilityModifier = VisibilityModifier.BY_ID[expectAny("public", "private", "internal", "protected")]!!
+    fun visibilityModifier(): VisibilityModifier = expectAny(VisibilityModifier.BY_ID)
 
     //varianceModifier
     //    : IN
     //    | OUT
     //    ;
-    fun varianceModifier(): VarianceModifier = VarianceModifier.BY_ID[expectAny("in", "out")]!!
+    fun varianceModifier(): VarianceModifier = expectAny(VarianceModifier.BY_ID)
 
     //typeParameterModifiers
     //    : typeParameterModifier+
@@ -2519,37 +2519,37 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | EXTERNAL
     //    | SUSPEND
     //    ;
-    fun functionModifier(): FunctionModifier = FunctionModifier.BY_ID[expectAny("tailrec", "operator", "infix", "inline", "external", "suspend")]!!
+    fun functionModifier(): FunctionModifier = expectAny(FunctionModifier.BY_ID)
 
     //propertyModifier
     //    : CONST
     //    ;
-    fun propertyModifier(): PropertyModifier = PropertyModifier.BY_ID[expectAny("const")]!!
+    fun propertyModifier(): PropertyModifier = expectAny(PropertyModifier.BY_ID)
 
     //inheritanceModifier
     //    : ABSTRACT
     //    | FINAL
     //    | OPEN
     //    ;
-    fun inheritanceModifier(): InheritanceModifier = InheritanceModifier.BY_ID[expectAny("abstract", "final", "open")]!!
+    fun inheritanceModifier(): InheritanceModifier = expectAny(InheritanceModifier.BY_ID)
 
     //parameterModifier
     //    : VARARG
     //    | NOINLINE
     //    | CROSSINLINE
     //    ;
-    fun parameterModifier(): ParameterModifier = ParameterModifier.BY_ID[expectAny("vararg", "noinline", "crossinline")]!!
+    fun parameterModifier(): ParameterModifier = expectAny(ParameterModifier.BY_ID)
 
     //reificationModifier
     //    : REIFIED
     //    ;
-    fun reificationModifier(): ReificationModifier = ReificationModifier.BY_ID[expectAny("reified")]!!
+    fun reificationModifier(): ReificationModifier = expectAny(ReificationModifier.BY_ID)
 
     //platformModifier
     //    : EXPECT
     //    | ACTUAL
     //    ;
-    fun platformModifier(): PlatformModifier = PlatformModifier.BY_ID[expectAny("expect", "actual")]!!
+    fun platformModifier(): PlatformModifier = expectAny(PlatformModifier.BY_ID)
 
     // SECTION: annotations
     //annotation
@@ -2559,7 +2559,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         Hidden()
         NLs()
         expect("@")
-        val useSite = expectAnyOpt("field", "property", "get", "set", "receiver", "param", "setparam", "delegate", "file")
+        val useSite = expectAnyOpt(ANNOTATION_SITES)
         if (useSite != null) {
             NLs()
             expect(":")
@@ -3711,6 +3711,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         check(eof) { "Not EOF found but ${peek()}" }
     }
 
+
     companion object {
         val HARD_KEYWORDS = setOf(
             "return", "for", "while", "do", "else", "when", "if", "super", "is", "in", "class", "interface", "fun", "var", "val"
@@ -3723,6 +3724,17 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             "reified", "sealed", "tailrec", "set", "vararg", "where", "field", "property", "receiver", "param",
             "setparam", "delegate", "file", "expect", "actual", "const", "suspend", "value"
         )
+
+        val ASSIGNMENT_OPERATOR = setOf("+=", "-=", "*=", "/=", "%=")
+        val EQUALITY_OPERATOR = setOf("!==", "===", "!=", "==")
+        val COMPARISON_OPERATOR = setOf(">=", "<=", "<", ">")
+        val IS_OPERATOR = setOf("!is", "is")
+        val IN_OPERATOR = setOf("!in", "in")
+        val IN_IS_OPERATOR = IS_OPERATOR + IN_OPERATOR
+        val ADDITIVE_OPERATOR = setOf("+", "-")
+        val MULTIPLICATIVE_OPERATOR = setOf("*", "/", "%")
+        val AS_OPERATOR = setOf("as?", "as")
+        val ANNOTATION_SITES = setOf("field", "property", "get", "set", "receiver", "param", "setparam", "delegate", "file")
 
         val VARIANCE_MODIFIERS = VarianceModifier.entries.map { it.id }.toSet()
         val REIFICATION_MODIFIERS = ReificationModifier.entries.map { it.id }.toSet()
