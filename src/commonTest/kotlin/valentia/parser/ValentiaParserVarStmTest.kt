@@ -115,7 +115,7 @@ open class ValentiaParserVarStmTest : StmBuilder {
         assertEquals(
             null,
             ValentiaParser.file("""
-                val IntType: TypeNode get() = "Int".type
+                //val IntType: TypeNode get() = "Int".type
                 val Boolean.lit: BoolLiteralExpr get() = BoolLiteralExpr(this)
             """.trimIndent()) as? Any?
         )

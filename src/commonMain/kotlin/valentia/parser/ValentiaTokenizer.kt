@@ -250,7 +250,8 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
                         out
                     }
                     peekChar().isLetterOrUndescore() -> listOf(readToken())
-                    else -> TODO("Unsupported after dollar string $this")
+                    peekChar() == end -> return LiteralStringPartToken("$").also { it.line = line }
+                    else -> TODO("Unsupported after dollar string '${peekChar()}' :: $this")
                 }
                 ExpressionStringPartToken(readAbsoluteRange(spos, pos), tokens)
             }

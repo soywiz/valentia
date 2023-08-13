@@ -490,7 +490,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
                 NLs()
                 if (matches(")")) break
                 if (expectOpt(",")) continue
-                params += functionValueParameter() ?: error("Not a valid value parameter")
+                params += functionValueParameter() ?: error("Not a valid value parameter $this")
                 NLs()
                 if (!expectOpt(",")) break
             }
@@ -506,7 +506,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : parameterModifiers? parameter (NL* ASSIGNMENT NL* expression)?
     //    ;
     fun functionValueParameter(): FuncValueParam? {
-        parameterModifiers(atLeastOne = false)
+        val mods = parameterModifiers(atLeastOne = false)
         val param = parameter() ?: return null
         NLs()
         val assignment = if (expectOpt("=")) {
@@ -634,12 +634,18 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun propertyDeclaration(modifiers: Modifiers): VariableDeclBase? {
         debug("TODO: propertyDeclaration")
+        val kind = peek().str
         if (!expectOpt("val") && !expectOpt("var")) return null
         //expectAny("val", "var")
-        typeParametersOpt()
-        opt {
+        val typeParams = typeParametersOpt()
+        val receiver = opt {
             NLs()
-            val res = receiverType()
+            var res = receiverType()
+            if (res is MultiType && res.types.size >= 2) {
+                res = res.copy(res.types.dropLast(1))
+                pos--
+                pos--
+            }
             NLs()
             if (expectOpt(".")) res else null
         }
@@ -1118,6 +1124,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val spos = pos
         val modifiers = zeroOrMore { typeModifier() }
         NLs()
+        //OR({ parenthesizedType() }, { nullableType() }, { typeReference() })
         //return nullableType().withModifiers(modifiers)
         val type = type() ?: return null.also { pos = spos }
         return type.withModifiers(modifiers)
@@ -2650,6 +2657,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         } else {
             unescapedAnnotation()?.let { AnnotationNodes(listOf(it)) }
         } ?: return null.also { pos = spos }
+        NLs()
         return AnnotationNodes(nodes.annotations.map { it.copy(useSite = useSite) })
     }
 

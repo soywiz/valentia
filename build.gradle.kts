@@ -77,3 +77,10 @@ tasks.named<JavaExec>("run") {
     dependsOn(tasks.named<Jar>("jvmJar"))
     classpath(tasks.named<Jar>("jvmJar"))
 }
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile::class.java).all {
+    kotlinOptions {
+        //freeCompilerArgs += listOf("-Xreport-perf", "-Xprofile=")
+        //freeCompilerArgs += listOf("-Xreport-perf")
+    }
+}

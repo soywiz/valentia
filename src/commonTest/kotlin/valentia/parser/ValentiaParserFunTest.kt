@@ -64,4 +64,23 @@ class ValentiaParserFunTest : DeclBuilder, StmBuilder {
             }
         """.trimIndent())
     }
+
+    @Test
+    fun testFun3() {
+        ValentiaParser.file("""
+            @Test
+            fun testNode() {
+                assertEquals("hello world", runJsCode("console.log('hello world')").trim())
+            }
+            fun genAndRunJs(vararg filesContent: String, extraArgs: List<Any> = emptyList(), trim: Boolean = true, printJs: Boolean = false): String {
+                val jsCode = genFilesJSString(*filesContent)
+                if (printJs) println(jsCode)
+                return runJsCode(jsCode, *extraArgs.toTypedArray()).let { if (trim) it.trim() else it }
+            }
+            fun genFilesJSString(
+                @Language("kotlin")
+                vararg filesContent: String
+            ): String = genFiles(*filesContent).indentToString()
+        """.trimIndent())
+    }
 }
