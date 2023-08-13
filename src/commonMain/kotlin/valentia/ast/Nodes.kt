@@ -373,7 +373,12 @@ enum class UnaryPostOp(val str: String) {
 }
 
 data class CastExpr(val expr: Expr, val targetType: TypeNode, val kind: String) : Expr()
-data class CallExpr(val expr: Expr, val params: List<Expr>, val lambdaArg: Expr? = null, val typeArgs: List<TypeNode>? = null) : Expr()
+data class CallExpr(val expr: Expr, val params: List<Expr>, val lambdaArg: Expr? = null, val typeArgs: List<TypeNode>? = null) : Expr() {
+    val paramsPlusLambda get() = params
+}
+//data class CallExpr(val expr: Expr, val params: List<Expr>? = null, val lambdaArg: Expr? = null, val typeArgs: List<TypeNode>? = null) : Expr() {
+//    val paramsPlusLambda = listOfNotNull(*(params ?: emptyList()).toTypedArray(), lambdaArg)
+//}
 data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : AssignableExpr()
 data class UnaryPostOpExpr(val expr: Expr, val op: UnaryPostOp) : Expr()
 data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr() {
