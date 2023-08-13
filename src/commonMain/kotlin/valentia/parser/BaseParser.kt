@@ -301,7 +301,7 @@ inline fun <T> BaseConsumer.opt(block: () -> T): T? {
     return res
 }
 
-inline fun <T> BaseConsumer.multiple(atLeastOne: Boolean, block: () -> T?): List<T> {
+inline fun <T> BaseConsumer.multiple(atLeastOne: Boolean, catch: Boolean = true, block: () -> T?): List<T> {
     val out = arrayListOf<T>()
     if (atLeastOne) {
         out += block() ?: TODO("multiple atLeastOne=$atLeastOne")
@@ -316,6 +316,7 @@ inline fun <T> BaseConsumer.multiple(atLeastOne: Boolean, block: () -> T?): List
             }
             out += res
         } catch (e: IllegalStateException) {
+            if (!catch) throw e
             pos = oldPos
             break@loop
         }
@@ -323,8 +324,8 @@ inline fun <T> BaseConsumer.multiple(atLeastOne: Boolean, block: () -> T?): List
     return out
 }
 
-inline fun <T> BaseConsumer.oneOrMore(block: () -> T?): List<T> = multiple(atLeastOne = true, block)
-inline fun <T> BaseConsumer.zeroOrMore(block: () -> T?): List<T> = multiple(atLeastOne = false, block)
+inline fun <T> BaseConsumer.oneOrMore(catch: Boolean = true, block: () -> T?): List<T> = multiple(atLeastOne = true, catch = catch, block)
+inline fun <T> BaseConsumer.zeroOrMore(catch: Boolean = true, block: () -> T?): List<T> = multiple(atLeastOne = false, catch = catch, block)
 
 inline fun BaseConsumer.recoverWithExpect(token: String, block: () -> Unit) {
     TODO("recoverWithExpect")

@@ -33,7 +33,12 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val fileAnnotations = zeroOrMore { fileAnnotation() }
         val _package = packageHeader()
         val imports = importList()
-        val topLevelDecls = zeroOrMore { topLevelObject() }
+        val topLevelDecls = arrayListOf<Decl>()
+        while (true) {
+            NLs()
+            if (eof) break
+            topLevelDecls += topLevelObject()
+        }
         NLs()
         EOF()
         return FileNode(
@@ -1689,7 +1694,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun callSuffix(expr: Expr): Expr? {
         val typeArgs = opt { typeArguments() }
         //val args = opt { valueArguments() }
-        val args = valueArguments()
+        val args = if (matches("(")) {
+            valueArguments()
+        } else {
+            null
+        }
         val lambdaArg = if (args == null) {
             annotatedLambda()
         } else {
@@ -2439,8 +2448,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun modifier(): Modifier? {
         Hidden()
-        val token = read()
-        return ALL_MODIFIERS[token.str].also { NLs() }
+        return expectAny(ALL_MODIFIERS).also { NLs() }
     }
 
     //typeModifiers
@@ -3708,7 +3716,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
 
     override fun EOF() {
         NLs()
-        check(eof) { "Not EOF found but ${peek()}" }
+        check(eof) { "Not EOF found but ${peek()} at $this" }
     }
 
 
