@@ -235,7 +235,20 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
                 val spos = pos
                 expect("\$")
                 val tokens: List<Token> = when {
-                    matches("{") -> expectAndRecoverSure("{", "}") { whileMap({ !matches("}") }) { readToken() } }
+                    matches("{") -> expectAndRecoverSure("{", "}") {
+                        val out = arrayListOf<Token>()
+                        var curlyLevel = 1
+                        while (hasMore) {
+                            if (matches("{")) curlyLevel++
+                            if (matches("}")) {
+                                --curlyLevel
+                                if (curlyLevel == 0) break
+                            }
+                            val tok = readToken()
+                            out += tok
+                        }
+                        out
+                    }
                     peekChar().isLetterOrUndescore() -> listOf(readToken())
                     else -> TODO("Unsupported after dollar string $this")
                 }

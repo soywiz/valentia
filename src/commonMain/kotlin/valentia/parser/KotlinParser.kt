@@ -1902,9 +1902,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val chunks = str.tokens.map { token ->
             when (token) {
                 is EscapeStringPartToken -> InterpolatedStringExpr.StringChunk("${token.c}")
-                is ExpressionStringPartToken -> InterpolatedStringExpr.ExpressionChunk(
-                    createParser(token.expr).expression() ?: error("Expression expected")
-                )
+                is ExpressionStringPartToken -> {
+                    InterpolatedStringExpr.ExpressionChunk(
+                        createParser(token.expr).expression() ?: error("Expression expected")
+                    )
+                }
                 is LiteralStringPartToken -> InterpolatedStringExpr.StringChunk(token.str)
             }
         }

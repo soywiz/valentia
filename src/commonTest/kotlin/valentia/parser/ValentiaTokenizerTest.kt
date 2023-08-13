@@ -2,6 +2,7 @@ package valentia.parser
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ValentiaTokenizerTest {
     fun chunks(str: String): List<String> = ValentiaTokenizer(str).tokenize().map { it.str }
@@ -34,6 +35,19 @@ class ValentiaTokenizerTest {
     fun testInterpolationString() {
         println(ValentiaTokenizer("\"\"").tokenize())
         println(ValentiaTokenizer("\"hello \$world\"").tokenize())
+    }
+
+    @Test
+    fun testInterpolationString2() {
+        val res = ValentiaTokenizer("\"hello \${run { 1 + 2 }}\"").tokenize()
+        assertEquals(1, res.size)
+        val (resf) = res
+        assertTrue(resf is StringInterpolationToken)
+        assertEquals(2, resf.tokens.size)
+        val (tok1, tok2) = resf.tokens
+        assertTrue(tok1 is LiteralStringPartToken)
+        assertTrue(tok2 is ExpressionStringPartToken)
+        assertEquals(11, tok2.expr.size)
     }
 
     @Test
