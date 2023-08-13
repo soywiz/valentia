@@ -12,10 +12,8 @@ class ParseValentiaSrc {
             println("FILE: $file : ")
             val text = file.readText()
             val (tokens, timeTokenize) = measureTimedValue { ValentiaTokenizer(text).tokenize() }
-            println("   -> tokenize=$timeTokenize")
             val (nodes, timeParse) = measureTimedValue { ValentiaParser(tokens).valentiaFile() }
-            println("   -> tokenize=$timeTokenize, parse=$timeParse")
-            println("   -> topLevelDecls=${nodes.topLevelDecls.size}")
+            println("   -> tokenize=$timeTokenize, parse=$timeParse, topLevelDecls=${nodes.topLevelDecls.size}")
         }
     }
 }

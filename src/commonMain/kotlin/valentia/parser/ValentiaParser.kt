@@ -11,7 +11,7 @@ open class ValentiaParser(
     fun valentiaFile(): FileNode = kotlinFile()
 
     companion object {
-        private fun <T> parserEOF(str: String, checkEOF: Boolean = true, block: ValentiaParser.() -> T): T {
+        private inline fun <T> parserEOF(str: String, checkEOF: Boolean = true, block: ValentiaParser.() -> T): T {
             return ValentiaParser(str).let { parser -> block(parser).also { if (checkEOF) parser.EOF() } }
         }
 
@@ -20,7 +20,7 @@ open class ValentiaParser(
         fun file(@Language("kotlin") str: String): FileNode =
             parserEOF(str) { valentiaFile() }
         fun expression(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String, checkEOF: Boolean = true): Expr =
-            parserEOF(str, checkEOF) { expression() }
+            parserEOF(str, checkEOF) { expressionSure() }
         fun assignment(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Stm =
             parserEOF(str) { assignment() ?: error("Not an assignment") }
         fun statement(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Stm =
@@ -28,7 +28,7 @@ open class ValentiaParser(
         fun statements(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): List<Stm> =
             parserEOF(str) { statements() }
         fun type(@Language("kotlin", prefix = "typealias Example = ", suffix = "") str: String): TypeNode =
-            parserEOF(str) { type() }
+            parserEOF(str) { type() ?: error("Expected type") }
 
     }
 }

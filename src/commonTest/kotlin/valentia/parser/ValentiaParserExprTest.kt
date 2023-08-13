@@ -5,6 +5,8 @@ import valentia.ast.OpSeparatedExprs
 import valentia.ast.StmBuilder
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 open class ValentiaParserExprTest : StmBuilder {
     @Test
@@ -86,9 +88,12 @@ open class ValentiaParserExprTest : StmBuilder {
     @Test
     fun testExpressionFail() {
         val invalid = "}"
-        assertEquals(
-            null,
-            ValentiaParser.expression(invalid, checkEOF = false) as? Any?
-        )
+        assertFailsWith<IllegalStateException> {
+            ValentiaParser.expression(invalid)
+        }
+        //val e = assertFailsWith<IllegalStateException> {
+        //    ValentiaParser.expression(invalid)
+        //}
+        //assertTrue(e.message!!.contains("Not an expression"))
     }
 }

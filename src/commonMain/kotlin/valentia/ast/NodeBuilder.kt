@@ -46,6 +46,10 @@ interface StmBuilder : NodeBuilder {
         val builder = WhenBuilder().also(block)
         return WhenExpr(WhenExpr.Subject(expr), builder.entries)
     }
+    fun LAMBDA(block: StmBuilder.() -> Unit): LambdaFunctionExpr {
+        return LambdaFunctionExpr(buildStmList { block() })
+    }
+
 }
 
 class WhenBuilder {
@@ -88,7 +92,9 @@ interface NodeBuilder {
     val List<TypeNode>.multi: MultiType get() = MultiType(this)
     fun collection(vararg items: Expr): CollectionLiteralExpr = CollectionLiteralExpr(items.toList())
     operator fun Expr.get(vararg indices: Expr): IndexedExpr = IndexedExpr(this, indices.toList())
+    operator fun Expr.get(dot: String): NavigationExpr = NavigationExpr(".", this, dot)
     operator fun Expr.invoke(vararg params: Expr, lambdaArg: Expr? = null, typeArgs: List<TypeNode>? = null): CallExpr = CallExpr(this, params.toList(), lambdaArg, typeArgs)
+    fun Expr.infix(key: String, expr: Expr): Expr = OpSeparatedExprs(listOf(key), listOf(this, expr))
     operator fun Expr.unaryMinus(): UnaryPreOpExpr = UnaryPreOpExpr(UnaryPreOp.MINUS, this)
     operator fun Expr.unaryPlus(): UnaryPreOpExpr = UnaryPreOpExpr(UnaryPreOp.PLUS, this)
     fun Expr.castTo(targetType: TypeNode, safe: Boolean = false): Expr =

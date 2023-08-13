@@ -37,7 +37,9 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         while (true) {
             NLs()
             if (eof) break
-            topLevelDecls += topLevelObject() ?: break
+            val topLevelObject = topLevelObject()
+                ?: error("Expected topLevelObject but found ${peek()} $this")
+            topLevelDecls += topLevelObject
         }
         NLs()
         EOF()
@@ -137,7 +139,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         NLs()
         expect("=")
         NLs()
-        val type = type()
+        val type = type() ?: error("Expected type")
         return TypeAliasDecl(id, type, types, modifiers)
     }
 
@@ -178,11 +180,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun classDeclaration(modifiers: Modifiers): ClassDecl {
         debug("TODO: classDeclaration")
         val kind = OR(
-            { expect("class"); "class" },
+            { if (expectOpt("class")) "class" else null },
             {
                 val isFun = expectOpt("fun")
                 NLs()
-                expect("interface")
+                if (!expectOpt("interface")) return@OR null
                 if (isFun) "fun interface" else "interface"
             },
         )
@@ -241,20 +243,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun classParameters(): List<ClassParameter> {
         val list = expectAndRecover("(", ")") {
             NLs()
-            opt {
-                val param = classParameter()
-                val extra = zeroOrMore {
-                    NLs()
-                    COMMA()
-                    NLs()
-                    classParameter()
-                }
-                opt {
-                    NLs()
-                    COMMA()
-                }
-                listOf(param) + extra
-            }.also { NLs() }
+            parseListNew({ expectOpt(",") }, oneOrMore = false, trailingSeparator = true, end = { matches(")") }) {
+                classParameter()
+            }.also {
+                NLs()
+            }
         } ?: emptyList()
 
         return list
@@ -275,7 +268,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         COLON()
         NLs()
         val type = type()
-        opt { NLs(); ASSIGNMENT(); NLs(); expression() }
+        NLs()
+        val expr = if (expectOpt("=")) { NLs(); expression() } else null
         return ClassParameter(id)
     }
 
@@ -326,12 +320,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         return ORNullable(
             { constructorInvocation() },
             { explicitDelegation() },
-            { BasicSubTypeInfo(userType()) },
+            { userType()?.let { BasicSubTypeInfo(it) } },
             {
                 val isSuspend = expectOpt("suspend")
                 NLs()
-                val res = functionType()
-                BasicSubTypeInfo(if (isSuspend) res.suspendable() else res)
+                functionType()?.let { BasicSubTypeInfo(if (isSuspend) it.suspendable() else it) }
             },
         )
     }
@@ -341,7 +334,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun constructorInvocation(): ConstructorInvocation? {
         val spos = pos
-        val type = userType()
+        val type = userType() ?: return null.also { pos = spos }
         NLs()
         val args = valueArguments() ?: return null.also { pos = spos }
         return ConstructorInvocation(type, args)
@@ -367,7 +360,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         NLs()
         if (!expectOpt("by")) return null.also { pos = spos }
         NLs()
-        val delegate = expression()
+        val delegate = expressionSure()
         return ExplicitDelegation(type, delegate)
     }
 
@@ -401,28 +394,25 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         debug("TODO: typeConstraints")
         if (!expectOpt("where")) return null
         NLs()
-        val tc = typeConstraint()
-        val more = zeroOrMore {
-            NLs()
-            expect(",")
-            NLs()
+        return parseListNew({ expectOpt(",") }, end = { eof || matches("{") }, oneOrMore = true) {
+        //return parseListNew({ expectOpt(",") }, oneOrMore = true) {
             typeConstraint()
         }
-        return listOf(tc) + more
         //return parseList(oneOrMore = true) { typeConstraint() }
     }
 
     //typeConstraint
     //    : annotation* simpleIdentifier NL* COLON NL* type
     //    ;
-    fun typeConstraint(): TypeConstraint {
+    fun typeConstraint(): TypeConstraint? {
         debug("TODO: typeConstraint")
+        val spos = pos
         val annotations = annotations()
-        val id = simpleIdentifier()
+        val id = simpleIdentifierOpt() ?: return null.also { pos = spos }
         NLs()
         COLON()
         NLs()
-        val type = type()
+        val type = type() ?: error("Expected type")
         return TypeConstraint(id, type, annotations)
     }
 
@@ -436,7 +426,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             NLs()
             if (matches("}")) return@zeroOrMore null
             classMemberDeclaration().also {
-                println("DECL: $it")
+                //println("DECL: $it")
                 semis(atLeastOne = false)
             }
         }
@@ -464,7 +454,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun anonymousInitializer(mods: Modifiers = modifiers()): InitDecl {
         expect("init")
         NLs()
-        val block = block()
+        val block = block() ?: error("Expect block after init")
         return InitDecl(block)
     }
 
@@ -481,9 +471,12 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val isData = expectOpt("data")
         NLs()
         expect("object")
-        val name = opt { NLs(); simpleIdentifier() }
-        opt { NLs(); COLON(); NLs(); delegationSpecifiers() }
-        opt { NLs(); classBody() }
+        NLs()
+        val name = simpleIdentifierOpt()
+        NLs()
+        if (expectOpt(":")) { NLs(); delegationSpecifiers() } else null
+        NLs()
+        classBody()
         return CompanionObjectDecl(name)
     }
 
@@ -581,14 +574,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | ASSIGNMENT NL* expression
     //    ;
     fun functionBody(): Stm? {
-        NLs()
-        if (expectOpt("=")) {
-            NLs()
-            return ReturnStm(expression())
-        } else if (matches("{")) {
-            return block()
-        } else {
-            return null
+        return when (peek().str) {
+            "=" -> {
+                expect("=")
+                NLs()
+                ReturnStm(expression())
+            }
+            "{" -> block()
+            else -> null
         }
         //debug("TODO: functionBody")
         //return OR(
@@ -615,7 +608,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun multiVariableDeclaration(): MultiVariableDecl? {
         if (!matches("(")) return null
-        val vars = expectAndRecoverSure("(", ")") {
+        val vars = expectAndRecover("(", ")") {
             parseListNew(trailingSeparator = true, end = { matches(")") }) {
                 variableDeclaration()
             }
@@ -658,7 +651,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val expr = if (matches("by")) {
             delegation = true
             propertyDelegate()
-        } else if (matches("=")) {
+        } else if (expectOpt("=")) {
             NLs()
             expression()
         } else {
@@ -683,8 +676,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //propertyDelegate
     //    : BY NL* expression
     //    ;
-    fun propertyDelegate(): Expr {
-        expect("by")
+    fun propertyDelegate(): Expr? {
+        if (!expectOpt("by")) return null
         NLs()
         return expression()
     }
@@ -789,14 +782,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun parameter(): Parameter? {
         val spos = pos
-        val id = simpleIdentifier()
+        val id = simpleIdentifierOpt() ?: return null
         NLs()
         if (!expectOpt(":")) {
             pos = spos
             return null
         }
         NLs()
-        val type = type()
+        val type = type() ?: error("Expected type")
         return Parameter(id, type)
     }
 
@@ -811,16 +804,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         expect("object")
         NLs()
         val name = simpleIdentifier()
-        opt {
-            NLs()
-            COLON()
-            NLs()
-            delegationSpecifiers()
-        }
-        opt {
-            NLs()
-            classBody()
-        }
+        NLs()
+        if (expectOpt(":")) { NLs(); delegationSpecifiers() } else null
+        NLs()
+        classBody()
         return ObjectDecl(name)
     }
 
@@ -899,7 +886,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //type
     //    : typeModifiers? (functionType | parenthesizedType | nullableType | typeReference | definitelyNonNullableType)
     //    ;
-    fun type(): TypeNode {
+    fun type(): TypeNode? {
+        val spos = pos
         debug("TODO: type")
 
         val modifiers = typeModifiers(atLeastOne = false)
@@ -926,7 +914,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
                 types.first().type
             }
         } else {
-            typeReference()
+            typeReference() ?: return null.also { pos = spos }
         }
         NLs()
         val isNullable = expectOpt("?")
@@ -971,7 +959,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : userType
     //    | DYNAMIC
     //    ;
-    fun typeReference(): TypeNode {
+    fun typeReference(): TypeNode? {
         if (expectOpt("dynamic")) return DynamicType
         return userType()
     }
@@ -994,15 +982,15 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //userType
     //    : simpleUserType (NL* DOT NL* simpleUserType)*
     //    ;
-    fun userType(): TypeNode {
+    fun userType(): TypeNode? {
         //println("TODO: userType")
-        val base = simpleUserType()
+        val base = simpleUserType() ?: return null
         val more = arrayListOf<TypeNode>()
         while (hasMore) {
             NLs()
             if (!expectOpt(".")) break
             NLs()
-            more += simpleUserType()
+            more += simpleUserType() ?: error("Expected simpleUserType")
         }
         return if (more.isNotEmpty()) MultiType(listOf(base, *more.toTypedArray())) else base
         //val types = parseList(oneOrMore = true, separator = { expectOpt(".") }) {
@@ -1014,9 +1002,9 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //simpleUserType
     //    : simpleIdentifier (NL* typeArguments)?
     //    ;
-    fun simpleUserType(): TypeNode {
+    fun simpleUserType(): TypeNode? {
         debug("TODO: simpleUserType")
-        val id = simpleIdentifier()
+        val id = simpleIdentifierOpt() ?: return null
         NLs()
         val generic = if (matches("<")) typeArguments() else null
         val simple = SimpleType(id)
@@ -1027,15 +1015,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : typeProjectionModifiers? type
     //    | MULT
     //    ;
-    fun typeProjection(): TypeNode {
-        return OR(
+    fun typeProjection(): TypeNode? {
+        return ORNullable(
             {
                 typeProjectionModifiers(atLeastOne = false)
                 type()
             },
             {
-                MULT()
-                SimpleType("*")
+                if (expectOpt("*")) SimpleType("*") else null
             },
             name = "typeProjection"
         )
@@ -1062,13 +1049,20 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //functionType
     //    : (receiverType NL* DOT NL*)? functionTypeParameters NL* ARROW NL* type
     //    ;
-    fun functionType(): FuncTypeNode {
-        val receiver = opt { receiverType().also { NLs(); DOT(); NLs() } }
+    fun functionType(): FuncTypeNode? {
+        val spos = pos
+        val receiver = opt {
+            val type = receiverType()
+            NLs()
+            if (!expectOpt(".")) return@opt null
+            NLs()
+            type
+        }
         val typeParams = functionTypeParameters()
         NLs()
-        expect("->")
+        if (!expectOpt("->")) return null.also { pos = spos }
         NLs()
-        val ret = type()
+        val ret = type() ?: error("Expected type")
         return FuncTypeNode(ret, typeParams, receiver)
     }
 
@@ -1105,10 +1099,12 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : typeModifiers? (parenthesizedType | nullableType | typeReference)
     //    ;
     fun receiverType(): TypeNode? {
+        val spos = pos
         val modifiers = zeroOrMore { typeModifier() }
         NLs()
         //return nullableType().withModifiers(modifiers)
-        return type().withModifiers(modifiers)
+        val type = type() ?: return null.also { pos = spos }
+        return type.withModifiers(modifiers)
     }
 
     //parenthesizedUserType
@@ -1172,7 +1168,9 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
                 { loopStatement() },
                 { declaration()?.let { DeclStm(it) } },
                 { assignment() },
-                { expression()?.let { ExprStm(it) } },
+                {
+                    expression()?.let { ExprStm(it) }
+                },
                 name = "statement"
             )
         }.withModifiers(modifiers)
@@ -1199,7 +1197,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun controlStructureBody(): Stm {
         Hidden()
         return when {
-            matches("{") -> block()
+            matches("{") -> block()!!
             else -> statement()
         }
     }
@@ -1207,7 +1205,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //block
     //    : LCURL NL* statements NL* RCURL
     //    ;
-    fun block(): Stm {
+    fun block(): Stm? {
+        if (!matches("{")) return null
         return expectAndRecoverSure("{", "}", reason = "block") {
             NLs()
             if (!matches("}")) {
@@ -1244,11 +1243,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             annotations = annotations()
             vardecl = variableDeclarationOrMultiVariableDeclaration()
             expect("in")
-            expr = expression()
+            expr = expressionSure()
         }
         NLs()
 
-        val body = if (expectOpt(";")) null else opt { controlStructureBody() }
+        val body = if (expectOpt(";")) null else controlStructureBody()
         //val body = controlStructureBody()
         ForLoopStm(expr, vardecl, body, annotations)
     }
@@ -1265,7 +1264,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         Hidden()
         NLs()
         Hidden()
-        val body: Stm = OR({ expect(";"); EmptyStm() }, { controlStructureBody() })
+        val body: Stm = OR(
+            { if (expectOpt(";")) EmptyStm() else null },
+            { controlStructureBody() }
+        )
         Hidden()
         WhileLoopStm(cond, body)
     }
@@ -1302,7 +1304,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             name = "assignment"
         ) ?: return null
         NLs()
-        val expr = expression()
+        val expr = expressionSure()
         return AssignStm(lvalue, op, expr)
     }
 
@@ -1310,16 +1312,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : (SEMICOLON | NL) NL*
     //    ;
     fun semi() {
-        if (matches(";")) {
-            skip(1)
-        }
+        expectOpt(";")
         while (peek() is HiddenToken || peek() is NLToken) {
             NLs()
         }
     }
 
     fun semiOpt() {
-        opt { semi() }
+        semi()
     }
 
     //semis
@@ -1336,7 +1336,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
 
 // SECTION: expressions
 
-    private inline fun binop(op: () -> String?, next: () -> Expr?, initialNLs: Boolean = true): Expr {
+    private inline fun binop(op: () -> String?, initialNLs: Boolean = true, next: () -> Expr?): Expr? {
         val spos = pos
         val ops = arrayListOf<String>()
         val exprs = arrayListOf<Expr>()
@@ -1344,7 +1344,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val expr = next()
         if (expr == null) {
             pos = spos
-            TODO("expr=null")
+            //TODO("expr=null")
+            return null
         }
         exprs += expr
         Hidden()
@@ -1372,30 +1373,35 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         return OpSeparatedExprs(ops, exprs).enrich(this, spos)
     }
 
+    fun expressionSure(): Expr {
+        val spos = pos
+        return expression() ?: error("Expression expected but found ${run { pos = spos; peek() }} : $this")
+    }
+
     //expression
     //    : disjunction
     //    ;
-    fun expression(): Expr = disjunction()
+    fun expression(): Expr? = disjunction()
 
     //disjunction
     //    : conjunction (NL* DISJ NL* conjunction)*
     //    ;
-    fun disjunction(): Expr = binop({ expectAnyOpt("||") }, { conjunction() })
+    fun disjunction(): Expr? = binop({ expectAnyOpt("||") }) { conjunction() }
 
     //conjunction
     //    : equality (NL* CONJ NL* equality)*
     //    ;
-    fun conjunction(): Expr = binop({ expectAnyOpt("&&") }, { equality() })
+    fun conjunction(): Expr? = binop({ expectAnyOpt("&&") }) { equality() }
 
     //equality
     //    : comparison (equalityOperator NL* comparison)*
     //    ;
-    fun equality(): Expr = binop({ equalityOperator() }, { comparison() }, initialNLs = false)
+    fun equality(): Expr? = binop({ expectAnyOpt(EQUALITY_OPERATOR) }, initialNLs = false) { comparison() }
 
     //comparison
     //    : genericCallLikeComparison (comparisonOperator NL* genericCallLikeComparison)*
     //    ;
-    fun comparison(): Expr = binop({ comparisonOperator() }, { genericCallLikeComparison() }, initialNLs = false)
+    fun comparison(): Expr? = binop({ expectAnyOpt(COMPARISON_OPERATOR) }, initialNLs = false) { genericCallLikeComparison() }
 
     //genericCallLikeComparison
     //    : infixOperation callSuffix*
@@ -1413,13 +1419,13 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : elvisExpression (inOperator NL* elvisExpression | isOperator NL* type)*
     //    ;
     fun infixOperation(): Expr? {
-        var res: Expr = elvisExpression()
+        var res: Expr = elvisExpression() ?: return null
         loop@while (true) {
             val op = expectAnyOpt(IN_IS_OPERATOR) ?: break
             NLs()
             res = when (op) {
-                "!in", "in" -> RangeTestExpr(res, op, elvisExpression())
-                "!is", "is" -> TypeTestExpr(res, op, type())
+                "!in", "in" -> RangeTestExpr(res, op, elvisExpression() ?: error("Expected expression"))
+                "!is", "is" -> TypeTestExpr(res, op, type() ?: error("Expected type"))
                 else -> return null
             }
         }
@@ -1429,7 +1435,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //elvisExpression
     //    : infixFunctionCall (NL* elvis NL* infixFunctionCall)*
     //    ;
-    fun elvisExpression(): Expr = binop({ expectAnyOpt("?:") }, { infixFunctionCall() })
+    fun elvisExpression(): Expr? = binop({ expectAnyOpt("?:") }) { infixFunctionCall() }
 
     //elvis
     //    : QUEST_NO_WS COLON
@@ -1439,41 +1445,41 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //infixFunctionCall
     //    : rangeExpression (simpleIdentifier NL* rangeExpression)*
     //    ;
-    fun infixFunctionCall(): Expr {
-        return binop({ simpleIdentifierOpt() }, { rangeExpression() })
+    fun infixFunctionCall(): Expr? {
+        return binop({ simpleIdentifierOpt() }, initialNLs = false) { rangeExpression() }
     }
 
     //rangeExpression
     //    : additiveExpression ((RANGE | RANGE_UNTIL) NL* additiveExpression)*
     //    ;
-    fun rangeExpression(): Expr {
-        return binop({ expectAnyOpt(RANGE_OPS) }, { additiveExpression() })
+    fun rangeExpression(): Expr? {
+        return binop({ expectAnyOpt(RANGE_OPS) }) { additiveExpression() }
     }
 
     //additiveExpression
     //    : multiplicativeExpression (additiveOperator NL* multiplicativeExpression)*
     //    ;
-    fun additiveExpression(): Expr {
-        return binop({ additiveOperator() }, { multiplicativeExpression() })
+    fun additiveExpression(): Expr? {
+        return binop({ additiveOperator() }) { multiplicativeExpression() }
     }
 
     //multiplicativeExpression
     //    : asExpression (multiplicativeOperator NL* asExpression)*
     //    ;
-    fun multiplicativeExpression(): Expr {
-        return binop({ multiplicativeOperator() }, { asExpression() })
+    fun multiplicativeExpression(): Expr? {
+        return binop({ multiplicativeOperator() }) { asExpression() }
     }
 
     //asExpression
     //    : prefixUnaryExpression (NL* asOperator NL* type)*
     //    ;
-    fun asExpression(): Expr {
-        var res: Expr = prefixUnaryExpression()
+    fun asExpression(): Expr? {
+        var res: Expr = prefixUnaryExpression() ?: return null
         val asTypes = zeroOrMore {
             NLs()
             val kind = asOperator() ?: return@zeroOrMore null
             NLs()
-            kind to type()
+            kind to (type() ?: error("Expected type"))
         }
         if (asTypes.isNotEmpty()) {
             for (type in asTypes) {
@@ -1486,10 +1492,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //prefixUnaryExpression
     //    : unaryPrefix* postfixUnaryExpression
     //    ;
-    fun prefixUnaryExpression(): Expr {
+    fun prefixUnaryExpression(): Expr? {
+        val spos = pos
         val prefixes = zeroOrMore { unaryPrefix() }
         debug("TODO: prefixUnaryExpression : $prefixes")
-        var res: Expr = postfixUnaryExpression()
+        var res: Expr = postfixUnaryExpression() ?: return null.also { pos = spos }
         for (prefix in prefixes.reversed()) {
             val prefixValue = prefix.value
             res = when (prefixValue) {
@@ -1516,9 +1523,9 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //postfixUnaryExpression
     //    : primaryExpression postfixUnarySuffix*
     //    ;
-    fun postfixUnaryExpression(): Expr {
+    fun postfixUnaryExpression(): Expr? {
         debug("TODO: postfixUnaryExpression")
-        var res: Expr = primaryExpression()
+        var res: Expr = primaryExpression() ?: return null
         zeroOrMore {
             postfixUnarySuffix(res)?.let { res = it }
         }
@@ -1576,7 +1583,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         if (matches("[")) {
             val params = expectAndRecoverSure("[", "]") {
                 parseList(separator = { expectOpt(",") }, doBreak = { matches("]") }) {
-                    expression()
+                    expression() ?: error("Expression expected")
                 }
             }
             return IndexedExpr(expr, params)
@@ -1598,7 +1605,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         return if (matches("(")) {
             parenthesizedDirectlyAssignableExpression()
         } else {
-            val expr = postfixUnaryExpression()
+            val expr = postfixUnaryExpression() ?: return null
             if (expr is AssignableExpr) {
                 expr
             } else {
@@ -1669,7 +1676,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun indexingSuffix(expr: Expr): AssignableExpr =
         IndexedExpr(expr, parseListWithStartEnd("[", "]", oneOrMore = true, separator = { expectOpt(",") }) {
-            expression()
+            expression() ?: error("Expression expected")
         })
 
     //navigationSuffix
@@ -1763,12 +1770,19 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : annotation? NL* (simpleIdentifier NL* ASSIGNMENT NL*)? MULT? NL* expression
     //    ;
     fun valueArgument(): Expr {
-        val annotations = opt { annotation() }
+        val annotations = annotation()
         NLs()
-        val namedArgument = opt { simpleIdentifier().also { NLs();ASSIGNMENT();NLs() } }
-        val spread = opt { MULT() }
+        val namedArgument = opt {
+            val id = simpleIdentifierOpt() ?: return@opt null
+            NLs()
+            if (!expectOpt("=")) return@opt null
+            NLs()
+            id
+        }
         NLs()
-        return expression()
+        val spread = expectOpt("*")
+        NLs()
+        return expression() ?: error("expression expected")
     }
 
     //primaryExpression
@@ -1787,8 +1801,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | tryExpression
     //    | jumpExpression
     //    ;
-    fun primaryExpression(): Expr {
-        Hidden()
+    fun primaryExpression(): Expr? {
         //literalConstantOpt()?.let { return it }
 
         debug("TODO: primaryExpression")
@@ -1815,13 +1828,13 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             "throw", "return", "continue", "break" -> jumpExpression() ?: error("Not a jump")
             "[" -> collectionLiteral() ?: error("Not a collection literal")
             else -> {
-                OR(
+                ORNullable(
                     { literalConstantOpt() },
                     { stringLiteral() },
                     { callableReference() },
                     { functionLiteral() },
                     { objectLiteral() },
-                    { IdentifierExpr(simpleIdentifier()) },
+                    { simpleIdentifierOpt()?.let { IdentifierExpr(it) } },
                 )
             }
         }
@@ -1841,7 +1854,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun collectionLiteral(): CollectionLiteralExpr? {
         if (!matches("[")) return null
         return CollectionLiteralExpr(parseListWithStartEnd("[", "]", separator = { expectOpt("," )}) {
-            expression()
+            expression() ?: error("Expression expected")
         })
     }
 
@@ -1887,7 +1900,9 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val chunks = str.tokens.map { token ->
             when (token) {
                 is EscapeStringPartToken -> InterpolatedStringExpr.StringChunk("${token.c}")
-                is ExpressionStringPartToken -> InterpolatedStringExpr.ExpressionChunk(createParser(token.expr).expression())
+                is ExpressionStringPartToken -> InterpolatedStringExpr.ExpressionChunk(
+                    createParser(token.expr).expression() ?: error("Expression expected")
+                )
                 is LiteralStringPartToken -> InterpolatedStringExpr.StringChunk(token.str)
             }
         }
@@ -2049,12 +2064,16 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             pos = spos
             return null
         }
-        val receiver = opt { NLs(); type().also { NLs(); DOT() } }
+        NLs()
+        val receiver = opt { type().also { NLs(); DOT() } }
         NLs()
         val paramsWithOptType = parametersWithOptionalType()
-        val retType = opt { NLs(); COLON(); NLs(); type() }
-        val typeConstraints = opt { NLs(); typeConstraints() }
-        val body = opt { NLs(); functionBody() }
+        NLs()
+        val retType = opt { COLON(); NLs(); type() }
+        NLs()
+        val typeConstraints = typeConstraints()
+        NLs()
+        val body = functionBody()
         return AnonymousFunctionExpr(FunDecl("", paramsWithOptType.map { FuncValueParam(it.id, it.type ?: UnknownType) }, retType, receiver = receiver, where = typeConstraints, body = body, modifiers = if (isSuspend) Modifiers(FunctionModifier.SUSPEND) else Modifiers.EMPTY))
     }
 
@@ -2130,7 +2149,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         NLs()
         val cond = expectAndRecoverSure("(", ")") {
             NLs()
-            expression().also { NLs() }
+            expression().also { NLs() } ?: error("Expression expected")
         }
         NLs()
         val trueBody = if (expectOpt(";")) {
@@ -2139,12 +2158,12 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             controlStructureBody()
         }
         NLs()
-        opt { SEMICOLON() }
+        expectOpt(";")
         NLs()
         val falseBody = if (expectOpt("else")) {
             opt { controlStructureBody() }.also {
                 NLs()
-                opt { SEMICOLON() }
+                expectOpt(";")
                 NLs()
             }
         } else {
@@ -2220,8 +2239,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun whenCondition(): WhenExpr.Condition {
         return when {
-            matches("in") || matches("!in") || matches("is") || matches("!is") -> WhenExpr.Condition(op = inIsOperator().also { NLs() }, expr = expression())
-            else -> WhenExpr.Condition(expr = expression())
+            matches("in") || matches("!in") || matches("is") || matches("!is") -> WhenExpr.Condition(op = inIsOperator().also { NLs() }, expr = expression() ?: error("Expression expected"))
+            else -> WhenExpr.Condition(expr = expression() ?: error("Expression expected"))
         }
     }
 
@@ -2251,7 +2270,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun tryExpression(): Expr? {
         if (!expectOpt("try")) return null
         NLs()
-        val body = block()
+        val body = block() ?: error("Expect block in try")
         val catches = arrayListOf<TryCatchExpr.Catch>()
         loop@while (hasMore) {
             NLs()
@@ -2278,13 +2297,13 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val (annotations, localName, type) = expectAndRecoverSure("(", ")") {
             val annotations = annotations()
             val localName = simpleIdentifier().also { COLON() }
-            val type = type()
+            val type = type() ?: error("Expected type")
             NLs()
             if (expectOpt(",")) Unit
             Triple(annotations, localName, type)
         }
         NLs()
-        val block = block()
+        val block = block() ?: error("Expect block after catch")
         return TryCatchExpr.Catch(localName, type, block)
     }
 
@@ -2294,7 +2313,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun finallyBlock(): Stm {
         expect("finally")
         NLs()
-        return block()
+        return block() ?: error("Expect block after finally")
     }
 
     //jumpExpression
@@ -2310,11 +2329,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         return when {
             expectOpt("throw") -> {
                 NLs()
-                ThrowExpr(expression())
+                ThrowExpr(expressionSure())
             }
             expectOpt("return") -> {
                 val label = if (expectOpt("@")) Identifier() else null
-                val expr = opt { expression() }
+                val expr = expression()
                 ReturnExpr(expr, label)
             }
             expectOpt("continue") -> {
@@ -2472,7 +2491,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : (annotation | parameterModifier)+
     //    ;
     fun parameterModifiers(atLeastOne: Boolean = true): Modifiers {
-        return Modifiers(multiple(atLeastOne = atLeastOne) { OR({ annotation() }, { parameterModifier() }) })
+        return Modifiers(multiple(atLeastOne = atLeastOne) { ORNullable({ annotation() }, { parameterModifier() }) })
     }
 
     //modifier
@@ -2570,43 +2589,44 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | EXTERNAL
     //    | SUSPEND
     //    ;
-    fun functionModifier(): FunctionModifier = expectAny(FunctionModifier.BY_ID)
+    fun functionModifier(): FunctionModifier? = expectAnyOpt(FunctionModifier.BY_ID)
 
     //propertyModifier
     //    : CONST
     //    ;
-    fun propertyModifier(): PropertyModifier = expectAny(PropertyModifier.BY_ID)
+    fun propertyModifier(): PropertyModifier? = expectAnyOpt(PropertyModifier.BY_ID)
 
     //inheritanceModifier
     //    : ABSTRACT
     //    | FINAL
     //    | OPEN
     //    ;
-    fun inheritanceModifier(): InheritanceModifier = expectAny(InheritanceModifier.BY_ID)
+    fun inheritanceModifier(): InheritanceModifier? = expectAnyOpt(InheritanceModifier.BY_ID)
 
     //parameterModifier
     //    : VARARG
     //    | NOINLINE
     //    | CROSSINLINE
     //    ;
-    fun parameterModifier(): ParameterModifier = expectAny(ParameterModifier.BY_ID)
+    fun parameterModifier(): ParameterModifier? = expectAnyOpt(ParameterModifier.BY_ID)
 
     //reificationModifier
     //    : REIFIED
     //    ;
-    fun reificationModifier(): ReificationModifier = expectAny(ReificationModifier.BY_ID)
+    fun reificationModifier(): ReificationModifier? = expectAnyOpt(ReificationModifier.BY_ID)
 
     //platformModifier
     //    : EXPECT
     //    | ACTUAL
     //    ;
-    fun platformModifier(): PlatformModifier = expectAny(PlatformModifier.BY_ID)
+    fun platformModifier(): PlatformModifier? = expectAnyOpt(PlatformModifier.BY_ID)
 
     // SECTION: annotations
     //annotation
     //    : (singleAnnotation | multiAnnotation) NL*
     //    ;
     fun annotation(): AnnotationNodes? {
+        val spos = pos
         if (!expectOpt("@")) return null
         val useSite = expectAnyOpt(ANNOTATION_SITES)
         if (useSite != null) {
@@ -2618,8 +2638,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
                 AnnotationNodes(oneOrMore { unescapedAnnotation() })
             }
         } else {
-            AnnotationNodes(listOf(unescapedAnnotation()))
-        }
+            unescapedAnnotation()?.let { AnnotationNodes(listOf(it)) }
+        } ?: return null.also { pos = spos }
         return AnnotationNodes(nodes.annotations.map { it.copy(useSite = useSite) })
     }
 
@@ -2656,12 +2676,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : constructorInvocation
     //    | userType
     //    ;
-    fun unescapedAnnotation(): AnnotationNode {
-        val type = userType()
-        val args = opt {
-            NLs()
-            valueArguments()
-        }
+    fun unescapedAnnotation(): AnnotationNode? {
+        val type = userType() ?: return null
+        NLs()
+        val args = if (matches("(")) valueArguments() else null
         return AnnotationNode(type, args)
     }
 
@@ -2733,9 +2751,16 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
 
         ids += simpleIdentifier()
         while (hasMore) {
+            val spos = pos
             NLs()
             if (expectOpt(".")) {
-                ids += simpleIdentifier()
+                val id = simpleIdentifierOpt()
+                if (id != null) {
+                    ids += id
+                } else {
+                    pos = spos
+                    break
+                }
             } else {
                 break
             }
@@ -2803,7 +2828,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //fun WS(): Unit = TODO("WS")
 
     //NL: '\n' | '\r' '\n'?;
-    fun NL(): Unit {
+    private fun NL(): Unit {
         if (peek() is NLToken) {
             skip()
         }

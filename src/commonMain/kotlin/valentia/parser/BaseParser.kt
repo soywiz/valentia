@@ -13,7 +13,7 @@ open class TokenReader(val tokens: List<Token>) : BaseTokenReader {
     override var pos: Int = 0
     override val len: Int get() = tokens.size
     override fun peek(offset: Int): Token = tokens.getOrElse(pos + offset) { EOFToken }
-    override fun toString(): String = "TokenReader(line=${peek().line}, pos=$pos/$len, peek=${(0 until 12).map { peek(it) }.filter { it !is NLToken }.joinToString("") { it.str }})"
+    override fun toString(): String = "TokenReader(line=${peek().line}, pos=$pos/$len, peek=\"${(0 until 12).map { peek(it) }.filter { it !is NLToken }.joinToString("") { it.str }}\")"
 }
 
 inline fun <reified T: Token> BaseTokenReader.expect(): T {
@@ -172,7 +172,7 @@ interface BaseConsumer {
 }
 
 inline fun <T> BaseConsumer.expectAndRecoverSure(start: String, end: String, reason: String? = null, block: () -> T): T {
-    return expectAndRecover(start, end, reason, block) ?: TODO("expectAndRecoverSure recovery reason=$reason")
+    return expectAndRecover(start, end, reason, block) ?: TODO("expectAndRecoverSure recovery reason=$reason : $this")
 }
 
 //@OptIn(ExperimentalContracts::class)
@@ -269,11 +269,7 @@ inline fun <T> BaseConsumer.OR(vararg funcs: () -> T?, name: String? = null): T 
     val exceptions = arrayListOf<Throwable>()
     for (func in funcs) {
         pos = rpos
-        //try {
-            return func() ?: continue
-        //} catch (e: IllegalStateException) {
-        //    exceptions += e
-        //}
+        return func() ?: continue
     }
     pos = rpos
     error("  Couldn't match any of OR[$name][$this] [${funcs.size}]:  \n${exceptions.joinToString("\n  ")}")

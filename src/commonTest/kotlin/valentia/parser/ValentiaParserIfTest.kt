@@ -27,7 +27,7 @@ class ValentiaParserIfTest : StmBuilder {
             IfExpr(cond=BoolLiteralExpr(value=true), trueBody=ExprStm(expr=IntLiteralExpr(1)), falseBody=ExprStm(expr=IntLiteralExpr(2))),
             ValentiaParser.expression("""
                 if (true) 1 else 2
-            """) as? Any?
+            """.trimIndent()) as? Any?
         )
     }
 
@@ -37,7 +37,7 @@ class ValentiaParserIfTest : StmBuilder {
             IfExpr(cond=BoolLiteralExpr(value=true), trueBody=ExprStm(expr=IntLiteralExpr(1)), falseBody=ExprStm(expr=IntLiteralExpr(2))),
             ValentiaParser.expression("""
                 if (true) 1; else 2;
-            """) as? Any?
+            """.trimIndent()) as? Any?
         )
     }
 

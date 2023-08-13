@@ -66,7 +66,7 @@ class ValentiaParserFullExamplesTest : StmBuilder {
                     )
                     val ctx = KotlinParser(CommonTokenStream(KotlinLexer(stream))).kotlinFile()
                     listener.enterKotlinFile(ctx)
-                    println(ctx.packageHeader())
+                    //println(ctx.packageHeader())
                 }
             }
         """.trimIndent()
