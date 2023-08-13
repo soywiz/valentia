@@ -373,7 +373,7 @@ enum class UnaryPostOp(val str: String) {
 }
 
 data class CastExpr(val expr: Expr, val targetType: TypeNode, val kind: String) : Expr()
-data class CallExpr(val expr: Expr, val params: List<Expr>, val lambdaArg: Expr? = null, val typeArgs: List<TypeNode>? = null) : Expr()
+data class CallExpr(val expr: Expr, val params: List<Expr> = emptyList(), val lambdaArg: Expr? = null, val typeArgs: List<TypeNode>? = null) : Expr()
 data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : AssignableExpr()
 data class UnaryPostOpExpr(val expr: Expr, val op: UnaryPostOp) : Expr()
 data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr() {
@@ -399,7 +399,8 @@ data class CharLiteralExpr(val value: Char) : LiteralExpr(value) {
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = CharType
 }
 data class IntLiteralExpr(val value: Long, val isLong: Boolean = false, val isUnsigned: Boolean = false) : LiteralExpr(value) {
-    override fun toString(): String = "IntLiteralExpr($value${if (isUnsigned) "U" else ""}${if (isLong) "L" else ""})"
+    override fun toString(): String = "$value${if (isUnsigned) "U" else ""}${if (isLong) "L" else ""}.lit"
+    //override fun toString(): String = "IntLiteralExpr($value${if (isUnsigned) "U" else ""}${if (isLong) "L" else ""})"
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = IntType
 }
 data class StringLiteralExpr(val value: String) : LiteralExpr(value) {

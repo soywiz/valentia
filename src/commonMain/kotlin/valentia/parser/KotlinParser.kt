@@ -285,7 +285,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         oneOrMore: Boolean = true,
         end: () -> Boolean = { eof },
         block: () -> T?
-    ): List<T> {
+    ): List<T>? {
+        val spos = pos
         NLs()
         val out = arrayListOf<T>()
         while (hasMore) {
@@ -300,7 +301,9 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             NLs()
         }
         if (oneOrMore && out.isEmpty()) {
-            error("oneOrMore=true : $out")
+            pos = spos
+            //error("oneOrMore=true : $out")
+            return null
         }
         return out
     }
@@ -308,8 +311,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //delegationSpecifiers
     //    : annotatedDelegationSpecifier (NL* COMMA NL* annotatedDelegationSpecifier)*
     //    ;
-    fun delegationSpecifiers(): List<SubTypeInfo> {
-        return parseListNew({ expectOpt(",") }, trailingSeparator = false) { annotatedDelegationSpecifier() }
+    fun delegationSpecifiers(): List<SubTypeInfo>? {
+        return parseListNew({ expectOpt(",") }, end = { matches("{") }, trailingSeparator = false) { annotatedDelegationSpecifier() }
     }
 
     //delegationSpecifier
@@ -319,8 +322,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | functionType
     //    | SUSPEND NL* functionType
     //    ;
-    fun delegationSpecifier(): SubTypeInfo {
-        return OR(
+    fun delegationSpecifier(): SubTypeInfo? {
+        return ORNullable(
             { constructorInvocation() },
             { explicitDelegation() },
             { BasicSubTypeInfo(userType()) },
@@ -337,30 +340,32 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : userType NL* valueArguments
     //    ;
     fun constructorInvocation(): ConstructorInvocation? {
+        val spos = pos
         val type = userType()
         NLs()
-        val args = valueArguments() ?: return null
+        val args = valueArguments() ?: return null.also { pos = spos }
         return ConstructorInvocation(type, args)
     }
 
     //annotatedDelegationSpecifier
     //    : annotation* NL* delegationSpecifier
     //    ;
-    fun annotatedDelegationSpecifier(): SubTypeInfo {
+    fun annotatedDelegationSpecifier(): SubTypeInfo? {
         val annotations = annotations(atLeastOne = false).also { NLs() }
-        return delegationSpecifier().annotated(annotations)
+        return delegationSpecifier()?.annotated(annotations)
     }
 
     //explicitDelegation
     //    : (userType | functionType) NL* BY NL* expression
     //    ;
-    fun explicitDelegation(): ExplicitDelegation {
-        val type = OR(
+    fun explicitDelegation(): ExplicitDelegation? {
+        val spos = pos
+        val type = ORNullable(
             { userType() },
             { functionType() }
-        )
+        ) ?: return null.also { pos = spos }
         NLs()
-        BY()
+        if (!expectOpt("by")) return null.also { pos = spos }
         NLs()
         val delegate = expression()
         return ExplicitDelegation(type, delegate)
@@ -595,9 +600,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //variableDeclaration
     //    : annotation* NL* simpleIdentifier (NL* COLON NL* type)?
     //    ;
-    fun variableDeclaration(): VariableDecl {
+    fun variableDeclaration(): VariableDecl? {
+        val spos = pos
         val annotations = annotations(atLeastOne = false)
-        val id = simpleIdentifier()
+        NLs()
+        val id = simpleIdentifierOpt() ?: return null.also { pos = spos }
         NLs()
         val type = if (expectOpt(":")) { NLs(); type() } else null
         return VariableDecl(id, type, annotations = annotations)
@@ -608,26 +615,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun multiVariableDeclaration(): MultiVariableDecl? {
         if (!matches("(")) return null
-        //val vars = arrayListOf<VariableDecl>()
         val vars = expectAndRecoverSure("(", ")") {
-            parseListNew(trailingSeparator = true) { variableDeclaration() }
-            /*
-            NLs()
-            vars += variableDeclaration()
-            while (hasMore) {
-                NLs()
-                if (expectOpt(")")) {
-                    skip(-1)
-                    break
-                }
-                if (expectOpt(",")) {
-                    NLs()
-                    vars += variableDeclaration()
-                }
+            parseListNew(trailingSeparator = true, end = { matches(")") }) {
+                variableDeclaration()
             }
-
-             */
-        }
+        } ?: return null
         return MultiVariableDecl(vars)
     }
 
@@ -666,10 +658,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val expr = if (matches("by")) {
             delegation = true
             propertyDelegate()
+        } else if (matches("=")) {
+            NLs()
+            expression()
         } else {
-            opt { ASSIGNMENT(); NLs(); expression() }
+            null
         }
-        opt { NLs(); SEMICOLON() }
+        NLs()
+        expectOpt(";")
         NLs()
         zeroOrMore {
             modifiers()
@@ -2000,11 +1996,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val (params, stms) = expectAndRecoverSure("{", "}", reason = "lambdaLiteral") {
             val params = opt {
                 NLs()
-                opt { lambdaParameters() }.also {
-                    NLs()
-                    ARROW()
-                    NLs()
-                }
+                val params = lambdaParameters(oneOrMore = false)
+                NLs()
+                if (!expectOpt("->")) return@opt null
+                NLs()
+                params
             }
             val stms = statements(oneOrMore = false)
             NLs()
@@ -2016,8 +2012,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //lambdaParameters
     //    : lambdaParameter (NL* COMMA NL* lambdaParameter)* (NL* COMMA)?
     //    ;
-    fun lambdaParameters(): List<VariableDeclBase> {
-        return parseListNew(trailingSeparator = true) { lambdaParameter() }
+    fun lambdaParameters(oneOrMore: Boolean = true): List<VariableDeclBase>? {
+        return parseListNew(oneOrMore = oneOrMore, trailingSeparator = true) { lambdaParameter() }
     }
 
     //lambdaParameter

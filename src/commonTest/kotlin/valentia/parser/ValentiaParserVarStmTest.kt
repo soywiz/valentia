@@ -1,8 +1,6 @@
 package valentia.parser
 
-import valentia.ast.MultiVariableDecl
-import valentia.ast.StmBuilder
-import valentia.ast.VariableDecl
+import valentia.ast.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -26,7 +24,7 @@ open class ValentiaParserVarStmTest : StmBuilder {
     @Test
     fun testVarLazyDelegatedStatement() {
         assertEquals(
-            STM(VariableDecl("a", expr = 1.lit, delegation = true)),
+            STM(VariableDecl("a", expr = CallExpr("lazy".id, lambdaArg = LambdaFunctionExpr(listOf(STM(1.lit)))), delegation = true)),
             ValentiaParser.statement("var a by lazy { 1 }") as Any
         )
     }
