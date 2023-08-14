@@ -120,7 +120,8 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
                 }
                 StringInterpolationToken(readAbsoluteRange(spos, pos), tokens, if (triple) "\"\"\"" else "\"")
             }
-            '?' -> SymbolToken(expectAny("?:", "?.", "?"))
+            //'?' -> SymbolToken(expectAny("?:", "?.", "?"))
+            '?' -> SymbolToken(expectAny("?:", "?"))
             '&' -> SymbolToken(expectAny("&&", "&"))
             '|' -> SymbolToken(expectAny("||", "|"))
             '^' -> SymbolToken(expectAny("^"))

@@ -346,7 +346,7 @@ data class TryCatchExpr(val body: Node, val catches: List<Catch> = emptyList(), 
     data class Catch(val local: String, val type: TypeNode, val body: Stm)
 }
 data class Temp(val type: TypeNode) : Expr()
-data class SuperExpr(val label: String? = null, val type: TypeNode? = null) : Expr()
+data class SuperExpr(val label: String? = null, val type: TypeNode? = null) : AssignableExpr()
 data class IfExpr(val cond: Expr, val trueBody: ExprOrStm, val falseBody: ExprOrStm? = null) : Expr()
 data class BreakExpr(val label: String? = null) : Expr()
 data class ContinueExpr(val label: String? = null) : Expr()
@@ -422,7 +422,7 @@ open class EmptyExpr : Expr()
 data class TypeTestExpr(val base: Expr, val kind: String, val type: TypeNode) : Expr()
 data class RangeTestExpr(val base: Expr, val kind: String, val container: Expr) : Expr()
 
-data class ThisExpr(val id: Identifier?) : Expr() {
+data class ThisExpr(val id: Identifier?) : AssignableExpr() {
 }
 
 // Statements

@@ -760,5 +760,300 @@ class ValentiaParserFullExamplesTest : StmBuilder {
         """.trimIndent())
     }
 
+    @Test
+    fun test13() {
+        ValentiaParser.file("""
+            package korlibs.datastructure
+
+            import kotlin.test.*
+
+            // This test is only defined on the JVM, so it doesn't execute on mobile, specially on Android,
+            // where memory limitations might make it run into an OutOfMemory exception
+            class IntMapJvmTest {
+                private val items by lazy { listOf(0, 13, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 363, 364, 365, 366, 367, 368, 369, 370, 371, 372, 373, 374, 375, 376, 377, 378, 379, 380, 381, 382, 383, 884, 900, 901, 902, 903, 904, 905, 906, 908, 910, 911, 912, 913, 914, 915, 916, 917, 918, 919, 920, 921, 922, 923, 924, 925, 926, 927, 928, 929, 931, 932, 933, 934, 935, 936, 937, 938, 939, 940, 941, 942, 943, 944, 945, 946, 947, 948, 949, 950, 951, 952, 953, 954, 955, 956, 957, 958, 959, 960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 977, 978, 982, 1024, 1025, 1026, 1027, 1028, 1029, 1030, 1031, 1032, 1033, 1034, 1035, 1036, 1037, 1038, 1039, 1040, 1041, 1042, 1043, 1044, 1045, 1046, 1047, 1048, 1049, 1050, 1051, 1052, 1053, 1054, 1055, 1056, 1057, 1058, 1059, 1060, 1061, 1062, 1063, 1064, 1065, 1066, 1067, 1068, 1069, 1070, 1071, 1072, 1073, 1074, 1075, 1076, 1077, 1078, 1079, 1080, 1081, 1082, 1083, 1084, 1085, 1086, 1087, 1088, 1089, 1090, 1091, 1092, 1093, 1094, 1095, 1096, 1097, 1098, 1099, 1100, 1101, 1102, 1103, 1104, 1105, 1106, 1107, 1108, 1109, 1110, 1111, 1112, 1113, 1114, 1115, 1116, 1117, 1118, 1119, 1120, 1121, 1122, 1123, 1124, 1125, 1126, 1127, 1128, 1129, 1130, 1131, 1132, 1133, 1134, 1135, 1136, 1137, 1138, 1139, 1140, 1141, 1142, 1143, 1144, 1145, 1146, 1147, 1148, 1149, 1150, 1151, 1152, 1153, 1154, 1155, 1156, 1157, 1158, 1160, 1161, 1162, 1163, 1164, 1165, 1166, 1167, 1168, 1169, 1170, 1171, 1172, 1173, 1174, 1175, 1176, 1177, 1178, 1179, 1180, 1181, 1182, 1183, 1184, 1185, 1186, 1187, 1188, 1189, 1190, 1191, 1192, 1193, 1194, 1195, 1196, 1197, 1198, 1199, 1200, 1201, 1202, 1203, 1204, 1205, 1206, 1207, 1208, 1209, 1210, 1211, 1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223, 1224, 1225, 1226, 1227, 1228, 1229, 1230, 1231, 1232, 1233, 1234, 1235, 1236, 1237, 1238, 1239, 1240, 1241, 1242, 1243, 1244, 1245, 1246, 1247, 1248, 1249, 1250, 1251, 1252, 1253, 1254, 1255, 1256, 1257, 1258, 1259, 1260, 1261, 1262, 1263, 1264, 1265, 1266, 1267, 1268, 1269, 1270, 1271, 1272, 1273, 1274, 1275, 1276, 1277, 1278, 1279, 1280, 1281, 1282, 1283, 1284, 1285, 1286, 1287, 1288, 1289, 1290, 1291, 1292, 1293, 1294, 1295, 1296, 1297, 1298, 1299, 8192, 8193, 8194, 8195, 8196, 8197, 8198, 8199, 8200, 8201, 8202, 8203, 8211, 8212, 8213, 8215, 8216, 8217, 8218, 8219, 8220, 8221, 8222, 8224, 8225, 8226, 8230, 8240, 8242, 8243, 8249, 8250, 8252, 8260, 8355, 8356, 8358, 8359, 8360, 8361, 8363, 8364, 8369, 8377, 8378) }
+
+                @Test
+                //@Ignore
+                fun testLimits() {
+                    val set = LinkedHashSet<Int>()
+                    val map = IntMap<Unit>()
+                    val mapInt = IntIntMap()
+                    for (i in items) {
+                        for (j in items) {
+                            if (j % 4 == 0) {
+                                val key = i or (j shl 16)
+                                set += key
+                                map[key] = Unit
+                                mapInt[key] = 1
+                            }
+                        }
+                    }
+                    assertEquals(131211, map.size)
+                    assertEquals(131211, mapInt.size)
+                    assertTrue { map.backSize <= 4194789 }
+                    assertTrue { mapInt.backSize <= 4194789 }
+                    assertTrue { map.stashSize <= 512 }
+                    assertTrue { mapInt.stashSize <= 512 }
+                    assertTrue { set.all { it in map } }
+                    assertTrue { set.all { it in mapInt } }
+                }
+            }
+
+        """.trimIndent())
+    }
+
+    @Test
+    fun test14() {
+        ValentiaParser.file("""
+            package korlibs.datastructure
+
+            open class LRUCache<K, V>(
+                val maxSize: Int = Int.MAX_VALUE,
+                val maxMemory: Long = Long.MAX_VALUE,
+                val atLeastOne: Boolean = true,
+                val getElementMemory: (V) -> Int = { 1 }
+            ) : BaseCacheMap<K, V>() {
+                var computedMemory: Long = 0L
+                    private set
+
+                override fun mustFree(key: K, value: V): Boolean {
+                    if (atLeastOne && size <= 1) return false
+                    if (size > maxSize) return true
+                    if (computedMemory > maxMemory) return true
+                    return false
+                }
+
+                override fun putNew(key: K, value: V) {
+                    computedMemory += getElementMemory(value)
+                }
+
+                override fun freed(key: K, value: V) {
+                    computedMemory -= getElementMemory(value)
+                }
+
+                // LRU
+                override fun get(key: K): V? {
+                    if (map.isNotEmpty() && map.keys.last() == key) return map[key]
+                    val value = map.remove(key)
+                    if (value != null) map[key] = value
+                    return value
+                }
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test15a() {
+        ValentiaParser.file("""
+            package korlibs.datastructure
+
+            import korlibs.datastructure.internal.*
+            import kotlin.math.*
+
+            inline fun count(cond: (index: Int) -> Boolean): Int {
+                var counter = 0
+                while (cond(counter)) counter++
+                return counter
+            }
+            inline fun <reified T> mapWhile(cond: (index: Int) -> Boolean, gen: (Int) -> T): List<T> = arrayListOf<T>().apply { while (cond(this.size)) this += gen(this.size) }
+            inline fun <reified T> mapWhileArray(cond: (index: Int) -> Boolean, gen: (Int) -> T): Array<T> = mapWhile(cond, gen).toTypedArray()
+            inline fun mapWhileInt(cond: (index: Int) -> Boolean, gen: (Int) -> Int): IntArray = IntArrayList().apply { while (cond(this.size)) this += gen(this.size) }.toIntArray()
+            inline fun mapWhileFloat(cond: (index: Int) -> Boolean, gen: (Int) -> Float): FloatArray = FloatArrayList().apply { while (cond(this.size)) this += gen(this.size) }.toFloatArray()
+            inline fun mapWhileDouble(cond: (index: Int) -> Boolean, gen: (Int) -> Double): DoubleArray = DoubleArrayList().apply { while (cond(this.size)) this += gen(this.size) }.toDoubleArray()
+        """.trimIndent())
+    }
+
+    @Test
+    fun test16() {
+        ValentiaParser.file("""
+            package korlibs.datastructure
+
+            open class CustomHashMap<K, V>(
+                val hasher: (key: K) -> Int,
+                val equalKey: (a: K, b: K) -> Boolean,
+                val equalValue: (a: V, b: V) -> Boolean,
+                val initialCapacity: Int = 16,
+            ) : MutableMap<K, V> {
+                inner class Bucket {
+                    val keys = fastArrayListOf<K>()
+                    val values = fastArrayListOf<V>()
+
+                    fun getKeyIndex(key: K): Int {
+                        for (n in keys.indices) if (equalKey(keys[n], key)) return n
+                        return -1
+                    }
+
+                    fun getValueIndex(value: V): Int {
+                        for (n in values.indices) if (equalValue(values[n], value)) return n
+                        return -1
+                    }
+                }
+
+                override val entries: MutableSet<MutableMap.MutableEntry<K, V>>
+                    get() = buckets.values
+                        .flatMap { bucket -> bucket?.keys?.indices?.map { it to bucket } ?: listOf() }
+                        .map { (index, bucket) ->
+                            object : MutableMap.MutableEntry<K, V> {
+                                override val key: K = bucket.keys[index]
+                                override val value: V = bucket.values[index]
+                                override fun setValue(newValue: V): V = bucket.values[index].also { bucket.values[index] = newValue }
+                            }
+                        }
+                        .toMutableSet()
+                override val keys: MutableSet<K> get() = buckets.values.flatMap { it?.keys ?: listOf() }.toMutableSet()
+                override val values: MutableCollection<V> get() = buckets.values.flatMap { it?.values ?: listOf() }.toMutableList()
+
+                @PublishedApi
+                internal val buckets = IntMap<Bucket>(initialCapacity)
+                private fun getOrCreateBucket(key: K): Bucket = buckets.getOrPut(hasher(key)) { Bucket() }
+                private fun getBucketOrNull(key: K): Bucket? = buckets.get(hasher(key))
+
+                override var size: Int = 0
+                    protected set
+
+                override fun clear() {
+                    size = 0
+                    buckets.clear()
+                }
+
+                override fun isEmpty(): Boolean = size == 0
+
+                override fun get(key: K): V? {
+                    val bucket = getBucketOrNull(key) ?: return null
+                    val keys = bucket.keys
+                    for (n in keys.indices) {
+                        if (equalKey(keys[n], key)) return bucket.values[n]
+                    }
+                    return null
+                }
+
+                override fun containsValue(value: V): Boolean {
+                    buckets.fastForEach { _, bucket ->
+                        if (bucket.getValueIndex(value) >= 0) return true
+                    }
+                    return false
+                }
+
+                override fun containsKey(key: K): Boolean {
+                    val bucket = getBucketOrNull(key) ?: return false
+                    return bucket.getKeyIndex(key) >= 0
+                }
+
+                override fun remove(key: K): V? {
+                    val bucketKey = hasher(key)
+                    val bucket = buckets[bucketKey] ?: return null
+                    val index = bucket.getKeyIndex(key).takeIf { it >= 0 } ?: return null
+                    size--
+                    bucket.keys.removeAt(index)
+                    try {
+                        return bucket.values.removeAt(index)
+                    } finally {
+                        if (bucket.keys.isEmpty()) buckets.remove(bucketKey)
+                    }
+                }
+
+                override fun put(key: K, value: V): V? {
+                    val bucket = getOrCreateBucket(key)
+                    val index = bucket.getKeyIndex(key)
+                    return if (index >= 0) {
+                        val oldValue = bucket.values[index]
+                        bucket.values[index] = value
+                        oldValue
+                    } else {
+                        size++
+                        bucket.keys.add(key)
+                        bucket.values.add(value)
+                        null
+                    }
+                }
+
+                override fun putAll(from: Map<out K, V>) {
+                    for ((k, v) in from) {
+                        put(k, v)
+                    }
+                }
+            }
+
+        """.trimIndent())
+    }
+
+    @Test
+    fun test17() {
+        ValentiaParser.file("""
+            expect inline fun <T> Any?.fastCastTo(): T
+        """.trimIndent())
+    }
+
+    @Test
+    fun test18a() {
+        ValentiaParser.file("""
+            private var data = 1 as Array
+            private var _start: Int = 0
+        """.trimIndent())
+    }
+
+    @Test
+    fun test18b() {
+        ValentiaParser.expression("""
+            arrayOfNulls<Any>(initialCapacity) as Array<TGen>
+        """.trimIndent())
+    }
+
     //val a by lazy { 10 }
+
+    @Test
+    fun test19() {
+        ValentiaParser.file("""
+            package korlibs.datastructure
+
+            /**
+             * [Map] with [String] keys that are treated in a insensitive manner.
+             */
+            class CaseInsensitiveStringMap<T> private constructor(
+                private val mapOrig: MutableMap<String, T>,
+                private val lcToOrig: MutableMap<String, String>,
+                private val mapLC: MutableMap<String, T>
+            ) : MutableMap<String, T> by mapOrig {
+                constructor() : this(LinkedHashMap(), LinkedHashMap(), LinkedHashMap())
+                constructor(data: Map<String, T>) : this() { putAll(data) }
+                constructor(vararg items: Pair<String, T>) : this() { putAll(items.toList()) }
+
+                override fun containsKey(key: String): Boolean = mapLC.containsKey(key.toLowerCase())
+
+                override fun clear() {
+                    mapOrig.clear()
+                    mapLC.clear()
+                    lcToOrig.clear()
+                }
+
+                override fun get(key: String): T? = mapLC[key.toLowerCase()]
+
+                override fun put(key: String, value: T): T? {
+                    remove(key)
+                    mapOrig[key] = value
+                    lcToOrig[key.toLowerCase()] = key
+                    return mapLC.put(key.toLowerCase(), value)
+                }
+
+                override fun putAll(from: Map<out String, T>) {
+                    for (v in from) put(v.key, v.value)
+                }
+
+                override fun remove(key: String): T? {
+                    val lkey = key.toLowerCase()
+                    val okey = lcToOrig[lkey]
+                    mapOrig.remove(okey)
+                    val res = mapLC.remove(lkey)
+                    lcToOrig.remove(lkey)
+                    return res
+                }
+
+                override fun equals(other: Any?): Boolean = (other is CaseInsensitiveStringMap<*>) && this.mapLC == other.mapLC
+                override fun hashCode(): Int = mapLC.hashCode()
+            }
+
+            fun <T> Map<String, T>.toCaseInsensitiveMap(): Map<String, T> =
+                CaseInsensitiveStringMap<T>().also { it.putAll(this) }
+        """.trimIndent())
+    }
 }

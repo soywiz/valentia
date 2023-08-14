@@ -10,7 +10,8 @@ import kotlin.time.measureTimedValue
 class ParseValentiaSrc {
     @Test
     fun test() {
-        val files = File(".").walkBottomUp().filter { it.extension == "kt" }
+        //val files = File(".").walkBottomUp().filter { it.extension == "kt" }
+        val files = File("../korge").walkBottomUp().filter { it.extension == "kt" }
         for (file in files) {
             doTest(file)
         }

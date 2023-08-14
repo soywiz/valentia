@@ -193,7 +193,7 @@ inline fun <T> BaseConsumer.expectAndRecover(start: String, end: String, reason:
         }
         return res
     } catch (e: IllegalStateException) {
-        println("RECOVERING NOT IMPLEMENTED!")
+        println("RECOVERING NOT IMPLEMENTED! ERROR: ${e.message}")
         throw e
     }
     return null
