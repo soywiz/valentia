@@ -242,7 +242,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun classParameters(): List<ClassParameter> {
         val list = expectAndRecover("(", ")") {
             NLs()
-            parseListNew({ expectOpt(",") }, oneOrMore = false, trailingSeparator = true, end = { matches(")") }) {
+            parseListNew({ expectOptNLs(",") }, oneOrMore = false, trailingSeparator = true, end = { matches(")") }) {
                 classParameter()
             }.also {
                 NLs()
@@ -1700,9 +1700,9 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : prefixUnaryExpression
     //    | parenthesizedAssignableExpression
     //    ;
-    fun assignableExpression(): AssignableExpr? {
+    fun assignableExpression(): Expr? {
         return ORNullable(
-            { prefixUnaryExpression() as? AssignableExpr? },
+            { prefixUnaryExpression() },
             { parenthesizedAssignableExpression() },
             name = "assignableExpression"
         )
@@ -1711,7 +1711,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //parenthesizedAssignableExpression
     //    : LPAREN NL* assignableExpression NL* RPAREN
     //    ;
-    fun parenthesizedAssignableExpression(): AssignableExpr? {
+    fun parenthesizedAssignableExpression(): Expr? {
         if (!matches("(")) return null
         return expectAndRecover("(", ")", nullIfNotMatching = true) {
             NLs()
