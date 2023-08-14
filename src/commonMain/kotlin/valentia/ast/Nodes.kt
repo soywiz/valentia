@@ -135,7 +135,7 @@ data class NamedTypeNode(val type: TypeNode, val name: String? = null) {
 data class UnificationExprType(val exprs: List<ExprOrStm>) : TypeNode() {
     constructor(vararg exprs: ExprOrStm?) : this(exprs.filterNotNull())
 }
-data class FuncTypeNode(val ret: TypeNode, val params: List<NamedTypeNode>, val receiver: TypeNode? = null, val suspendable: Boolean = false) : TypeNode()
+data class FuncTypeNode(val ret: TypeNode?, val params: List<NamedTypeNode>, val receiver: TypeNode? = null, val suspendable: Boolean = false) : TypeNode()
 data class MultiType(val types: List<TypeNode>) : TypeNode() {
     constructor(vararg types: TypeNode) : this(types.toList())
 }

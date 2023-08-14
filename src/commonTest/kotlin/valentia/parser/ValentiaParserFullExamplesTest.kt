@@ -74,6 +74,24 @@ class ValentiaParserFullExamplesTest : StmBuilder {
     }
 
     @Test
+    fun test3a() {
+        ValentiaParser.file(
+            """
+            fun Char.isLetterOrUndescore(): Boolean = true
+        """.trimIndent()
+        )
+    }
+
+    @Test
+    fun test3b() {
+        ValentiaParser.file(
+            """
+            fun Char?.isLetterOrUndescore(): Boolean = true
+        """.trimIndent()
+        )
+    }
+
+    @Test
     fun test3() {
         ValentiaParser.file(
             """
@@ -100,6 +118,16 @@ class ValentiaParserFullExamplesTest : StmBuilder {
             }
         """.trimIndent()
         )
+    }
+
+    @Test
+    fun test4b() {
+        ValentiaParser.file("fun <T> whileMap(cond: (Int) -> Boolean, gen: () -> T): List<T>")
+    }
+
+    @Test
+    fun test4c() {
+        ValentiaParser.type("(Int) -> Boolean")
     }
 
     @Test
@@ -1266,5 +1294,76 @@ class ValentiaParserFullExamplesTest : StmBuilder {
                 return Bitmap8(bmp.width, bmp.height, ByteArray(bmp.width * bmp.height) { colors[bmpInts[it]].toByte() }, palette.colors)
             }
         """.trimIndent())
+    }
+
+    @Test
+    fun test24a() {
+        ValentiaParser.statement("""
+            return buildVectorPath(VectorPath(), fun VectorPath.() {
+                close()
+            })
+        """.trimIndent())
+    }
+    @Test
+    fun test24b() {
+        ValentiaParser.statement("""
+            return buildVectorPath(VectorPath(), fun VectorPath.(Int) {
+                close()
+            })
+        """.trimIndent())
+    }
+
+    @Test
+    fun test25a() {
+        ValentiaParser.file("""
+            fun FOR(id: String, expr: Expr, block: (StmBuilder.() -> Unit) = null): ForLoopStm? = null
+        """.trimIndent())
+    }
+
+    @Test
+    fun test25b() {
+        ValentiaParser.file("""
+            fun FOR(block: (StmBuilder.() -> Unit)?)
+        """.trimIndent())
+    }
+
+    @Test
+    fun test25c() {
+        ValentiaParser.type("(StmBuilder.() -> Unit)?")
+    }
+
+    @Test
+    fun test25() {
+        ValentiaParser.file("""
+            fun FOR(id: String, expr: Expr, block: (StmBuilder.() -> Unit)? = null): ForLoopStm? = null
+        """.trimIndent())
+    }
+
+    @Test
+    fun test26() {
+        ValentiaParser.file("""
+            package korlibs.datastructure
+
+            /**
+             * This acts as a [lazy] delegate but for functions.
+             */
+            fun <T : Any> (() -> T).memoize(): (() -> T) {
+                val func = this
+                var set = false
+                lateinit var cached: T
+                return {
+                    if (!set) {
+                        cached = func()
+                        set = true
+                    }
+                    cached
+                }
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test26a() {
+        ValentiaParser.file("fun <T : Any> (() -> T).memoize(): (() -> T)")
     }
 }

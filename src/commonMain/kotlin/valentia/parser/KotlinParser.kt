@@ -502,8 +502,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
                 if (matches(")")) break
                 if (expectOpt(",")) continue
                 params += functionValueParameter() ?: error("Not a valid value parameter $this")
-                NLs()
-                if (!expectOpt(",")) break
+                if (!expectOptNLs(",")) break
             }
             NLs()
             params
@@ -548,18 +547,16 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             val typeParams = typeParametersOpt()
             NLs()
             val receiver = opt {
-                receiverType().let {
-                    var it = it
-                    NLs()
-                    if (!matches(".")) {
-                        if (it is MultiType && it.types.size >= 2) {
-                            it = it.copy(it.types.dropLast(1))
-                            while (peek().str != "." && pos > 0) pos--
-                        }
+                //if (matches("(")) return@opt null
+                var it = receiverType()
+                if (!matchesNLs(".")) {
+                    if (it is MultiType && it.types.size >= 2) {
+                        it = it.copy(it.types.dropLast(1))
+                        while (peek().str != "." && pos > 0) pos--
                     }
-                    if (!expectOpt(".")) return@opt null
-                    it
                 }
+                if (!expectOpt(".")) return@opt null
+                it
             }
             NLs()
             val funcName = simpleIdentifier()
@@ -764,11 +761,12 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun parametersWithOptionalType(): List<ParameterOptType>? {
         if (!matches("(")) return null
-        return expectAndRecover("(", ")") {
+        return expectAndRecover("(", ")", nullIfNotMatching = true) {
             NLs()
-            parseListNew({ expectOpt(",") }, trailingSeparator = true, end = { matches(")") }) {
+            val items = parseListNew({ expectOpt(",") }, trailingSeparator = true, end = { matches(")") }) {
                 functionValueParameterWithOptionalType()
             }
+            items ?: emptyList()
         }
     }
 
@@ -924,6 +922,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
 
         val modifiers = typeModifiers(atLeastOne = false)
 
+        return ORNullable(
+            { nullableType() },
+            { functionType() },
+            { parenthesizedType() },
+            { definitelyNonNullableType() },
+            { typeReference() },
+        )
+        /*
         // @TODO: Receiver here
 
         val receiver = opt {
@@ -934,12 +940,15 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
 
         val type: TypeNode = if (matches("(")) {
             val types = functionTypeParameters()
-            val retType = if (expectOptNLs("->")) type() else null
+            if (!expectOptNLs("->")) return null.also { pos = spos }
+            val retType = type()
+            //FuncTypeNode(retType, types, receiver)
             if (retType != null) {
                 FuncTypeNode(retType, types, receiver)
             } else {
                 types.firstOrNull()?.type
-                    ?: return null.also { pos = spos }
+                    ?: FuncTypeNode(retType, types, receiver)
+                    //?: return null.also { pos = spos }
                     //?: error("types=$types -> retType=$retType :: $this")
             }
         } else {
@@ -948,6 +957,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val isNullable = expectOptNLs("?")
         while (expectOptNLs("?")) Unit
         return if (isNullable) type.nullable() else type
+        */
     }
 
     //typeReference
@@ -962,8 +972,16 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //nullableType
     //    : (typeReference | parenthesizedType) NL* quest+
     //    ;
-    //fun nullableType(): TypeNode {
-    //}
+    fun nullableType(): TypeNode? {
+        val type = ORNullable(
+            { parenthesizedType() },
+            { typeReference() },
+        ) ?: return null
+        NLs()
+        var count = 0
+        while (hasMore && expectOpt("?")) count++
+        return if (count > 0) type.nullable() else null
+    }
 
     //quest
     //    : QUEST_NO_WS
@@ -1057,7 +1075,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             NLs()
             type
         }
-        val typeParams = functionTypeParameters()
+        val typeParams = functionTypeParameters() ?: return null.also { pos = spos }
         if (!expectOptNLs("->")) return null.also { pos = spos }
         NLs()
         val ret = type() ?: error("Expected type")
@@ -1067,8 +1085,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //functionTypeParameters
     //    : LPAREN NL* (parameter | type)? (NL* COMMA NL* (parameter | type))* (NL* COMMA)? NL* RPAREN
     //    ;
-    fun functionTypeParameters(): List<NamedTypeNode> {
-        return expectAndRecoverSure("(", ")") {
+    fun functionTypeParameters(): List<NamedTypeNode>? {
+        return expectAndRecover("(", ")", nullIfNotMatching = true) {
             val first = ORNullable({ parameter()?.let { NamedTypeNode(it) } }, { type()?.let { NamedTypeNode(it) } })
             val rest = zeroOrMore {
                 NLs()
@@ -1086,12 +1104,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //parenthesizedType
     //    : LPAREN NL* type NL* RPAREN
     //    ;
-    //fun parenthesizedType(): TypeNode {
-    //    return expectAndRecover("(", ")") {
-    //        NLs()
-    //        type().also { NLs() }
-    //    } ?: UnknownType
-    //}
+    fun parenthesizedType(): TypeNode? {
+        return expectAndRecover("(", ")", nullIfNotMatching = true) {
+            NLs(); type().also { NLs() }
+        }
+    }
 
     //receiverType
     //    : typeModifiers? (parenthesizedType | nullableType | typeReference)
@@ -1099,18 +1116,17 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun receiverType(): TypeNode? {
         val spos = pos
         val modifiers = zeroOrMore { typeModifier() }
-        NLs()
-        //OR({ parenthesizedType() }, { nullableType() }, { typeReference() })
+        return ORNullable({ parenthesizedType() }, { nullableType() }, { typeReference() })?.withModifiers(modifiers) ?: return null.also { pos = spos }
         //return nullableType().withModifiers(modifiers)
-        val type = type() ?: return null.also { pos = spos }
-        return type.withModifiers(modifiers)
+        //val type = type() ?: return null.also { pos = spos }
+        //return type.withModifiers(modifiers)
     }
 
     //parenthesizedUserType
     //    : LPAREN NL* (userType | parenthesizedUserType) NL* RPAREN
     //    ;
-    fun parenthesizedUserType(): TypeNode {
-        return expectAndRecoverSure("(", ")") {
+    fun parenthesizedUserType(): TypeNode? {
+        return expectAndRecover("(", ")", nullIfNotMatching = true) {
             NLs()
             OR({ userType() }, { parenthesizedUserType() }).also { NLs() }
         }
@@ -1119,14 +1135,15 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //definitelyNonNullableType
     //    : typeModifiers? (userType | parenthesizedUserType) NL* AMP NL* typeModifiers? (userType | parenthesizedUserType)
     //    ;
-    fun definitelyNonNullableType(): DefinitelyNonNullableType {
+    fun definitelyNonNullableType(): DefinitelyNonNullableType? {
+        val spos = pos
         val mods1 = typeModifiers(atLeastOne = false)
-        val type1 = OR({ userType() }, { parenthesizedUserType() })
+        val type1 = ORNullable({ userType() }, { parenthesizedUserType() }) ?: return null.also { pos = spos }
         NLs()
-        expect("&")
+        if (!expectOpt("&")) return null.also { pos = spos }
         NLs()
         val mods2 = typeModifiers(atLeastOne = false)
-        val type2 = OR({ userType() }, { parenthesizedUserType() })
+        val type2 = ORNullable({ userType() }, { parenthesizedUserType() }) ?: return null.also { pos = spos }
         return DefinitelyNonNullableType(type1, mods1, type2, mods2)
     }
 
@@ -1752,10 +1769,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun valueArguments(): List<Expr>? {
         debug("valueArguments: $this")
         if (!matches("(")) return null
-        return expectAndRecoverSure("(", ")") {
+        return expectAndRecover("(", ")", nullIfNotMatching = true) {
             parseList(oneOrMore = false, separator = { expectOpt(",") }, doBreak = { matches(")") }) {
                 valueArgument()
-            }
+            }.filterNotNull()
         }.also {
             debug("/valueArguments: $this")
         }
@@ -1764,7 +1781,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //valueArgument
     //    : annotation? NL* (simpleIdentifier NL* ASSIGNMENT NL*)? MULT? NL* expression
     //    ;
-    fun valueArgument(): Expr {
+    fun valueArgument(): Expr? {
+        val spos = pos
         val annotations = annotation()
         NLs()
         val namedArgument = opt {
@@ -1776,8 +1794,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         }
         val spread = expectOptNLs("*")
         NLs()
-        return expression()
-            ?: error("Expression expected [valueArgument] in $this")
+        return expression() ?: return null.also { pos = spos }
+            //?: error("Expression expected [valueArgument] in $this")
     }
 
     //primaryExpression
@@ -2056,26 +2074,20 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun anonymousFunction(): AnonymousFunctionExpr? {
         val spos = pos
         val isSuspend = expectOpt("suspend")
-        NLs()
-        if (!expectOpt("fun")) {
-            pos = spos
-            return null
-        }
-        NLs()
+        if (!expectOptNLs("fun")) return null.also { pos = spos}
         val receiver = opt {
-            val type = type()
             NLs()
-            if (!expectOpt(".")) return@opt null
+            val type = type()
+            if (!expectOptNLs(".")) return@opt null
             type
         }
         NLs()
-        val paramsWithOptType = parametersWithOptionalType() ?: error("Expected parameters")
-        NLs()
-        val retType = if (expectOpt(":")) { NLs(); type() } else null
-        NLs()
-        val typeConstraints = typeConstraints()
-        NLs()
-        val body = functionBody()
+        val paramsWithOptType = parametersWithOptionalType()
+            //?: return null.also { pos = spos }
+            ?: error("Expected parameters $this")
+        val retType = if (expectOptNLs(":")) { NLs(); type() } else null
+        val typeConstraints = opt { NLs(); typeConstraints() }
+        val body = opt { NLs(); functionBody() }
         return AnonymousFunctionExpr(FunDecl("", paramsWithOptType.map { FuncValueParam(it.id, it.type ?: UnknownType) }, retType, receiver = receiver, where = typeConstraints, body = body, modifiers = if (isSuspend) Modifiers(FunctionModifier.SUSPEND) else Modifiers.EMPTY))
     }
 
