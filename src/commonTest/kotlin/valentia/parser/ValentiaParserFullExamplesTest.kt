@@ -1944,4 +1944,61 @@ class ValentiaParserFullExamplesTest : StmBuilder {
     fun test37a() {
         ValentiaParser.expression("this::class.portableSimpleName")
     }
+
+    @Test
+    fun test38a() {
+        ValentiaParser.expression("""
+            (1
+                shl 2)
+        """.trimIndent())
+    }
+
+    @Test
+    fun test38b() {
+        println(ValentiaParser.expression("""
+            (1 shl 2)
+        """.trimIndent()))
+    }
+
+    @Test
+    fun test38() {
+        ValentiaParser.statement("""
+            val eventMask = NativeLong(
+                (ExposureMask
+                    or StructureNotifyMask
+                    or EnterWindowMask
+                    )
+                    .toLong()
+            )
+        """)
+    }
+
+    @Test
+    fun test39a() {
+        ValentiaParser.file("""
+            fun onOutOnOver(out: @EventsDslMarker (MouseEvents) -> Unit): T
+        """.trimIndent())
+    }
+
+    @Test
+    fun test39() {
+        ValentiaParser.file("""
+            inline fun <T : View> T.onOutOnOver(
+                noinline out: @EventsDslMarker (MouseEvents) -> Unit,
+                noinline over: @EventsDslMarker (MouseEvents) -> Unit
+            ): T {
+                var component: Closeable? = null
+                onOut { events ->
+                    component?.close()
+                    component = null
+                    out(events)
+                }
+                onOver { events -> component = onNextFrame { over(events) } }
+                return this
+            }
+
+            inline fun <T : View?> T.onClick(noinline handler: @EventsDslMarker suspend (MouseEvents) -> Unit) =
+                doMouseEvent(MouseEvents::click, handler)
+        """.trimIndent())
+    }
 }

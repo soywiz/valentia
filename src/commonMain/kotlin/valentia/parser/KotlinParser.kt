@@ -353,9 +353,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val annotations = annotations(atLeastOne = false).also { NLs() }
         return delegationSpecifier()?.annotated(annotations)
     }
-    data class ExpressionState(val allowLambda: Boolean) {
+    data class ExpressionState(val allowLambda: Boolean = true, val insideParenthesis: Boolean = false) {
         companion object {
             val DISALLOW_LAMBDA = ExpressionState(allowLambda = false)
+            val INSIDE_PARENTHESIZED_EXPR = ExpressionState(insideParenthesis = true)
         }
     }
 
@@ -806,7 +807,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             return null
         }
         NLs()
-        val type = type() ?: error("Expected type")
+        val type = type()
+            ?: error("Expected type in parameter :: $this")
         return Parameter(id, type)
     }
 
@@ -1471,7 +1473,13 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : rangeExpression (simpleIdentifier NL* rangeExpression)*
     //    ;
     fun infixFunctionCall(state: ExpressionState? = null): Expr? {
-        return binop({ simpleIdentifierOpt() }, initialNLs = false) { rangeExpression(state) }
+        return binop(
+            {
+                if (state?.insideParenthesis == true) NLs()
+                simpleIdentifierOpt().also { NLs() }
+            }, initialNLs = false) {
+                rangeExpression(state)
+        }
     }
 
     //rangeExpression
@@ -1859,7 +1867,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         //if (matches("object")) return objectLiteral()
         //if (matches("throw") || matches("return") || matches("continue") || matches("break")) return jumpExpression()
         return when (peek().str) {
-            "(" -> parenthesizedExpression() ?: error("Expected parenthesized expression")
+            "(" -> parenthesizedExpression() ?: error("Expected parenthesized expression in $this")
             "this" -> thisExpression() ?: error("Not a this")
             "super" -> superExpression() ?: error("Not a super")
             "if" -> ifExpression() ?: error("Not a if")
@@ -1886,7 +1894,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun parenthesizedExpression(): Expr? {
         if (!matches("(")) return null
-        val expr = expectAndRecover("(", ")", nullIfNotMatching = true) { NLs(); expression().also { NLs() } }
+        val expr = expectAndRecover("(", ")", nullIfNotMatching = true) {
+            NLs()
+            expression(ExpressionState.INSIDE_PARENTHESIZED_EXPR).also { NLs() }
+        }
         return expr
     }
 
@@ -2572,7 +2583,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             expectOptNLs("suspend") -> FunctionModifier.SUSPEND
             expectOptNLs("@") -> {
                 pos--
-                annotation()
+                annotation(allowAnnotationSpaceBetweenArgs = false)
             }
             else -> null
         }
@@ -2670,7 +2681,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //annotation
     //    : (singleAnnotation | multiAnnotation) NL*
     //    ;
-    fun annotation(): AnnotationNodes? {
+    fun annotation(allowAnnotationSpaceBetweenArgs: Boolean = true): AnnotationNodes? {
         val spos = pos
         if (!expectOpt("@")) return null
         val useSite = expectAnyOpt(ANNOTATION_SITES)
@@ -2683,7 +2694,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
                 AnnotationNodes(oneOrMore { unescapedAnnotation() })
             }
         } else {
-            unescapedAnnotation()?.let { AnnotationNodes(listOf(it)) }
+            unescapedAnnotation(allowAnnotationSpaceBetweenArgs)?.let { AnnotationNodes(listOf(it)) }
         } ?: return null.also { pos = spos }
         NLs()
         return AnnotationNodes(nodes.annotations.map { it.copy(useSite = useSite) })
@@ -2722,10 +2733,12 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : constructorInvocation
     //    | userType
     //    ;
-    fun unescapedAnnotation(): AnnotationNode? {
+    fun unescapedAnnotation(allowAnnotationSpaceBetweenArgs: Boolean = true): AnnotationNode? {
         val type = userType() ?: return null
-        NLs()
-        val args = if (matches("(")) valueArguments() else null
+        if (!allowAnnotationSpaceBetweenArgs) {
+            if (peek(-1) is SpacesToken) return AnnotationNode(type, null)
+        }
+        val args = if (matchesNLs("(")) valueArguments() else null
         return AnnotationNode(type, args)
     }
 
