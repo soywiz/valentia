@@ -1366,4 +1366,17 @@ class ValentiaParserFullExamplesTest : StmBuilder {
     fun test26a() {
         ValentiaParser.file("fun <T : Any> (() -> T).memoize(): (() -> T)")
     }
+
+    @Test
+    fun test27() {
+        ValentiaParser.file("""
+            override fun decodeHeader(s: SyncStream, props: ImageDecodingProps): ImageInfo? = try {
+                null
+            } catch (t: Throwable) {
+                null
+            }
+        
+            override fun writeImage(image: ImageData, s: SyncStream, props: ImageEncodingProps) { }
+        """.trimIndent())
+    }
 }

@@ -2281,17 +2281,23 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         NLs()
         val body = block() ?: error("Expect block in try")
         val catches = arrayListOf<TryCatchExpr.Catch>()
+        var finally: Stm? = null
         loop@while (hasMore) {
+            val spos = pos
             NLs()
             val peek = peek().str
             when (peek) {
                 "catch" -> catches += catchBlock()
-                "finally" -> break@loop
-                else -> break@loop
+                "finally" -> {
+                    finally = finallyBlock()
+                    break@loop
+                }
+                else -> {
+                    pos = spos
+                    break@loop
+                }
             }
         }
-        NLs()
-        val finally = opt { finallyBlock() }
         return TryCatchExpr(body, catches, finally)
     }
 
