@@ -13,7 +13,11 @@ open class TokenReader(val tokens: List<Token>) : BaseTokenReader {
     override var pos: Int = 0
     override val len: Int get() = tokens.size
     override fun peek(offset: Int): Token = tokens.getOrElse(pos + offset) { EOFToken }
-    override fun toString(): String = "TokenReader(line=${peek().line}, pos=$pos/$len, peek=\"${(0 until 12).map { peek(it) }.filter { it !is NLToken }.joinToString("") { it.str }}\")"
+    override fun toString(): String {
+        val peekStr = (0 until 12).map { peek(it) }.filter { it !is NLToken }.joinToString("") { it.str }
+        val prevPeekStr = (-6 until 0).map { peek(it) }.filter { it !is NLToken }.joinToString("") { it.str }
+        return "TokenReader(line=${peek().line}, pos=$pos/$len, peek=\"$peekStr\", prev=\"$prevPeekStr\")"
+    }
 }
 
 inline fun <reified T: Token> BaseTokenReader.expect(): T {
@@ -114,10 +118,10 @@ open class StrReader(val str: String) : BaseReader {
     override var pos: Int = 0
     override val len: Int get() = str.length
     override fun peekChar(offset: Int): Char = str.getOrElse(pos + offset) { '\u0000' }
-    override fun peek(count: Int): String = str.substring(pos, (pos + count).coerceAtMost(len))
+    override fun peek(count: Int, offset: Int): String = str.substring((pos + offset).coerceIn(0 .. len), (pos + count + offset).coerceIn(0 .. len))
     override fun readAbsoluteRange(start: Int, end: Int): String = str.substring(start, end)
 
-    override fun toString(): String = "StrReader(pos=$pos, len=$len, peek='${peek(8)}')"
+    override fun toString(): String = "StrReader(pos=$pos, len=$len, peek='${peek(8)}' prev=${peek(4, -4)})"
 }
 
 interface BaseConsumer {
@@ -203,7 +207,7 @@ inline fun <T> BaseConsumer.expectAndRecover(start: String, end: String, reason:
 interface BaseReader : BaseConsumer {
     fun peekChar(offset: Int = 0): Char
     fun readChar(): Char = peekChar().also { skip(1) }
-    fun peek(count: Int): String
+    fun peek(count: Int, offset: Int = 0): String
     fun read(count: Int): String = peek(count).also { skip(it.length) }
 
     fun expectChar(char: Char) {

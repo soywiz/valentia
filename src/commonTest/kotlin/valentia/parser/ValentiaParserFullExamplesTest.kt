@@ -1379,4 +1379,61 @@ class ValentiaParserFullExamplesTest : StmBuilder {
             override fun writeImage(image: ImageData, s: SyncStream, props: ImageEncodingProps) { }
         """.trimIndent())
     }
+
+    @Test
+    fun test28a() {
+        ValentiaParser.statements("""
+            val udata = if (celType == 2) 1 else data
+            val a = 1
+            AseBitmapCell(bmp, x, y, opacity)
+        """.trimIndent())
+    }
+
+    @Test
+    fun test29() {
+        ValentiaParser.file("""
+            fun lzfDecompress(in_data: UByteArrayInt, in_len: Int, out_data: UByteArrayInt, out_len: Int): Int {
+                var iidx = 0
+                var oidx = 0
+        
+                do {
+                    var ctrl = in_data[iidx++]
+        
+                    if (ctrl < (1 shl 5)) { // literal run
+                        ctrl++
+        
+                        if (oidx + ctrl > out_len) return -1 //SET_ERRNO (E2BIG);
+        
+                        //println("LITERAL COUNT: ${'$'}ctrl")
+        
+                        do {
+                            out_data[oidx++] = in_data[iidx++]
+                        } while ((--ctrl) != 0)
+                    } else { // back reference
+                        var len = ctrl ushr 5
+        
+                        var reference = (oidx - ((ctrl and 0x1f) shl 8) - 1).toInt()
+        
+                        if (len == 7) len += in_data[iidx++]
+        
+                        reference -= in_data[iidx++]
+        
+                        //println("LZ: ${'$'}reference, len=${'$'}len")
+        
+                        if (oidx + len + 2 > out_len) return -1 //SET_ERRNO (E2BIG);
+                        if (reference < 0) return -2 //SET_ERRNO (EINVAL);
+        
+                        out_data[oidx++] = out_data[reference++]
+                        out_data[oidx++] = out_data[reference++]
+        
+                        do {
+                            out_data[oidx++] = out_data[reference++]
+                        } while ((--len) != 0)
+                    }
+                } while (iidx < in_len)
+        
+                return oidx.toInt()
+            }
+        """.trimIndent())
+    }
 }

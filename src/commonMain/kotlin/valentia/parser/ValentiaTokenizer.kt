@@ -66,7 +66,7 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
             '`' -> {
                 val c = readChar()
                 IDToken("$c" + readUntil {
-                    if (it == '\r' || it == '\n') error("Invalid token")
+                    if (it == '\r' || it == '\n') error("Invalid token $this")
                     it == '`'
                 })
             }

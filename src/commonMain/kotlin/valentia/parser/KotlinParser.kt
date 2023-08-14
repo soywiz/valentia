@@ -1128,7 +1128,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun parenthesizedUserType(): TypeNode? {
         return expectAndRecover("(", ")", nullIfNotMatching = true) {
             NLs()
-            OR({ userType() }, { parenthesizedUserType() }).also { NLs() }
+            ORNullable({ userType() }, { parenthesizedUserType() }).also { NLs() }
         }
     }
 
@@ -1180,12 +1180,23 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         return when (val ftoken = peek().str) {
             "var", "val" -> DeclStm(propertyDeclaration(modifiers, stm = true) ?: error("var-val"))
             "for", "while", "do" -> loopStatement() ?: error("Couldn't parse loop: '$ftoken'")
-            else -> OR(
-                { declaration()?.let { DeclStm(it) } },
-                { assignment() },
-                { expression()?.let { ExprStm(it) } },
-                name = "statement"
-            )
+            "fun" -> declaration()!!.let { DeclStm(it) }
+            else -> {
+                if (ftoken == "suspend" && peekSkipping(1).str == "fun") {
+                    declaration()!!.let { DeclStm(it) }
+                } else {
+                    OR(
+                        { assignment() },
+                        {
+                            expression()?.let {
+                                ExprStm(it)
+                            }
+                        },
+                        { declaration()?.let { DeclStm(it) } },
+                        name = "statement"
+                    )
+                }
+            }
         }.withModifiers(modifiers)
     }
 
