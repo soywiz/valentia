@@ -29,6 +29,5 @@ open class ValentiaParser(
             parserEOF(str) { statements() }
         fun type(@Language("kotlin", prefix = "typealias Example = ", suffix = "") str: String): TypeNode =
             parserEOF(str) { type() ?: error("Expected type") }
-
     }
 }

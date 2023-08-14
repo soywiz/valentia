@@ -212,6 +212,18 @@ class ValentiaParserFullExamplesTest : StmBuilder {
     }
 
     @Test
+    fun test5c() {
+        ValentiaParser.file(
+            """
+            interface Indenter {
+                companion object;
+                data class Line(val indentLevel: Int, var str: String)           
+            }
+        """.trimIndent()
+        )
+    }
+
+    @Test
     fun test6() {
         ValentiaParser.file(
             """
@@ -1054,6 +1066,205 @@ class ValentiaParserFullExamplesTest : StmBuilder {
 
             fun <T> Map<String, T>.toCaseInsensitiveMap(): Map<String, T> =
                 CaseInsensitiveStringMap<T>().also { it.putAll(this) }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test20a() {
+        ValentiaParser.statement("""
+            this[key]!! += value
+        """.trimIndent())
+    }
+
+    @Test
+    fun test20() {
+        ValentiaParser.file("""
+            package korlibs.datastructure
+
+            typealias MapList<K, V> = Map<K, List<V>>
+            typealias MutableMapList<K, V> = MutableMap<K, ArrayList<V>>
+            typealias LinkedHashMapList<K, V> = LinkedHashMap<K, ArrayList<V>>
+
+            fun <K, V> MapList<K, V>.getFirst(key: K): V? = this[key]?.firstOrNull()
+            fun <K, V> MapList<K, V>.getLast(key: K): V? = this[key]?.lastOrNull()
+
+            fun <K, V> MapList<K, V>.flatten(): List<Pair<K, V>> = flatMapIterable().toList()
+
+            fun <K, V> MapList<K, V>.flatMapIterable(): Iterable<Pair<K, V>> = object : Iterable<Pair<K, V>> {
+                override fun iterator(): Iterator<Pair<K, V>> = flatMapIterator()
+            }
+
+            fun <K, V> MapList<K, V>.flatMapIterator(): Iterator<Pair<K, V>> =
+                entries.flatMap { item -> item.value.map { item.key to it } }.iterator()
+
+            fun <K, V> MutableMapList<K, V>.append(key: K, value: V): MutableMapList<K, V> {
+                getOrPut(key) { arrayListOf() }
+                this[key]!! += value
+                return this
+            }
+
+            fun <K, V> MutableMapList<K, V>.replace(key: K, value: V): MutableMapList<K, V> {
+                remove(key)
+                append(key, value)
+                return this
+            }
+
+            fun <K, V> MutableMapList<K, V>.appendAll(vararg items: Pair<K, V>): MutableMapList<K, V> =
+                this.apply { for ((k, v) in items) append(k, v) }
+
+            fun <K, V> MutableMapList<K, V>.replaceAll(vararg items: Pair<K, V>): MutableMapList<K, V> =
+                this.apply { for ((k, v) in items) replace(k, v) }
+
+            fun <K, V> linkedHashMapListOf(vararg items: Pair<K, V>): MutableMapList<K, V> = LinkedHashMapList<K, V>().apply {
+                for ((k, v) in items) append(k, v)
+            }
+
+            fun <K, V> LinkedHashMapList(items: List<Pair<K, V>>): MutableMapList<K, V> = LinkedHashMapList<K, V>().apply {
+                for ((k, v) in items) append(k, v)
+            }
+
+            fun <K, V> LinkedHashMapList(items: MapList<K, V>): MutableMapList<K, V> = LinkedHashMapList<K, V>().apply {
+                for ((k, values) in items) for (v in values) append(k, v)
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test21() {
+        ValentiaParser.file("""
+            /**
+             * Double growable ArrayList without boxing.
+             */
+            @Suppress("UNCHECKED_CAST")
+            class DoubleArrayList(capacity: Int = 7) : IDoubleArrayList {
+                companion object
+                val a: Int
+                //var data: DoubleArray = DoubleArray(capacity) as DoubleArray; private set
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test22a() {
+        ValentiaParser.topLevelDecl("private var C.prop by WeakProperty { 0 }")
+    }
+
+    @Test
+    fun test22() {
+        ValentiaParser.file("""
+            package korlibs.datastructure
+
+            import kotlin.test.Test
+            import kotlin.test.assertEquals
+
+
+            private class C {
+                val value = 1
+            }
+
+            private var C.prop by WeakProperty { 0 }
+            private var C.prop2 by WeakPropertyThis<C, String> { "${'$'}{value * 2}" }
+
+            class WeakPropertyTest {
+            	@Test
+            	fun name() {
+            		val c1 = C()
+            		val c2 = C()
+            		assertEquals(0, c1.prop)
+            		assertEquals(0, c2.prop)
+            		c1.prop = 1
+            		c2.prop = 2
+            		assertEquals(1, c1.prop)
+            		assertEquals(2, c2.prop)
+
+            		assertEquals("2", c2.prop2)
+            		c2.prop2 = "3"
+            		assertEquals("3", c2.prop2)
+            	}
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test23a() {
+        ValentiaParser.file("""
+            class Bitmap8(
+            	data: ByteArray = ByteArray(width * height),
+            ) {
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test23() {
+        ValentiaParser.file("""
+            package korlibs.image.bitmap
+
+            import korlibs.datastructure.*
+            import korlibs.image.color.*
+
+            class Bitmap8(
+            	width: Int,
+            	height: Int,
+            	data: ByteArray = ByteArray(width * height),
+            	palette: RgbaArray = RgbaArray(0x100)
+            ) : BitmapIndexed(8, width, height, data, palette) {
+            	override fun createWithThisFormat(width: Int, height: Int): Bitmap = Bitmap8(width, height, palette = palette)
+
+            	override fun setInt(x: Int, y: Int, color: Int) = setIntIndex(index(x, y), color)
+            	override fun getInt(x: Int, y: Int): Int = datau[index(x, y)]
+            	override fun getRgbaRaw(x: Int, y: Int): RGBA = palette[get(x, y)]
+                override fun getIntIndex(n: Int): Int = datau[n]
+                override fun setIntIndex(n: Int, color: Int) { datau[n] = color }
+
+                override fun copyUnchecked(srcX: Int, srcY: Int, dst: Bitmap, dstX: Int, dstY: Int, width: Int, height: Int) {
+                    if (dst !is Bitmap8) return super.copyUnchecked(srcX, srcY, dst, dstX, dstY, width, height)
+                    for (y in 0 until height) {
+                        korlibs.memory.arraycopy(this.data, this.index(srcX, srcY + y), (dst as Bitmap8).data, dst.index(dstX, dstY + y), width)
+                    }
+                }
+
+                override fun clone() = Bitmap8(width, height, data.copyOf(), RgbaArray(palette.ints.copyOf()))
+
+            	override fun toString(): String = "Bitmap8(${'$'}width, ${'$'}height, palette=${'$'}{palette.size})"
+
+                companion object {
+                    inline operator fun invoke(width: Int, height: Int, palette: RgbaArray = RgbaArray(0x100), pixelProvider: (x: Int, y: Int) -> Byte): Bitmap8 {
+                        return Bitmap8(width, height, ByteArray(width * height) { pixelProvider(it % width, it / width) }, palette)
+                    }
+
+                    fun copyRect(
+                        src: Bitmap8,
+                        srcX: Int,
+                        srcY: Int,
+                        dst: Bitmap8,
+                        dstX: Int,
+                        dstY: Int,
+                        width: Int,
+                        height: Int
+                    ) = src.copy(srcX, srcY, dst, dstX, dstY, width, height)
+                }
+            }
+
+            fun Bitmap.tryToExactBitmap8(): Bitmap8? {
+                if (this is BitmapIndexed) {
+                    return Bitmap8(width, height, ByteArray(width * height) { this.getIntIndex(it).toByte() }, RgbaArray(this.palette.ints.copyOf(256)))
+                }
+
+                val bmp = this.toBMP32IfRequired().depremultipliedIfRequired()
+                val bmpInts = bmp.ints
+                val palette = Palette(RgbaArray(256))
+                val colors = IntIntMap()
+                var ncolor = 0
+                for (color in bmpInts) {
+                     if (!colors.contains(color)) {
+                        palette.colors[ncolor] = if (bmp.premultiplied) RGBAPremultiplied(color).depremultiplied else RGBA(color)
+                        colors[color] = ncolor++
+                    }
+                    if (colors.size >= 256) return null
+                }
+                return Bitmap8(bmp.width, bmp.height, ByteArray(bmp.width * bmp.height) { colors[bmpInts[it]].toByte() }, palette.colors)
+            }
         """.trimIndent())
     }
 }

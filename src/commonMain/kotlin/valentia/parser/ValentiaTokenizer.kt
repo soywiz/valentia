@@ -20,6 +20,35 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
         return this.count { it == '\n' }
     }
 
+    private fun readNumber(): NumberToken {
+        val spos = pos
+        loop@while (hasMore) {
+            val c = peekChar()
+            when {
+                c == 'e' || c == 'E' -> {
+                    readChar()
+                    when (peekChar()) {
+                        '-', '+' -> readChar()
+                    }
+                }
+                c == '.' -> {
+                    if (peekChar(1).isDigit()) {
+                        readChar()
+                    } else {
+                        break@loop
+                    }
+                }
+                c.isLetterOrDigitOrUndescore() -> {
+                    readChar()
+                }
+                else -> {
+                    break@loop
+                }
+            }
+        }
+        return NumberToken(readAbsoluteRange(spos, pos))
+    }
+
     fun readToken(): Token {
         val line = currentLine
         return when (val c = peekChar()) {
@@ -29,61 +58,9 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
                 currentLine += nlines
                 (if (nlines >= 1) NLToken(res, nlines) else SpacesToken(res))
             }
-            in '0'..'9' -> {
-                val spos = pos
-                loop@while (hasMore) {
-                    val c = peekChar()
-                    when {
-                        c == 'e' || c == 'E' -> {
-                            readChar()
-                            when (peekChar()) {
-                                '-', '+' -> readChar()
-                            }
-                        }
-                        c == '.' -> {
-                            if (peekChar(1).isDigit()) {
-                                readChar()
-                            } else {
-                                break@loop
-                            }
-                        }
-                        c.isLetterOrDigitOrUndescore() -> {
-                            readChar()
-                        }
-                        else -> {
-                            break@loop
-                        }
-                    }
-                }
-                NumberToken(readAbsoluteRange(spos, pos))
-                /*
-                val baseNum = readWhile { it.isLetterOrDigitOrUndescore() }
-                //println(" || ${peekChar()}")
-                val spos = pos
-                val extra = if (matches(".")) {
-                    opt {
-                        expect(".")
-                        if (peekChar().isDigit()) {
-                            "." + readWhile { it.isLetterOrDigitOrUndescore() }
-                        } else {
-                            null
-                        }
-                    }
-                } else {
-                    null
-                }
-                if (extra == null) {
-                    pos = spos
-                }
-                */
-                //println("N=${"$baseNum$extra"}")
-                //println(" -> ${peekChar()}")
-                //NumberToken("$baseNum${extra ?: ""}")
-            }
+            in '0'..'9' -> readNumber()
             in 'a'..'z', in 'A'..'Z', '_' -> {
-                if (expectOpt("as?")) {
-                    return IDToken("as?")
-                }
+                if (expectOpt("as?")) return IDToken("as?")
                 IDToken(readWhile { it.isLetterOrDigitOrUndescore() })
             }
             '`' -> {
@@ -135,7 +112,13 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
             }
             '~' -> SymbolToken(expectAny("~"))
             //'.' -> SymbolToken(expectAny(".*", "..>", "..", "."))
-            '.' -> SymbolToken(expectAny("..>", "..", "."))
+            '.' -> {
+                if (peekChar(1).isDigit()) {
+                    readNumber()
+                } else {
+                    SymbolToken(expectAny("..>", "..", "."))
+                }
+            }
             '@' -> SymbolToken(expectAny("@"))
             '#' -> {
                 if (matches("#!")) {
@@ -194,12 +177,17 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
             '\$' -> {
                 val spos = pos
                 expect("\$")
-                val tokens: List<Token> = when {
+                val tokens: List<Token>? = when {
                     matches("{") -> expectAndRecoverSure("{", "}") { whileMap({ !matches("}") }) { readToken() } }
                     peekChar().isLetterOrUndescore() -> listOf(readToken())
-                    else -> TODO("Unsupported after dollar string $this")
+                    else -> null
                 }
-                ExpressionStringPartToken(readAbsoluteRange(spos, pos), tokens)
+                val str = readAbsoluteRange(spos, pos)
+                if (tokens != null) {
+                    ExpressionStringPartToken(str, tokens)
+                } else {
+                    LiteralStringPartToken(str)
+                }
             }
             else -> {
                 LiteralStringPartToken(readUntil { it == '\$' || matches("\"\"\"") }.also {
@@ -235,7 +223,7 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
             '\$' -> {
                 val spos = pos
                 expect("\$")
-                val tokens: List<Token> = when {
+                val tokens: List<Token>? = when {
                     matches("{") -> expectAndRecoverSure("{", "}") {
                         val out = arrayListOf<Token>()
                         var curlyLevel = 1
@@ -252,9 +240,16 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
                     }
                     peekChar().isLetterOrUndescore() -> listOf(readToken())
                     peekChar() == end -> return LiteralStringPartToken("$").also { it.line = line }
-                    else -> TODO("Unsupported after dollar string '${peekChar()}' :: $this")
+                    else -> {
+                        null
+                        //TODO("Unsupported after dollar string '${peekChar()}' :: $this")
+                    }
                 }
-                ExpressionStringPartToken(readAbsoluteRange(spos, pos), tokens)
+                val str = readAbsoluteRange(spos, pos)
+                when {
+                    tokens != null -> ExpressionStringPartToken(str, tokens)
+                    else -> LiteralStringPartToken(str)
+                }
             }
             '\\' -> {
                 readEscapeSequence()

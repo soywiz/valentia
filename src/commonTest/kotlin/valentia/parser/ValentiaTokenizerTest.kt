@@ -29,6 +29,7 @@ class ValentiaTokenizerTest {
         assertEquals(listOf("1", ".", "+"), chunks("1.+"))
         assertEquals(listOf("1.0", "+"), chunks("1.0+"))
         assertEquals(listOf("1", ".", "a", "+"), chunks("1.a+"))
+        assertEquals(listOf(".0", "+"), chunks(".0+"))
     }
 
     @Test
@@ -73,6 +74,13 @@ class ValentiaTokenizerTest {
         println(ValentiaTokenizer("""
             // hello
             world
+        """.trimIndent()).tokenize())
+    }
+
+    @Test
+    fun testTripleQuoteWithSimpleDollar() {
+        println(ValentiaTokenizer("""
+            ${'"'}""$ $#""${'"'}
         """.trimIndent()).tokenize())
     }
 

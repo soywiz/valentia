@@ -171,60 +171,70 @@ interface Modifier {
 }
 enum class ClassModifier(override val id: String) : Modifier {
     ENUM("enum"), SEALED("sealed"), ANNOTATION("annotation"), DATA("data"), INNER("inner"), VALUE("value");
+    override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
 enum class MemberModifier(override val id: String) : Modifier {
     OVERRIDE("override"), LATE_INIT("lateinit");
+    override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
 enum class VisibilityModifier(override val id: String) : Modifier {
     PUBLIC("public"), PRIVATE("private"), INTERNAL("internal"), PROTECTED("protected");
+    override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
 enum class VarianceModifier(override val id: String) : Modifier {
     IN("in"), OUT("out");
+    override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
 enum class FunctionModifier(override val id: String) : Modifier {
     TAILREC("tailrec"), OPERATOR("operator"), INFIX("infix"), INLINE("inline"), EXTERNAL("external"), SUSPEND("suspend");
+    override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
 enum class PropertyModifier(override val id: String) : Modifier {
     CONST("const");
+    override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
 enum class InheritanceModifier(override val id: String) : Modifier {
     ABSTRACT("abstract"), FINAL("final"), OPEN("open");
+    override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
 enum class ParameterModifier(override val id: String) : Modifier {
     VARARG("vararg"), NOINLINE("noinline"), CROSSINLINE("crossinline");
+    override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
 enum class ReificationModifier(override val id: String) : Modifier {
     REIFIED("reified");
+    override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
 enum class PlatformModifier(override val id: String) : Modifier {
     EXPECT("expect"), ACTUAL("actual");
+    override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
@@ -233,6 +243,7 @@ enum class PlatformModifier(override val id: String) : Modifier {
 enum class AnnotationUseSite(override val id: String) : Modifier {
     FIELD("field"), PROPERTY("property"), GET("get"), SET("set"), RECEIVER("receiver"),
     PARAM("param"), SETPARAM("setparam"), DELEGATE("delegate"), FILE("file");
+    override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
@@ -287,19 +298,27 @@ data class FunDecl constructor(
     }
 }
 sealed abstract class VariableDeclBase(declName: String) : Decl(declName)
-data class VariableDecl(val id: String, val type: TypeNode? = null, val expr: Expr? = null, val delegation: Boolean = false, val annotations: Annotations = Annotations.EMPTY) : VariableDeclBase(id)
+data class VariableDecl(
+    val id: String,
+    val type: TypeNode? = null,
+    val expr: Expr? = null,
+    val delegation: Boolean = false,
+    val receiver: TypeNode? = null,
+    val annotations: Annotations = Annotations.EMPTY,
+) : VariableDeclBase(id)
 data class MultiVariableDecl(
     val decls: List<VariableDecl>,
     val expr: Expr? = null,
     val delegation: Boolean = false,
     val type: TypeNode? = null,
+    val receiver: TypeNode? = null,
 ) : VariableDeclBase(decls.joinToString(",") { it.declName }) {
     constructor(vararg decls: VariableDecl, expr: Expr? = null) : this(decls.toList(), expr)
 }
-fun <T : VariableDeclBase> T.withAssignment(expr: Expr, delegation: Boolean = false): T {
+fun <T : VariableDeclBase> T.withAssignment(expr: Expr, delegation: Boolean = false, receiver: TypeNode? = null): T {
     return when (this) {
-        is VariableDecl -> this.copy(expr = expr, delegation = delegation) as T
-        is MultiVariableDecl -> this.copy(expr = expr, delegation = delegation) as T
+        is VariableDecl -> this.copy(expr = expr, delegation = delegation, receiver = receiver) as T
+        is MultiVariableDecl -> this.copy(expr = expr, delegation = delegation, receiver = receiver) as T
         else -> TODO()
     }
 }
@@ -378,7 +397,7 @@ enum class UnaryPostOp(val str: String) {
 data class CastExpr(val expr: Expr, val targetType: TypeNode, val kind: String) : Expr()
 data class CallExpr(val expr: Expr, val params: List<Expr> = emptyList(), val lambdaArg: Expr? = null, val typeArgs: List<TypeNode>? = null) : Expr()
 data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : AssignableExpr()
-data class UnaryPostOpExpr(val expr: Expr, val op: UnaryPostOp) : Expr()
+data class UnaryPostOpExpr(val expr: Expr, val op: UnaryPostOp) : AssignableExpr()
 data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr() {
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
         val type = expr.getType(resolutionContext)

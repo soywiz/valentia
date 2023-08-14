@@ -29,4 +29,11 @@ class ValentiaParserAssignTest : StmBuilder {
         )
     }
 
+    @Test
+    fun testAssignThis2() {
+        assertEquals(
+            ASSIGN(THIS["key".id].notNull(), "+=", "value".id),
+            ValentiaParser.statement("this[key]!! += value") as? Any?
+        )
+    }
 }

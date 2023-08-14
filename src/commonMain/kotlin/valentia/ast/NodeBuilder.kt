@@ -75,6 +75,7 @@ interface StmBuilder : DeclBuilder {
     }
 
     fun ASSIGN(lvalue: AssignableExpr, expr: Expr, op: String = "="): AssignStm = AssignStm(lvalue, op, expr).addStm()
+    fun ASSIGN(lvalue: AssignableExpr, op: String, expr: Expr): AssignStm = AssignStm(lvalue, op, expr).addStm()
 
     fun STM(expr: Expr): ExprStm = ExprStm(expr).addStm()
     fun STM(decl: Decl): DeclStm = DeclStm(decl).addStm()
@@ -131,6 +132,7 @@ interface NodeBuilder {
     val TypeNode.multi: MultiType get() = MultiType(this)
     val List<TypeNode>.multi: MultiType get() = MultiType(this)
     fun collection(vararg items: Expr): CollectionLiteralExpr = CollectionLiteralExpr(items.toList())
+    fun Expr.notNull(): UnaryPostOpExpr = UnaryPostOpExpr(this, UnaryPostOp.NOT_NULL)
     operator fun Expr.get(vararg indices: Expr): IndexedExpr = IndexedExpr(this, indices.toList())
     operator fun Expr.get(dot: String): NavigationExpr = NavigationExpr(".", this, dot)
     operator fun Expr.invoke(vararg params: Expr, lambdaArg: Expr? = null, typeArgs: List<TypeNode>? = null): CallExpr = CallExpr(this, params.toList(), lambdaArg, typeArgs)

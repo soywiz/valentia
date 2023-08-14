@@ -119,6 +119,13 @@ open class ValentiaParserVarStmTest : StmBuilder {
                 val Boolean.lit: BoolLiteralExpr get() = BoolLiteralExpr(this)
             """.trimIndent()) as? Any?
         )
+    }
 
+    @Test
+    fun test4() {
+        assertEquals(
+            VariableDecl("prop", expr = "WeakProperty".id(lambdaArg = LAMBDA { STM(0.lit) }), delegation = true, receiver = "C".type),
+            ValentiaParser.topLevelDecl("private var C.prop by WeakProperty { 0 }") as? Any?
+        )
     }
 }
