@@ -2156,4 +2156,32 @@ class ValentiaParserFullExamplesTest : StmBuilder {
                 })"
         """)
     }
+
+    @Test
+    fun test47a() {
+        ValentiaParser.file("""
+            import js.externals.jquery.`${'$'}`
+        """.trimIndent())
+    }
+
+    @Test
+    fun test47b() {
+        ValentiaParser.statement("""
+            test(cb@ { e ->})
+        """.trimIndent())
+    }
+
+    @Test
+    fun test47c() {
+        ValentiaParser.file("""
+            private fun installSearchBar() {
+                searchBar.addEventListener("keyup", callback = cb@{ e ->
+                    // If key isn't "Enter" then return
+                    if ((e as? KeyboardEvent)?.which != 13) return@cb
+                    val searchString = (e.target as? HTMLInputElement)?.value ?: return@cb
+                    if (searchString.isBlank()) return@cb
+                })
+            }
+        """.trimIndent())
+    }
 }

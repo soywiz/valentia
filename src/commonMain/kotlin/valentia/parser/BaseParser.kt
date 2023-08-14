@@ -298,6 +298,7 @@ inline fun <T> BaseConsumer.ORNullable(vararg funcs: () -> T?, name: String? = n
     return null
 }
 
+/*
 inline fun <T1, T2> BaseConsumer.ORDis(func1: () -> T1?, func2: () -> T2?): Disjunction2<T1, T2> {
     val rpos = pos
     val exceptions = arrayListOf<Throwable>()
@@ -336,6 +337,8 @@ inline fun <T1, T2, T3> BaseConsumer.ORDis(func1: () -> T1?, func2: () -> T2?, f
     //error("Couldn't match any of OR")
     return null
 }
+
+ */
 
 @OptIn(ExperimentalContracts::class)
 @Deprecated("")

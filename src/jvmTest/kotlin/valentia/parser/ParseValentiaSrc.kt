@@ -14,6 +14,7 @@ class ParseValentiaSrc {
     @Test
     fun test() {
         doTestFolder(File("."))
+        //doTestFolder(File(".."))
         doTestFolder(File("../korge"))
     }
 

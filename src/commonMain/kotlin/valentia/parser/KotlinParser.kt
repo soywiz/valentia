@@ -1437,7 +1437,9 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : infixOperation callSuffix*
     //    ;
     fun genericCallLikeComparison(state: ExpressionState? = null): Expr? {
+        val spos = pos
         var res: Expr = infixOperation(state) ?: return null
+        //if (matchesNLs("@")) return null.also { pos = spos } // This is a label
         zeroOrMore {
             callSuffix(res, state)?.also { res = it }
         }
@@ -1545,10 +1547,19 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         debug("TODO: prefixUnaryExpression : $prefixes")
         var res: Expr = postfixUnaryExpression(state) ?: return null.also { pos = spos }
         for (prefix in prefixes.reversed()) {
-            val prefixValue = prefix.value
+            val prefixValue = prefix
             res = when (prefixValue) {
                 is UnaryPreOp -> UnaryPreOpExpr(prefixValue, res)
-                else -> TODO("prefixUnaryExpression")
+                is LabelNode -> {
+                    if (res is LambdaFunctionExpr) {
+                        println("TODO: LabelNode")
+                        res
+                    } else {
+                        println("TODO: LabelNode")
+                        res
+                    }
+                }
+                else -> TODO("prefixUnaryExpression prefixValue=$prefixValue, res=$res at $this")
             }
         }
         return res
@@ -1559,8 +1570,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | label
     //    | prefixUnaryOperator NL*
     //    ;
-    fun unaryPrefix(state: ExpressionState? = null): Disjunction3<UnaryPreOp, AnnotationNodes, LabelNode>? {
-        return ORDis(
+    fun unaryPrefix(state: ExpressionState? = null): Any? {
+        return ORNullable(
             { prefixUnaryOperator().also { NLs() } },
             { annotation() },
             { label() },
@@ -1586,7 +1597,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         }
     }
 
-    private fun <T> parseList(oneOrMore: Boolean = false, separator: () -> Boolean = { expectOpt(",") }, doBreak: () -> Boolean = { false }, node: () -> T): List<T> {
+    @Deprecated("")
+    private fun <T> parseList(oneOrMore: Boolean = false, separator: () -> Boolean = { expectOpt(",") }, doBreak: () -> Boolean = { false }, node: () -> T?): List<T> {
         val nodes = arrayListOf<T>()
         //val oldPos = pos
         //try {
@@ -1600,7 +1612,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             NLs()
             if (doBreak()) break@loop
             NLs()
-            nodes += node()
+            nodes += node() ?: break@loop
             NLs()
             if (doBreak()) break@loop
             separator()
@@ -1790,8 +1802,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : annotation* label? NL* lambdaLiteral
     //    ;
     fun annotatedLambda(): Expr? {
-        zeroOrMore { annotation() }
-        opt { label() }
+        zeroOrMore {
+            annotation()
+        }
+        val label = label()
         NLs()
         return lambdaLiteral()
     }
@@ -1817,11 +1831,26 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         debug("valueArguments: $this")
         if (!matches("(")) return null
         return expectAndRecover("(", ")", nullIfNotMatching = true) {
-            parseList(oneOrMore = false, separator = { expectOpt(",") }, doBreak = { matches(")") }) {
-                valueArgument()
-            }.filterNotNull()
-        }.also {
-            debug("/valueArguments: $this")
+            //parseListNew(oneOrMore = false, separator = { expectOpt(",") }, end = { eof || matches(")") }) {
+            //    valueArgument()
+            //}
+            parseList(oneOrMore = false, separator = { expectOpt(",") }, doBreak = { eof || matches(")") }) {
+                val arg = valueArgument()
+                //println("arg=$arg")
+                arg
+            }
+            //NLs()
+            //if (matches(")")) return@expectAndRecover emptyList()
+            //val arg = valueArgument() ?: return@expectAndRecover null
+            //val more = zeroOrMore {
+            //    NLs()
+            //    if (!expectOptNLs(",")) return@zeroOrMore null
+            //    NLs()
+            //    valueArgument()
+            //}
+            //expectOptNLs(",")
+            //NLs()
+            //(listOf(arg) + more).filterNotNull()
         }
     }
 
@@ -1889,13 +1918,18 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             "[" -> collectionLiteral() ?: error("Not a collection literal")
             else -> {
                 ORNullable(
+                    { lambdaLiteral() },
                     //{ parenthesizedExpression() },
                     { literalConstantOpt() },
                     { stringLiteral() },
                     { callableReference() },
                     { functionLiteral() },
                     { objectLiteral() },
-                    { simpleIdentifierOpt()?.let { IdentifierExpr(it) } },
+                    {
+                        val id = simpleIdentifierOpt() ?: return@ORNullable null
+                        if (matches("@")) return@ORNullable null // This looks like a label
+                        IdentifierExpr(id)
+                    },
                 )
             }
         }
@@ -3547,12 +3581,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         return IdentifierOpt() ?: run { pos = spos; error("not an identifier but ${peek()} in $this") }
     }
     fun IdentifierOpt(): String? {
-        val idToken = expectOpt<IDToken>()
-            ?: return null
-        if (idToken.str in HARD_KEYWORDS) {
-
-            return null
-        }
+        val idToken = expectOpt<IDToken>() ?: return null
+        if (idToken.str in HARD_KEYWORDS) return null
         return idToken.str
         //var n = 0
         //val c = peekChar()
