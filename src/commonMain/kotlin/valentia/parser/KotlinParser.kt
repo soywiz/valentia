@@ -1719,14 +1719,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun navigationSuffix(expr: Expr, op: String? = memberAccessOperator()): AssignableExpr {
         if (op == null) error("Unexpected memberAccessOperator")
         NLs()
-        if (matches("class")) {
-            return NavigationExpr(op, expr, "class")
+        return when {
+            expectOpt("class") -> NavigationExpr(op, expr, "class")
+            matches("(") -> NavigationExpr(op, expr, parenthesizedExpression()!!)
+            else -> {
+                val id = simpleIdentifier()
+                NavigationExpr(op, expr, id)
+            }
         }
-        if (matches("(")) {
-            return NavigationExpr(op, expr, parenthesizedExpression()!!)
-        }
-        val id = simpleIdentifier()
-        return NavigationExpr(op, expr, id)
     }
 
     //data class CallSuffix(
@@ -3837,9 +3837,9 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //
     //ErrorCharacter: .;
 
-    override fun EOF() {
+    override fun EOF(message: String?) {
         NLs()
-        if (!eof) throw EofNotFoundException("Not EOF found but ${peek()} at $this")
+        if (!eof) throw EofNotFoundException("Not EOF (message=$message) found but ${peek()} at $this")
     }
 
     companion object {

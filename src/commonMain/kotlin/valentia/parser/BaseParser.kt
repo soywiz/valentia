@@ -55,8 +55,8 @@ interface BaseTokenReader : BaseConsumer {
         while (peek() is HiddenToken) pos++
         return peek().also { skip() }
     }
-    override fun EOF() {
-        check(eof) { "Not EOF found but ${peek()}" }
+    override fun EOF(message: String?) {
+        check(eof) { "Not EOF found but ${peek()} message=$message" }
     }
 
     override fun skip(count: Int) {
@@ -169,8 +169,8 @@ interface BaseConsumer {
         return matches(str, consume = true)
     }
 
-    fun EOF() {
-        check(eof) { "Not EOF found" }
+    fun EOF(message: String? = null) {
+        check(eof) { "Not EOF found (message=$message)" }
     }
 
 }

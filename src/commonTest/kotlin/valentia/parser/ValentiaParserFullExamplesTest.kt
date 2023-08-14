@@ -1929,4 +1929,19 @@ class ValentiaParserFullExamplesTest : StmBuilder {
             }
         """.trimIndent())
     }
+
+    @Test
+    fun test37() {
+        ValentiaParser.file("""
+            open class UniformBlock(val fixedLocation: Int) {
+                val name: String get() = this::class.portableSimpleName
+                private val layout = KMemLayoutBuilder()
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test37a() {
+        ValentiaParser.expression("this::class.portableSimpleName")
+    }
 }

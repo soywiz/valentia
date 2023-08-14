@@ -12,7 +12,9 @@ open class ValentiaParser(
 
     companion object {
         private inline fun <T> parserEOF(str: String, checkEOF: Boolean = true, block: ValentiaParser.() -> T): T {
-            return ValentiaParser(str).let { parser -> block(parser).also { if (checkEOF) parser.EOF() } }
+            return ValentiaParser(str).let { parser -> block(parser).also {
+                if (checkEOF) parser.EOF("generated=$it")
+            } }
         }
 
         fun topLevelDecl(@Language("kotlin") str: String): Decl =
