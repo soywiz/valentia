@@ -16,7 +16,7 @@ class ParseValentiaSrc {
         //doTestFolder(File(".."))
         doTestFolder(File("."))
         //doTestFolder(File("./runtime"))
-        //doTestFolder(File("../korge"))
+        doTestFolder(File("../korge"))
     }
 
     @Test

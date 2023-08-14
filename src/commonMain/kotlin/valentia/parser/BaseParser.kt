@@ -2,8 +2,6 @@ package valentia.parser
 
 import valentia.ast.Node
 import valentia.ast.enrich
-import valentia.util.Disjunction2
-import valentia.util.Disjunction3
 import valentia.util.isLetterOrDigitOrUndescore
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
@@ -124,6 +122,13 @@ open class StrReader(val str: String) : BaseReader {
     override fun toString(): String = "StrReader(pos=$pos, len=$len, peek='${peek(8)}' prev=${peek(4, -4)})"
 }
 
+//@Deprecated("", ReplaceWith("debug { message }"))
+//inline fun BaseConsumer.debug(message: String) = debug { message }
+
+inline fun BaseConsumer.debug(message: () -> String) {
+    //kotlin.io.println(message)
+}
+
 interface BaseConsumer {
     var pos: Int
     val len: Int
@@ -134,10 +139,6 @@ interface BaseConsumer {
     fun matches(str: String, consume: Boolean = false): Boolean
 
     fun reportError(e: Throwable) {
-    }
-
-    fun debug(message: Any?) {
-        //kotlin.io.println(message)
     }
 
     fun unexpected(reason: String? = null): Nothing = TODO("reason=$reason")
@@ -157,6 +158,32 @@ interface BaseConsumer {
     @Deprecated("")
     fun expectAny(vararg strs: String): String {
         return expectAnyOpt(*strs) ?: error("Couldn't find ${strs.toList()} in $this")
+    }
+
+    fun expectAny(str1: String, consume: Boolean = true): String {
+        if (matches(str1, consume = consume)) return str1
+        error("Couldn't find $str1 in $this")
+    }
+
+    fun expectAny(str1: String, str2: String, consume: Boolean = true): String {
+        if (matches(str1, consume = consume)) return str1
+        if (matches(str2, consume = consume)) return str2
+        error("Couldn't find $str1 or $str2 in $this")
+    }
+
+    fun expectAny(str1: String, str2: String, str3: String, consume: Boolean = true): String {
+        if (matches(str1, consume = consume)) return str1
+        if (matches(str2, consume = consume)) return str2
+        if (matches(str3, consume = consume)) return str3
+        error("Couldn't find $str1, $str2 or $str3 in $this")
+    }
+
+    fun expectAny(str1: String, str2: String, str3: String, str4: String, consume: Boolean = true): String {
+        if (matches(str1, consume = consume)) return str1
+        if (matches(str2, consume = consume)) return str2
+        if (matches(str3, consume = consume)) return str3
+        if (matches(str4, consume = consume)) return str4
+        error("Couldn't find $str1, $str2, $str3 or $str4 in $this")
     }
 
     @Deprecated("")
