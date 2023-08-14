@@ -444,7 +444,7 @@ open class EmptyExpr : Expr()
 data class TypeTestExpr(val base: Expr, val kind: String, val type: TypeNode) : Expr()
 data class RangeTestExpr(val base: Expr, val kind: String, val container: Expr) : Expr()
 
-data class ThisExpr(val id: Identifier?) : AssignableExpr() {
+data class ThisExpr(val id: String?) : AssignableExpr() {
 }
 
 // Statements

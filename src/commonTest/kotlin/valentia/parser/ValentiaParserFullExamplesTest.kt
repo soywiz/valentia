@@ -904,6 +904,14 @@ class ValentiaParserFullExamplesTest : StmBuilder {
     }
 
     @Test
+    fun test16a() {
+        ValentiaParser.expression("""
+            buckets.values
+                .flatMap
+        """.trimIndent())
+    }
+
+    @Test
     fun test16() {
         ValentiaParser.file("""
             package korlibs.datastructure
@@ -1645,6 +1653,280 @@ class ValentiaParserFullExamplesTest : StmBuilder {
                 return dict
             }
             */
+        """.trimIndent())
+    }
+
+    @Test
+    fun test31() {
+        ValentiaParser.file("""
+            internal fun RGBA.toCgColor(releases: Releases, space: CGColorSpaceRef?): CPointer<CGColor>? = memScoped {
+                // Not available on iOS
+                //CGColorCreateGenericRGB(color.rd.cg, color.gd.cg, color.bd.cg, color.ad.cg)
+                val data = allocArray<CGFloatVar>(4)
+                //val data = releases.arena.allocArray<CGFloatVar>(4)
+                data[0] = this@toCgColor.rd.cg
+                data[1] = this@toCgColor.gd.cg
+                data[2] = this@toCgColor.bd.cg
+                data[3] = this@toCgColor.ad.cg
+                val color = CGColorCreate(space, data)
+                releases.colors.add(color)
+                color
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test32() {
+        ValentiaParser.file("""
+            package korlibs.image.format
+
+            import korlibs.image.bitmap.matchContentsDistinctCount
+            import korlibs.io.async.suspendTestNoBrowser
+            import korlibs.io.file.std.resourcesVfs
+            import kotlin.test.Test
+            import kotlin.test.assertEquals
+            import kotlin.test.assertTrue
+
+            class DDSTest {
+                val props = ImageDecodingProps(format = ImageFormats(PNG, DDS), premultiplied = false)
+
+                @Test
+                fun dxt1() = suspendTestNoBrowser {
+                    val output = resourcesVfs["dxt1.dds"].readBitmapNoNative(props)
+                    val expected = resourcesVfs["dxt1.png"].readBitmapNoNative(props)
+                    assertEquals(0, output.matchContentsDistinctCount(expected))
+                }
+
+                @Test
+                fun dxt3() = suspendTestNoBrowser {
+                    val output = resourcesVfs["dxt3.dds"].readBitmapNoNative(props)
+                    val expected = resourcesVfs["dxt3.png"].readBitmapNoNative(props)
+                    assertTrue { output.matchContentsDistinctCount(expected) < 7000 }
+                    //output.writeTo(LocalVfs("c:/temp/dxt3.png"))
+                }
+
+                @Test
+                fun dxt5() = suspendTestNoBrowser {
+                    val output = resourcesVfs["dxt5.dds"].readBitmapNoNative(props)
+                    val expected = resourcesVfs["dxt5.png"].readBitmapNoNative(props)
+                    assertTrue { output.matchContentsDistinctCount(expected) < 7000 }
+                    //output.writeTo(LocalVfs("c:/temp/dxt5.png"))
+                }
+
+                @Test
+                fun dxt5_registered() = suspendTestNoBrowser {
+                    RegisteredImageFormats.temporalRegister(DDS, PNG) {
+                        val output = resourcesVfs["dxt5.dds"].readBitmapNoNative()
+                        val expected = resourcesVfs["dxt5.dds"].readBitmapNoNative(DDS.toProps())
+                        assertEquals(0, output.matchContentsDistinctCount(expected))
+                        //output.writeTo(LocalVfs("c:/temp/dxt5.png"))
+                    }
+                }
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test33a() {
+        ValentiaParser.file("""
+            internal var baseConsoleHook: ((
+                kind: BaseConsole.Kind, 
+                msg: Array<out Any?>,
+                logInternal: (kind: BaseConsole.Kind, msg: Array<out Any?>) -> Unit,
+            ) -> Unit)? = null
+
+            open class BaseConsole() : AnsiEscape {
+                enum class Kind(val level: Int, val color: AnsiEscape.Color?) {
+                    ERROR(0, AnsiEscape.Color.RED),
+                    LOG(5, null),
+                }
+
+                data class LogEntry(val kind: Kind, val msg: List<Any?>) {
+                    override fun toString(): String = msg.joinToString(", ")
+                }
+            }
+
+            expect object Console : BaseConsole
+
+            fun Console.assert(cond: Boolean, msg: String) {
+                if (cond) throw AssertionError(msg)
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test33b() {
+        ValentiaParser.type("""
+            ((
+                kind: BaseConsole.Kind, 
+                msg: Array<out Any?>,
+                logInternal: (kind: BaseConsole.Kind, msg: Array<out Any?>) -> Unit,
+            ) -> Unit)?
+        """.trimIndent())
+    }
+
+    @Test
+    fun test34() {
+        ValentiaParser.statement("""
+            while (
+                PeekMessageW(
+                    msg.ptr,
+                    null,
+                    0.convert(),
+                    0.convert(),
+                    PM_REMOVE.convert()
+                ).toInt() != 0
+            ) {
+                TranslateMessage(msg.ptr)
+                DispatchMessageW(msg.ptr)
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test35a() {
+        ValentiaParser.statement("""
+            (c as? JLabel)?.text ?: (c as? JScrollableTextArea)?.text ?: (c as? JTextComponent)?.text
+            ?: (c as? AbstractButton)?.text ?: (c as? Frame)?.title
+        """.trimIndent())
+    }
+
+    @Test
+    fun test35() {
+        ValentiaParser.statement("""
+            @Suppress("UNCHECKED_CAST")
+            override fun <T> getProperty(c: Any, key: LightProperty<T>): T {
+                return when (key) {
+                    LightProperty.CHECKED -> {
+                        (c as? JComponent)?.name
+                    }
+                    LightProperty.CHECKED -> {
+                        (c as? JToggleButton)?.isSelected ?: false
+                    }
+                    LightProperty.TEXT -> {
+                        (c as? JLabel)?.text ?: (c as? JScrollableTextArea)?.text ?: (c as? JTextComponent)?.text
+                        ?: (c as? AbstractButton)?.text ?: (c as? Frame)?.title
+                    }
+                    LightProperty.SELECTED_INDEX -> {
+                        (c as? JComboBox<ComboBoxItem>)?.selectedIndex ?: super.getProperty(c, key)
+                    }
+                    LightProperty.PROGRESS_CURRENT -> {
+                        (c as? JSlider)?.value ?: super.getProperty(c, key)
+                    }
+                    LightProperty.PROGRESS_MAX -> {
+                        (c as? JSlider)?.maximum ?: super.getProperty(c, key)
+                    }
+                    else -> super.getProperty(c, key)
+                } as T
+            }
+        """)
+    }
+
+    @Test
+    fun test36a() {
+        ValentiaParser.statement("(c).text = text")
+        ValentiaParser.statement("(c).text += text")
+    }
+
+    @Test
+    fun test36() {
+        ValentiaParser.file("""
+            override fun <T> setProperty(c: Any, key: LightProperty<T>, value: T) {
+                when (key) {
+                    LightProperty.VISIBLE -> {
+                        val visible = key[value]
+                        if (c is JFrame2) {
+                            if (!c.isVisible && visible) {
+                                c.setLocationRelativeTo(null)
+                            }
+                        }
+                        (c as Component).isVisible = visible
+                    }
+                    LightProperty.TEXT -> {
+                        val text = key[value]
+                        (c as? JLabel)?.text = text
+                        (c as? JScrollableTextArea)?.text = text
+                        (c as? JTextComponent)?.text = text
+                        (c as? AbstractButton)?.text = text
+                        (c as? Frame)?.title = text
+                    }
+                    LightProperty.NAME -> {
+                        val text = key[value]
+                        (c as? JComponent)?.name = text
+                    }
+                    LightProperty.IMAGE -> {
+                        val bmp = key[value]
+                        val image = (c as? JImage)
+                        if (image != null) {
+                            if (bmp == null) {
+                                image.image = null
+                            } else {
+                                if (bmp is AwtNativeImage) {
+                                    image.image = bmp.awtImage.clone()
+        
+                                } else {
+                                    if ((image.width != bmp.width) || (image.height != bmp.height)) {
+                                        //println("*********************** RECREATED NATIVE IMAGE!")
+                                        image.image = bmp.toAwt()
+                                    }
+                                    bmp.toBMP32().transferTo(image.image!!)
+                                }
+                            }
+                            image.repaint()
+                        }
+                    }
+                    LightProperty.ICON -> {
+                        val bmp = key[value]
+                        when (c) {
+                            is JFrame2 -> {
+                                c.iconImage = bmp?.toBMP32()?.toAwt()
+                            }
+                        }
+                    }
+                    LightProperty.IMAGE_SMOOTH -> {
+                        val v = key[value]
+                        when (c) {
+                            is JImage -> {
+                                c.smooth = v
+                            }
+                        }
+                    }
+                    LightProperty.BGCOLOR -> {
+                        val v = key[value]
+                        (c as? Component)?.background = Color(v.value, true)
+                    }
+                    LightProperty.PROGRESS_CURRENT -> {
+                        (c as? JProgressBar)?.value = key[value]
+                        (c as? JSlider)?.value = key[value]
+                    }
+                    LightProperty.PROGRESS_MAX -> {
+                        (c as? JProgressBar)?.maximum = key[value]
+                        (c as? JSlider)?.maximum = key[value]
+                    }
+                    LightProperty.CHECKED -> {
+                        (c as? JToggleButton)?.isSelected = key[value]
+                    }
+                    //LightProperty.RADIO_GROUP -> {
+                    //	val lg = value as LightRadioButtonGroup
+                    //	val group = lg.extra?.getOrPut("group") { ButtonGroup() } as ButtonGroup
+                    //	val but = c as? AbstractButton
+                    //	if (but != null) group.add(but)
+                    //}
+                    LightProperty.COMBO_BOX_ITEMS -> {
+                        val cb = (c as? JComboBox<ComboBoxItem>)
+                        if (cb != null) {
+                            cb.removeAllItems()
+                            for (item in (value as List<ComboBoxItem>)) cb.addItem(item)
+                        }
+                    }
+                    LightProperty.SELECTED_INDEX -> {
+                        val cb = (c as? JComboBox<ComboBoxItem>)
+                        if (cb != null) {
+                            cb.selectedIndex = cb.selectedIndex
+                        }
+                    }
+                }
+            }
         """.trimIndent())
     }
 }

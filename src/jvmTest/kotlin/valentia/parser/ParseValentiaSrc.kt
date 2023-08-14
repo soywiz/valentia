@@ -5,9 +5,12 @@ import valentia.ast.FileNode
 import java.io.File
 import kotlin.test.Test
 import kotlin.time.Duration
+import kotlin.time.TimeSource
+import kotlin.time.measureTime
 import kotlin.time.measureTimedValue
 
 class ParseValentiaSrc {
+    var count = 0
     @Test
     fun test() {
         doTestFolder(File("."))
@@ -27,11 +30,12 @@ class ParseValentiaSrc {
     }
 
     fun doTest(file: File) {
-        println("FILE: $file : ")
+        println("FILE[${count++}]: $file : ")
         val text = file.readText()
         var _timeTokenize: Duration? = null
         var _timeParse: Duration? = null
         var _nodes: FileNode? = null
+        val startTime = TimeSource.Monotonic.markNow()
         try {
             val (tokens, timeTokenize) = measureTimedValue { ValentiaTokenizer(text).tokenize() }
             _timeTokenize = timeTokenize
@@ -39,7 +43,8 @@ class ParseValentiaSrc {
             _nodes = nodes
             _timeParse = timeParse
         } finally {
-            println("   -> tokenize=$_timeTokenize, parse=$_timeParse, topLevelDecls=${_nodes?.topLevelDecls?.size}")
+            val endTime = TimeSource.Monotonic.markNow()
+            println("   -> tokenize=$_timeTokenize, parse=$_timeParse, total=${endTime - startTime}, topLevelDecls=${_nodes?.topLevelDecls?.size}")
         }
     }
 }
