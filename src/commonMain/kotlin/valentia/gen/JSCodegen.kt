@@ -6,13 +6,13 @@ import valentia.transform.TransformUnsupportedNodes
 import valentia.util.Indenter
 import valentia.util.indent
 
-open class JSCodegen : Codegen(), Indenter by Indenter() {
+open class JSCodegen : Codegen() {
     var hasMainFunction = false
 
     override fun generateProgram(program: Program) {
         super.generateProgram(program)
         if (hasMainFunction) {
-            line("main([])")
+            indenter.line("main([])")
         }
     }
 
@@ -25,12 +25,12 @@ open class JSCodegen : Codegen(), Indenter by Indenter() {
     }
 
     override fun generateClass(clazz: ClassDecl) {
-        line("class ${clazz.name}") {
+        indenter.line("class ${clazz.name}") {
             for (decl in clazz.body ?: emptyList()) {
                 when (decl) {
                     is FunDecl -> {
                         val params = decl.params.joinToString(", ") { it.id }
-                        line("${decl.name}($params)") {
+                        indenter.line("${decl.name}($params)") {
                             decl.body?.let {
                                 generateStmsCompact(transformer.transform(it))
                             }
@@ -45,7 +45,7 @@ open class JSCodegen : Codegen(), Indenter by Indenter() {
     override fun generateFunction(func: FunDecl) {
         val params = func.params.joinToString(", ") { it.id }
         val suspendMod = if (func.isSuspend) "*" else ""
-        line("function ${suspendMod}${func.jsName}($params)") {
+        indenter.line("function ${suspendMod}${func.jsName}($params)") {
             func.body?.let {
                 generateStmsCompact(transformer.transform(it))
             }
@@ -65,22 +65,22 @@ open class JSCodegen : Codegen(), Indenter by Indenter() {
 
     infix fun Indenter.Line.ELSE(block: () -> Unit) {
         str += " else {"
-        indent {
+        indenter.indent {
             block()
         }
-        line("}")
+        indenter.line("}")
     }
 
     override fun generateStm(stm: Stm) {
         when (stm) {
             is AssignStm -> {
-                line("${generateExpr(stm.lvalue)} ${stm.op} ${generateExpr(stm.expr)};")
+                indenter.line("${generateExpr(stm.lvalue)} ${stm.op} ${generateExpr(stm.expr)};")
             }
             is IfStm -> {
                 val (pre, expr) = transformer.ensure(stm.cond)
                 pre?.let { generateStm(pre) }
                 if (expr != null) {
-                    val lin = line("if (${generateExpr(expr)})") {
+                    val lin = indenter.line("if (${generateExpr(expr)})") {
                         generateStmsCompact(stm.btrue)
                     }
                     if (stm.bfalse != null) {
@@ -90,26 +90,32 @@ open class JSCodegen : Codegen(), Indenter by Indenter() {
                     }
                 }
             }
-            is ForLoopStm -> {
-                val (pre, expr) = transformer.ensure(stm.expr)
-                pre?.let { generateStm(pre) }
-                if (expr != null) {
-                    line("for (const ${stm.vardecl}) of ${generateExpr(expr)}") {
-                        generateStmsCompact(stm.body)
+            is LoopStm -> {
+                val labelStr = if (stm.modifiers.label != null) "${stm.modifiers.label?.id}: " else ""
+                when (stm) {
+                    is ForLoopStm -> {
+                        val (pre, expr) = transformer.ensure(stm.expr)
+                        pre?.let { generateStm(pre) }
+                        if (expr != null) {
+                            indenter.line("${labelStr}for (const ${generateVarDecl(stm.vardecl)} of ${generateExpr(expr)})") {
+                                generateStmsCompact(stm.body)
+                            }
+                        }
                     }
-                }
-            }
-            is WhileLoopStm -> {
-                val (pre, expr) = transformer.ensure(stm.cond)
-                pre?.let { generateStm(pre) }
-                if (expr != null) {
-                    line("while (${generateExpr(expr)})") {
-                        generateStmsCompact(stm.body)
+                    is WhileLoopStm -> {
+                        val (pre, expr) = transformer.ensure(stm.cond)
+                        pre?.let { generateStm(pre) }
+                        if (expr != null) {
+                            indenter.line("${labelStr}while (${generateExpr(expr)})") {
+                                generateStmsCompact(stm.body)
+                            }
+                        }
                     }
+                    is DoWhileLoopStm -> TODO()
                 }
             }
             is Stms -> {
-                line("") {
+                indenter.line("") {
                     for (stm in stm.stms) {
                         generateStm(stm)
                     }
@@ -118,18 +124,28 @@ open class JSCodegen : Codegen(), Indenter by Indenter() {
             is ExprStm -> {
                 val (pre, expr) = transformer.ensure(stm.expr)
                 pre?.let { generateStm(pre) }
-                expr?.let { line("${generateExpr(expr)};") }
+                expr?.let { indenter.line("${generateExpr(expr)};") }
             }
             is ReturnStm -> {
                 if (stm.expr == null) {
-                    line("return;")
+                    indenter.line("return;")
                     return
                 }
                 val (pre, expr) = transformer.ensure(stm.expr)
                 pre?.let { generateStm(pre) }
-                expr?.let { line("return ${generateExpr(expr)};") }
+                expr?.let { indenter.line("return ${generateExpr(expr)};") }
             }
+            is BreakStm -> indenter.line("break ${stm.label ?: ""};")
+            is ContinueStm -> indenter.line("continue ${stm.label ?: ""};")
             else -> TODO("generateStm: $stm")
+        }
+    }
+
+    private fun generateVarDecl(vardecl: VariableDeclBase?): String {
+        return when (vardecl) {
+            is MultiVariableDecl -> "(" + vardecl.decls.map { it.id }.joinToString(", ") + ")"
+            is VariableDecl -> vardecl.id
+            null -> TODO("vardecl=null")
         }
     }
 

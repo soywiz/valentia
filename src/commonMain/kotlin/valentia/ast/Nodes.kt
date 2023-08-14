@@ -34,6 +34,7 @@ data class Modifiers(val items: List<Any> = emptyList()) {
     val modifiers by lazy { items.filterIsInstance<Modifier>().toSet() }
     val annotations by lazy { Annotations(items.filterIsInstance<AnnotationNodes>()) }
     val labels by lazy { items.filterIsInstance<LabelNode>() }
+    val label by lazy { labels.firstOrNull() }
     fun isEmpty(): Boolean = items.isEmpty()
     operator fun contains(item: Modifier): Boolean = item in modifiers
     val isEnum: Boolean get() = ClassModifier.ENUM in this
@@ -400,7 +401,9 @@ enum class UnaryPostOp(val str: String) {
 }
 
 data class CastExpr(val expr: Expr, val targetType: TypeNode, val kind: String) : Expr()
-data class CallExpr(val expr: Expr, val params: List<Expr> = emptyList(), val lambdaArg: Expr? = null, val typeArgs: List<TypeNode>? = null) : Expr()
+data class CallExpr(val expr: Expr, val params: List<Expr> = emptyList(), val lambdaArg: Expr? = null, val typeArgs: List<TypeNode>? = null) : Expr() {
+    val paramsPlusLambda by lazy { params + listOfNotNull(lambdaArg) }
+}
 data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : AssignableExpr()
 data class UnaryPostOpExpr(val expr: Expr, val op: UnaryPostOp) : AssignableExpr()
 data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr() {
@@ -473,6 +476,8 @@ data class TryCatchStm(val body: Stm, val catches: List<Catch> = emptyList(), va
 data class ReturnStm(val expr: Expr?) : Stm()
 data class IfStm(val cond: Expr, val btrue: Stm, val bfalse: Stm? = null) : Stm()
 data class AssignStm(val lvalue: Expr, val op: String, val expr: Expr) : Stm()
+data class BreakStm(val label: String? = null) : Stm()
+data class ContinueStm(val label: String? = null) : Stm()
 
 fun List<Stm>.compact(): Stm = when {
     this.isEmpty() -> EmptyStm()
@@ -489,17 +494,19 @@ data class EmptyStm(val dummy: Unit = Unit) : Stm()
 data class ExprStm(val expr: Expr) : Stm()
 data class DeclStm(val decl: Decl) : Stm()
 
-abstract class LoopStm : Stm() {
+sealed class LoopStm(
+) : Stm() {
+    abstract val modifiers: Modifiers
 }
 
 /** Iterates over a collection */
-data class ForLoopStm(val expr: Expr, val vardecl: VariableDeclBase?, val body: Stm? = null, val annotations: Annotations = Annotations.EMPTY) : LoopStm() {
+data class ForLoopStm(val expr: Expr, val vardecl: VariableDeclBase?, val body: Stm? = null, val annotations: Annotations = Annotations.EMPTY, override val modifiers: Modifiers = Modifiers.EMPTY) : LoopStm() {
 }
 
 /** Executes 0 or more times */
-data class WhileLoopStm(val cond: Expr, val body: Stm, val modifiers: Modifiers? = null) : LoopStm() {
+data class WhileLoopStm(val cond: Expr, val body: Stm, override val modifiers: Modifiers = Modifiers.EMPTY) : LoopStm() {
 }
 
 /** Executes 1 or more times */
-data class DoWhileLoopStm(val body: Stm?, val cond: Expr?) : LoopStm() {
+data class DoWhileLoopStm(val body: Stm?, val cond: Expr?, override val modifiers: Modifiers = Modifiers.EMPTY) : LoopStm() {
 }

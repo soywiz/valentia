@@ -2,8 +2,11 @@ package valentia.gen
 
 import valentia.ast.*
 import valentia.sema.*
+import valentia.util.Indenter
 
-open class Codegen {
+abstract class Codegen {
+    var indenter = Indenter()
+
     open fun supportedNode(node: Node): Boolean {
         return true
     }
@@ -70,6 +73,16 @@ open class Codegen {
         override fun toString(): String = id
     }
 
+    fun Node.getTypeSafe(resolutionContext: ResolutionContext): TypeNode {
+        try {
+            return getType(resolutionContext)
+        } catch (e: Throwable) {
+            println("ERROR[UnknownType]: ${e.message}")
+            //e.printStackTrace()
+            return UnknownType
+        }
+    }
+
     open fun generateExpr(expr: Expr): Any {
         return when (expr) {
             is IdentifierExpr -> IdWithContext(expr.id, symbolProvider)
@@ -103,12 +116,13 @@ open class Codegen {
                 //println("expr.id=${expr.id} : $symbols")
 
                 val res = generateExpr(expr.expr)
-                val paramsStr = "(" + expr.params.joinToString(", ") { generateExpr(it).toString() } + ")"
+                val paramsStr = "(" + expr.paramsPlusLambda.joinToString(", ") { generateExpr(it).toString() } + ")"
                 if (res is IdWithContext) {
-                    val funcType = FuncTypeNode(UnknownType, expr.params.map { NamedTypeNode(it.getType(DummyResolutionContext)) })
-                    val resolved = res.resolve(funcType) ?: error("Can't resolve $funcType")
+                    val funcType = FuncTypeNode(UnknownType, expr.params.map { NamedTypeNode(it.getTypeSafe(DummyResolutionContext)) })
+                    val resolved = res.resolve(funcType)
+                    println("Can't resolve $funcType")
                     println("RESOLVE: $funcType : $resolved")
-                    resolved!!.jsName + paramsStr
+                    (resolved?.jsName ?: res.id) + paramsStr
                 } else {
                     res.toString() + paramsStr
                 }
@@ -121,7 +135,28 @@ open class Codegen {
                 }
                 "${generateExpr(expr.expr)}.$keyStr"
             }
+            is LambdaFunctionExpr -> {
+                val str = initLambdaBlock {
+                    for (stm in expr.stms) generateStm(stm)
+                }
+                "() => { $str }"
+            }
+            is BreakExpr -> throw UnsupportedOperationException("break expression not supported")
+            is ContinueExpr -> throw UnsupportedOperationException("continue expression not supported")
+            //is BreakExpr -> if (expr.label != null) "break ${expr.label};" else "break;"
+            //is ContinueExpr -> if (expr.label != null) "continue ${expr.label};" else "continue;"
             else -> TODO("generateExpr: $expr")
+        }
+    }
+
+    open fun initLambdaBlock(block: () -> Unit): String {
+        val oldIndenter = indenter
+        try {
+            indenter = Indenter()
+            block()
+            return indenter.indentToString()
+        } finally {
+            indenter = oldIndenter
         }
     }
 }

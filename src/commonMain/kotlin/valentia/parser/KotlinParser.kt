@@ -1219,21 +1219,15 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         NLs()
         return when (val ftoken = peek().str) {
             "var", "val" -> DeclStm(propertyDeclaration(modifiers, stm = true) ?: error("var-val"))
-            "for", "while", "do" -> loopStatement() ?: error("Couldn't parse loop: '$ftoken'")
+            "for", "while", "do" -> loopStatement(modifiers) ?: error("Couldn't parse loop: '$ftoken'")
             "fun" -> declaration()!!.let { DeclStm(it) }
             else -> {
                 if ((ftoken == "suspend" || ftoken == "override") && peekSkipping(1).str == "fun") {
                     declaration()!!.let { DeclStm(it) }
                 } else {
                     OR(
-                        {
-                            assignment()
-                        },
-                        {
-                            expression()?.let {
-                                ExprStm(it)
-                            }
-                        },
+                        { assignment() },
+                        { expression()?.let { ExprStm(it) } },
                         { declaration()?.let { DeclStm(it) } },
                         name = "statement"
                     )
@@ -1248,10 +1242,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun label(): LabelNode? {
         val spos = pos
         val id = simpleIdentifierOpt() ?: return null
-        if (!expectOpt("@")) {
-            pos = spos
-            return null
-        }
+        if (id == "break" || id == "continue") return null.also { pos = spos }
+        if (!expectOpt("@")) return null.also { pos = spos }
         NLs()
         return LabelNode(id)
     }
@@ -1287,10 +1279,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | whileStatement
     //    | doWhileStatement
     //    ;
-    fun loopStatement(): LoopStm? = when (peek().str) {
-        "for" -> forStatement()
-        "while" -> whileStatement()
-        "do" -> doWhileStatement()
+    fun loopStatement(modifiers: Modifiers): LoopStm? = when (peek().str) {
+        "for" -> forStatement(modifiers)
+        "while" -> whileStatement(modifiers)
+        "do" -> doWhileStatement(modifiers)
         else -> null
     }
 
@@ -1298,7 +1290,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : FOR NL* LPAREN annotation* (variableDeclaration | multiVariableDeclaration)
     //    IN expression RPAREN NL* controlStructureBody?
     //    ;
-    fun forStatement(): ForLoopStm = enrich {
+    fun forStatement(modifiers: Modifiers): ForLoopStm = enrich {
         expect("for")
         NLs()
         var annotations: Annotations = Annotations.EMPTY
@@ -1316,13 +1308,13 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
 
         val body = if (expectOpt(";")) null else controlStructureBody()
         //val body = controlStructureBody()
-        ForLoopStm(expr, vardecl, body, annotations)
+        ForLoopStm(expr, vardecl, body, annotations, modifiers)
     }
 
     // whileStatement
     //    : WHILE NL* LPAREN expression RPAREN NL* (controlStructureBody | SEMICOLON)
     //    ;
-    fun whileStatement(): WhileLoopStm = enrich {
+    fun whileStatement(modifiers: Modifiers): WhileLoopStm = enrich {
         expect("while")
         NLs()
         val cond = expectAndRecover("(", ")") {
@@ -1335,13 +1327,13 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             { controlStructureBody() }
         )
         Hidden()
-        WhileLoopStm(cond, body)
+        WhileLoopStm(cond, body, modifiers)
     }
 
     // doWhileStatement
     //    : DO NL* controlStructureBody? NL* WHILE NL* LPAREN expression RPAREN
     //    ;
-    fun doWhileStatement(): DoWhileLoopStm = enrich {
+    fun doWhileStatement(modifiers: Modifiers): DoWhileLoopStm = enrich {
         expect("do")
         NLs()
         val body = opt { controlStructureBody() }
@@ -1352,7 +1344,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             NLs()
             expression().also { NLs() }
         }
-        DoWhileLoopStm(body, cond)
+        DoWhileLoopStm(body, cond, modifiers)
     }
 
     //assignment

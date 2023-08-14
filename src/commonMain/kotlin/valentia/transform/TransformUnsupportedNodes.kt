@@ -24,6 +24,8 @@ class TransformUnsupportedNodes(val supported: (Node) -> Boolean) {
                 val bfalse = expr.falseBody?.let { AssignStm(tempExpr, "=", (it as ExprStm).expr) }
                 return IfStm(expr.cond, btrue, bfalse) to tempExpr
             }
+            is BreakExpr -> return BreakStm(expr.label) to null
+            is ContinueExpr -> return ContinueStm(expr.label) to null
         }
         return null to expr
     }

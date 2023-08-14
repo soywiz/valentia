@@ -10,6 +10,12 @@ import kotlin.test.assertEquals
 class JSCodegenTest {
     @Test
     fun testSuspend() {
+        println(genFilesJSString("""suspend fun test() {
+            test@for (n in 0 until 10) {
+                yield(n)
+                break@test
+            }
+        }"""))
         println(genFilesJSString("suspend fun test() { }"))
         println(genFilesJSString("suspend fun test() = 1"))
     }
@@ -82,7 +88,7 @@ class JSCodegenTest {
     fun genFilesJSString(
         @Language("kotlin")
         vararg filesContent: String
-    ): String = genFiles(*filesContent).indentToString()
+    ): String = genFiles(*filesContent).indenter.indentToString()
 
     fun genFiles(
         @Language("kotlin")
