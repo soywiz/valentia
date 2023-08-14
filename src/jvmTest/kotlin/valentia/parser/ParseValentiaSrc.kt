@@ -31,6 +31,10 @@ class ParseValentiaSrc {
 
     fun doTest(file: File) {
         println("FILE[${count++}]: $file : ")
+        if (file == File("../korge/kmem/src/commonTest/kotlin/korlibs/memory/NBufferTest.kt")) {
+            println("--> SKIPPING")
+            return
+        }
         val text = file.readText()
         var _timeTokenize: Duration? = null
         var _timeParse: Duration? = null

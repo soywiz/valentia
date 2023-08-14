@@ -2001,4 +2001,159 @@ class ValentiaParserFullExamplesTest : StmBuilder {
                 doMouseEvent(MouseEvents::click, handler)
         """.trimIndent())
     }
+
+    @Test
+    fun test40() {
+        ValentiaParser.file("""
+            @OptIn(KorgeInternal::class)
+            abstract class View internal constructor(
+                /** Indicates if this class is a container or not. This is only overridden by Container. This check is performed like this, to avoid type checks. That might be an expensive operation in some targets. */
+                val isContainer: Boolean
+            ) : BaseView(), Renderable
+                , BView
+                , HitTestable
+                , WithHitShape2D
+            //, EventDispatcher by EventDispatcher.Mixin()
+        """.trimIndent())
+    }
+
+    @Test
+    fun test41() {
+        ValentiaParser.file("""
+            package korlibs.korge.gradle.util
+
+            import java.io.*
+            import java.nio.file.Files
+
+            object LDLibraries {
+                private val libFolders = LinkedHashSet<File>()
+                private val loadConfFiles = LinkedHashSet<File>()
+
+                val ldFolders: List<File> get() = libFolders.toList()
+
+                // /etc/ld.so.conf
+                // include /etc/ld.so.conf.d/*.conf
+
+                fun addPath(path: String) {
+                    val file = File(path)
+                    if (file.isDirectory) {
+                        libFolders.add(file)
+                    }
+                }
+
+                init {
+                    try {
+                        // Fixed paths as described https://renenyffenegger.ch/notes/Linux/fhs/etc/ld_so_conf
+                        addPath("/lib")
+                        addPath("/usr/lib")
+                        // Load config file
+                        loadConfFile(File("/etc/ld.so.conf"))
+                    } catch (e: Throwable) {
+                        e.printStackTrace()
+                    }
+                }
+
+                fun hasLibrary(name: String) = libFolders.any { File(it, name).exists() }
+
+                private fun loadConfFile(file: File) {
+                    if (file in loadConfFiles) return
+                    loadConfFiles.add(file)
+                    for (line in file.readLines()) {
+                        val tline = line.trim().substringBefore('#').takeIf { it.isNotEmpty() } ?: continue
+
+                        if (tline.startsWith("include ")) {
+                            val glob = tline.removePrefix("include ")
+                            val globFolder = File(glob).parentFile
+                            val globPattern = File(glob).name
+                            if (globFolder.isDirectory) {
+                                for (folder in
+                                Files.newDirectoryStream(globFolder.toPath(), globPattern).toList().map { it.toFile() }
+                                ) {
+                                    loadConfFile(folder)
+                                }
+                            }
+                        } else {
+                            addPath(tline)
+                        }
+                    }
+                }
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test42() {
+        ValentiaParser.expression("""
+            throw SecurityException(
+                ("Failed to open "
+                        + URANDOM_FILE + " for reading"), e
+            )
+        """.trimIndent())
+    }
+
+    @Test
+    fun test43() {
+        ValentiaParser.statement("""
+            Float32Buffer(14).also { array ->
+                array.setArray(1, floatArrayOf(1f, 2f, 3f, 4f))
+                array.setArray(7, floatArrayOf(-1f, -2f, -3f, -4f, -5f, -6f, -7f), 2, 3)
+                assertEquals(
+                    expectedStr,
+                    ""${'"'}
+                    ${'"'}{array.getArray().map { it.toInt() }.joinToString(",")}
+                    ${'"'}{array.getArray(0, size = array.size).map { it.toInt() }.joinToString(",")}
+                    ${'"'}{array.getArray(1).map { it.toInt() }.joinToString(",")}
+                    ${'"'}{array.getArray(2, size = 3).map { it.toInt() }.joinToString(",")}
+                    ""${'"'}.trimIndent()
+                )
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test44() {
+        ValentiaParser.file("""
+            fun PathInfo.normalize(): String {
+            	val path = this.fullPath
+            	val schemeIndex = path.indexOf(":")
+            	return if (schemeIndex >= 0) {
+            		val take = if (path.substring(schemeIndex).startsWith("://")) 3 else 1
+            		path.substring(0, schemeIndex + take) + path.substring(schemeIndex + take).pathInfo.normalize()
+            	} else {
+            		val path2 = path.replace('\\', '/')
+            		val out = ArrayList<String>()
+
+            		path2.split("/").fastForEach { part ->
+            			when (part) {
+            				"", "." -> if (out.isEmpty()) out += "" else Unit
+            				".." -> if (out.isNotEmpty()) out.removeAt(out.size - 1)
+            				else -> out += part
+            			}
+            		}
+            		out.joinToString("/")
+            	}
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test45() {
+        ValentiaParser.statement("""
+            do {
+            } while (inputBase.readS32LE(matchIndex) != inputBase.readS32LE(input) || matchIndex + MAX_DISTANCE < input
+            )
+        """.trimIndent())
+    }
+
+    @Test
+    fun test46() {
+        ValentiaParser.statement("""
+            override fun toString(): String =
+                "CurveLUT[$('$')curve](${'$'}{
+                    (0 until size).joinToString(", ") {
+                        "${'$'}{ts[it]},len=${'$'}{estimatedLengths[it]}: ${'$'}{points[it]}"
+                    }
+                })"
+        """)
+    }
 }

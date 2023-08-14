@@ -84,5 +84,12 @@ class ValentiaTokenizerTest {
         """.trimIndent()).tokenize())
     }
 
+    @Test
+    fun testTokenizeLongNumber() {
+        "ab1c5ed5da6d8118".toULong(16)
+        println((ValentiaTokenizer("0xab1c5ed5da6d8118uL").readToken() as NumberToken).value)
+        //println(ValentiaTokenizer("1 + 0xab1c5ed5da6d8118uL,").tokenize())
+    }
+
     val TRIPLE = "\"\"\""
 }

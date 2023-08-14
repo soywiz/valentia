@@ -310,7 +310,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : annotatedDelegationSpecifier (NL* COMMA NL* annotatedDelegationSpecifier)*
     //    ;
     fun delegationSpecifiers(): List<SubTypeInfo>? {
-        return parseListNew({ expectOpt(",") }, end = { matches("{") }, oneOrMore = true, trailingSeparator = false) {
+        return parseListNew({ expectOptNLs(",") }, end = { matches("{") }, oneOrMore = true, trailingSeparator = false) {
             annotatedDelegationSpecifier()
         }
     }
@@ -1275,7 +1275,9 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             annotations = annotations()
             vardecl = variableDeclarationOrMultiVariableDeclaration()
             expect("in")
-            expr = expressionSure()
+            NLs()
+            expr = expressionSure(ExpressionState.INSIDE_PARENTHESIZED_EXPR)
+            NLs()
         }
         NLs()
 
@@ -1314,7 +1316,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         expect("while")
         NLs()
         val cond = expectAndRecover("(", ")") {
-            expression()
+            NLs()
+            expression().also { NLs() }
         }
         DoWhileLoopStm(body, cond)
     }
@@ -1486,21 +1489,30 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : additiveExpression ((RANGE | RANGE_UNTIL) NL* additiveExpression)*
     //    ;
     fun rangeExpression(state: ExpressionState? = null): Expr? {
-        return binop({ expectAnyOpt(RANGE_OPS) }, initialNLs = false) { additiveExpression(state) }
+        return binop({
+            if (state?.insideParenthesis == true) NLs()
+            expectAnyOpt(RANGE_OPS)
+         }, initialNLs = false) { additiveExpression(state) }
     }
 
     //additiveExpression
     //    : multiplicativeExpression (additiveOperator NL* multiplicativeExpression)*
     //    ;
     fun additiveExpression(state: ExpressionState? = null): Expr? {
-        return binop({ additiveOperator() }, initialNLs = false) { multiplicativeExpression(state) }
+        return binop({
+            if (state?.insideParenthesis == true) NLs()
+            additiveOperator()
+         }, initialNLs = false) { multiplicativeExpression(state) }
     }
 
     //multiplicativeExpression
     //    : asExpression (multiplicativeOperator NL* asExpression)*
     //    ;
     fun multiplicativeExpression(state: ExpressionState? = null): Expr? {
-        return binop({ multiplicativeOperator() }, initialNLs = false) { asExpression(state) }
+        return binop({
+            if (state?.insideParenthesis == true) NLs()
+            multiplicativeOperator()
+         }, initialNLs = false) { asExpression(state) }
     }
 
     //asExpression
@@ -1955,8 +1967,15 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
                 is EscapeStringPartToken -> InterpolatedStringExpr.StringChunk("${token.c}")
                 is ExpressionStringPartToken -> {
                     InterpolatedStringExpr.ExpressionChunk(
-                        createParser(token.expr).expression()
-                            ?: error("Expression expected in $this")
+                        try {
+                            val parser = createParser(token.expr)
+                            parser.NLs()
+                            parser.expression(ExpressionState.INSIDE_PARENTHESIZED_EXPR)
+                                .also { parser.NLs() }
+                                ?: error("Expression expected in $this")
+                        } catch (e: Throwable) {
+                            throw IllegalStateException("Error parsing string expressions at $this", e)
+                        }
                     )
                 }
                 is LiteralStringPartToken -> InterpolatedStringExpr.StringChunk(token.str)
@@ -2204,12 +2223,19 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             controlStructureBody()
         }
         expectOptNLs(";")
+        val spos = pos
         val falseBody = if (expectOptNLs("else")) {
-            opt {
-                NLs()
-                controlStructureBody()
-            }.also {
-                expectOptNLs(";")
+            // This else is a when else, not an else from this if
+            if (expectOptNLs("->")) {
+                pos = spos
+                null
+            } else {
+                opt {
+                    NLs()
+                    controlStructureBody()
+                }.also {
+                    expectOptNLs(";")
+                }
             }
         } else {
             null

@@ -281,8 +281,9 @@ data class NLToken(val spaces: String, val nlines: Int) : Token(spaces)
 data class SymbolToken(val symbol: String) : Token(symbol)
 data class ShebangToken(val shebang: String) : Token(shebang)
 data class NumberToken(val number: String) : Token(number) {
+    val numberLower: String by lazy { number.lowercase() }
     val numberCleanedUp: String by lazy {
-        number.replace("_", "").replace(Regex("\\D+\$"), "").lowercase()
+        numberLower.replace("_", "").replace(Regex("\\D+\$"), "")
     }
     val isHexPrefix: Boolean get() = numberCleanedUp.startsWith("0x")
     val isOctPrefix: Boolean get() = numberCleanedUp.startsWith("0o")
@@ -290,22 +291,31 @@ data class NumberToken(val number: String) : Token(number) {
 
     val isFloat: Boolean get() = !isHexPrefix && numberCleanedUp.endsWith('f')
     val isLong: Boolean get() = numberCleanedUp.endsWith('l')
-    val isDecimal: Boolean get() = numberCleanedUp.contains('.') || numberCleanedUp.contains('e')
-    val isUnsigned: Boolean get() = numberCleanedUp.contains('u')
+    val isDecimal: Boolean get() = numberLower.contains('.') || numberCleanedUp.contains('e')
+    val isUnsigned: Boolean get() = numberLower.contains('u')
 
     val value: Number by lazy {
         when {
-            isHexPrefix -> numberCleanedUp.substring(2).toLong(16)
-            isOctPrefix -> numberCleanedUp.substring(2).toLong(8)
-            numberCleanedUp.startsWith("0b") -> numberCleanedUp.substring(2).toLong(2)
+            isHexPrefix -> {
+                val base = numberCleanedUp.substring(2)
+                if (isUnsigned) base.toULongOrNull(16)?.toLong() else base.toLongOrNull(16)
+            }
+            isOctPrefix -> {
+                val base = numberCleanedUp.substring(2)
+                if (isUnsigned) base.toULongOrNull(8)?.toLong() else base.toLongOrNull(8)
+            }
+            numberCleanedUp.startsWith("0b") -> {
+                val base = numberCleanedUp.substring(2)
+                if (isUnsigned) base.toULongOrNull(2)?.toLong() else base.toLongOrNull(2)
+            }
             else -> {
                 if (isDecimal) {
                     numberCleanedUp.toDoubleOrNull()
                 } else {
-                    numberCleanedUp.toLongOrNull()
+                    if (isUnsigned) numberCleanedUp.toULongOrNull()?.toLong() else numberCleanedUp.toLongOrNull()
                 }
             }
-        } ?: error("Number '$number' : '$numberCleanedUp'")
+        } ?: error("Error parsing number '$number' : '$numberCleanedUp'")
     }
 }
 data class IDToken(val id: String) : Token(id)

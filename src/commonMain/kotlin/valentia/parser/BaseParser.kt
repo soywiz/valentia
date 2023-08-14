@@ -16,7 +16,7 @@ open class TokenReader(val tokens: List<Token>) : BaseTokenReader {
     override fun toString(): String {
         val peekStr = (0 until 12).map { peek(it) }.filter { it !is NLToken }.joinToString("") { it.str }
         val prevPeekStr = (-6 until 0).map { peek(it) }.filter { it !is NLToken }.joinToString("") { it.str }
-        return "TokenReader(line=${peek().line}, pos=$pos/$len, peek=\"$peekStr\", prev=\"$prevPeekStr\")"
+        return "TokenReader(line=${peek().line}, pos=$pos/$len, peek=${peek(0)}, peek=\"$peekStr\", prev=\"$prevPeekStr\")"
     }
 }
 
