@@ -60,9 +60,11 @@ fun <T : Node> T.annotated(annotations: Annotations): T {
     return this
 }
 
+interface ModifierOrAnnotation
+
 data class AnnotationNodes(
     val annotations: List<AnnotationNode>,
-) : Node() {
+) : Node(), ModifierOrAnnotation {
     constructor(vararg annotations: AnnotationNode) : this(annotations.toList())
 }
 
@@ -166,7 +168,7 @@ fun TypeNode.nullable(): NullableType {
 
 // Modifiers
 
-interface Modifier {
+interface Modifier : ModifierOrAnnotation {
     val id: String
 }
 enum class ClassModifier(override val id: String) : Modifier {

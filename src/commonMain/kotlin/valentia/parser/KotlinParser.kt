@@ -390,7 +390,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun typeParameter(): TypeParameter {
         debug("TODO: typeParameter")
-        //opt { typeParameterModifiers() }
+        val modifiers = typeParameterModifiers(atLeastOne = false)
         NLs()
         val id = simpleIdentifier()
         NLs()
@@ -1550,6 +1550,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             val prefixValue = prefix
             res = when (prefixValue) {
                 is UnaryPreOp -> UnaryPreOpExpr(prefixValue, res)
+                is AnnotationNodes -> {
+                    println("TODO: AnnotationNodes")
+                    res
+                }
                 is LabelNode -> {
                     if (res is LambdaFunctionExpr) {
                         println("TODO: LabelNode")
@@ -2682,17 +2686,17 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //typeParameterModifiers
     //    : typeParameterModifier+
     //    ;
-    fun typeParameterModifiers(): Modifiers = Modifiers(multiple(atLeastOne = true) { typeParameterModifier() })
+    fun typeParameterModifiers(atLeastOne: Boolean = true): Modifiers = Modifiers(multiple(atLeastOne = atLeastOne) { typeParameterModifier() })
 
     //typeParameterModifier
     //    : reificationModifier NL*
     //    | varianceModifier NL*
     //    | annotation
     //    ;
-    fun typeParameterModifier(): Any {
-        return OR(
-            { reificationModifier(); NLs() },
-            { varianceModifier(); NLs() },
+    fun typeParameterModifier(): ModifierOrAnnotation? {
+        return ORNullable(
+            { reificationModifier().also { NLs() } },
+            { varianceModifier().also { NLs() } },
             { annotation() },
         )
     }

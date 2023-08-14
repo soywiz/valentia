@@ -13,9 +13,9 @@ class ParseValentiaSrc {
     var count = 0
     @Test
     fun test() {
-        doTestFolder(File("."))
-        //doTestFolder(File(".."))
-        doTestFolder(File("../korge"))
+        doTestFolder(File(".."))
+        //doTestFolder(File("."))
+        //doTestFolder(File("../korge"))
     }
 
     @Test

@@ -2184,4 +2184,52 @@ class ValentiaParserFullExamplesTest : StmBuilder {
             }
         """.trimIndent())
     }
+
+    @Test
+    fun test48() {
+        ValentiaParser.file("""
+            class TOCMaker : PandocVisitor() {
+                val fakeTop = TOCElement(listOf(), "top")
+            
+                /* this is a shallow visitor, not going below level 1 */
+                override fun visit(b: Block): Block =
+                        @Suppress(Warnings.USELESS_CAST)
+                        if (b is Block.Header) visit(b as Block.Header)
+                        else b
+            
+                override fun visit(b: Block.Header): Block {
+                    fakeTop.add(b.level, b.text, b.attr.id, numbered = "unnumbered" !in b.attr.classes)
+                    return b
+                }
+            
+                fun buildPandocList(): Block =
+                        fakeTop
+                                .toPandocList()
+                                .filterIsInstance<Block.BulletList>()
+                                .first()
+                                .items
+                                .first()
+                                .let { Block.Div(Attr(id = "TOC"), it) }
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test49() {
+        ValentiaParser.file("""
+            interface ShapeFactory<in T : ShapeParameters> {
+                fun createShape(shapeParameters: T): Shape
+            }
+        """.trimIndent())
+    }
+
+    @Test
+    fun test50() {
+        ValentiaParser.file("""
+            override fun addDBEventListener(type: EventStringType, listener: (event: EventObject) -> Unit) {
+                //println("addDBEventListener:${'$'}type")
+                eventListeners.getOrPut(type) { FastArrayList() } += listener
+            }
+        """.trimIndent())
+    }
 }
