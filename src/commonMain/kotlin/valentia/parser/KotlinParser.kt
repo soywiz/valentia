@@ -2257,9 +2257,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | rangeTest
     //    | typeTest
     //    ;
-    fun whenCondition(): WhenExpr.Condition {
+    fun whenCondition(): WhenExpr.ConditionBase {
         return when {
-            matches("in") || matches("!in") || matches("is") || matches("!is") -> WhenExpr.Condition(op = inIsOperator().also { NLs() }, expr = expression() ?: error("Expression expected"))
+            matches("in") || matches("!in") -> {
+                WhenExpr.ConditionIn(op = inIsOperator().also { NLs() }, expr = expression() ?: error("Expression expected in/ $this"))
+            }
+            matches("is") || matches("!is") -> {
+                WhenExpr.ConditionIs(op = inIsOperator().also { NLs() }, type = type() ?: error("Expression expected is $this"))
+            }
             else -> WhenExpr.Condition(expr = expression() ?: error("Expression expected"))
         }
     }

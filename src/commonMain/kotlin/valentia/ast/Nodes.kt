@@ -357,8 +357,11 @@ data class WhenExpr(
     val entries: List<Entry> = emptyList(),
 ) : Expr() {
     data class Subject(val expr: Expr? = null, val decl: VariableDecl? = null)
-    data class Entry(val conditions: List<Condition>? = null, val body: Stm = EmptyStm())
-    data class Condition(val op: String? = null, val expr: Expr = EmptyExpr())
+    data class Entry(val conditions: List<ConditionBase>? = null, val body: Stm = EmptyStm())
+    sealed interface ConditionBase
+    data class Condition(val expr: Expr = EmptyExpr()) : ConditionBase
+    data class ConditionIn(val op: String? = null, val expr: Expr = EmptyExpr()) : ConditionBase
+    data class ConditionIs(val op: String? = null, val type: TypeNode? = null) : ConditionBase
 }
 data class CollectionLiteralExpr(val items: List<Expr>) : Expr()
 data class TryCatchExpr(val body: Node, val catches: List<Catch> = emptyList(), val finally: Stm? = null) : Expr() {
