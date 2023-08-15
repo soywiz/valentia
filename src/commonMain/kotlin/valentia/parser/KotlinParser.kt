@@ -1210,7 +1210,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //statement
     //    : (label | annotation)* ( declaration | assignment | loopStatement | expression)
     //    ;
-    fun statement(): Stm {
+    fun statement(): Stm? {
+        val spos = pos
         //NLs()
         val modifiers = Modifiers(zeroOrMore {
             NLs()
@@ -1225,7 +1226,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
                 if ((ftoken == "suspend" || ftoken == "override") && peekSkipping(1).str == "fun") {
                     declaration()!!.let { DeclStm(it) }
                 } else {
-                    OR(
+                    ORNullable(
                         { assignment() },
                         { expression()?.let { ExprStm(it) } },
                         { declaration()?.let { DeclStm(it) } },
@@ -1233,7 +1234,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
                     )
                 }
             }
-        }.withModifiers(modifiers)
+        }?.withModifiers(modifiers) ?: return null.also { pos = spos }
     }
 
     //label
@@ -1253,10 +1254,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    | statement
     //    ;
     fun controlStructureBody(): Stm {
+        //return OR({ statement() }, { block() })
         return when {
-            matches("{") -> block()!!
+            matches("{") -> OR({ lambdaLiteral()?.let { ExprStm(it) } }, { block() })
             else -> statement()
-        }
+        } ?: error("controlStructureBody")
     }
 
     //block

@@ -26,7 +26,7 @@ open class ValentiaParser(
         fun assignment(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Stm =
             parserEOF(str) { assignment() ?: error("Not an assignment") }
         fun statement(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Stm =
-            parserEOF(str) { statement() }
+            parserEOF(str) { statement() ?: error("Not an statement") }
         fun statements(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): List<Stm> =
             parserEOF(str) { statements() }
         fun type(@Language("kotlin", prefix = "typealias Example = ", suffix = "") str: String): TypeNode =

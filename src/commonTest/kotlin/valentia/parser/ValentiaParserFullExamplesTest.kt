@@ -2309,4 +2309,14 @@ class ValentiaParserFullExamplesTest : StmBuilder {
             }
         """.trimIndent())
     }
+
+    @Test
+    fun test52() {
+        ValentiaParser.file("""
+            private fun getIndentFunction(indent: String) = when {
+                indent.isEmpty() -> { line: String -> line }
+                else -> { line: String -> indent + line }
+            }
+        """.trimIndent())
+    }
 }
