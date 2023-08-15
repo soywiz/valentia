@@ -565,7 +565,18 @@ data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr() {
 
 data class IdentifierExpr(val id: String) : AssignableExpr()
 
-data class OpSeparatedExprs(val ops: List<String>, val exprs: List<Expr>) : Expr()
+data class OpSeparatedBinaryExprs(val ops: List<String>, val exprs: List<Expr>) : Expr() {
+    fun toSimpleOps(): Expr {
+        check(ops.size == exprs.size - 1)
+        var out = exprs.first()
+        for (n in ops.indices) {
+            out = BinaryOpExpr(out, ops[n], exprs[n + 1])
+        }
+        return out
+    }
+}
+
+data class BinaryOpExpr(val left: Expr, val op: String, val right: Expr) : Expr()
 
 open class LiteralExpr(val literal: Any?) : Expr()
 

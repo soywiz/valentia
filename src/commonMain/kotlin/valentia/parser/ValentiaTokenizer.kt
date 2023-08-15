@@ -118,7 +118,7 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
                 if (peekChar(1).isDigit()) {
                     readNumber()
                 } else {
-                    SymbolToken(expectAny("..>", "..", "."))
+                    SymbolToken(expectAny("..<", "..", "."))
                 }
             }
             '@' -> SymbolToken(expectAny("@"))

@@ -196,6 +196,11 @@ open class JSCodegen {
         override fun toString(): String = id
     }
 
+    fun Node.getTypeSafe(): TypeNode {
+        // @TODO: Get from this context
+        return getTypeSafe(DummyResolutionContext)
+    }
+
     fun Node.getTypeSafe(resolutionContext: ResolutionContext): TypeNode {
         try {
             return getType(resolutionContext)
@@ -238,11 +243,14 @@ open class JSCodegen {
                     else -> TODO("Unsupported $expr")
                 }
             }
-            is OpSeparatedExprs -> {
-                val exprStrs = expr.exprs.map { generateExpr(it) }
-                exprStrs[0].toString() + " " + (0 until expr.ops.size).joinToString(" ") {
-                    expr.ops[it] + " " + exprStrs[it + 1]
-                }
+            //is OpSeparatedBinaryExprs -> {
+            //    val exprStrs = expr.exprs.map { generateExpr(it) }
+            //    exprStrs[0].toString() + " " + (0 until expr.ops.size).joinToString(" ") {
+            //        expr.ops[it] + " " + exprStrs[it + 1]
+            //    }
+            //}
+            is BinaryOpExpr -> {
+                "" + generateExpr(expr.left) + " " + expr.op + " " + generateExpr(expr.right)
             }
             is CallExpr -> {
                 //val symbols = symbolProvider[expr.id]
@@ -386,8 +394,29 @@ open class JSCodegen {
                         val (pre, expr) = transformer.ensure(stm.expr)
                         pre?.let { generateStm(pre) }
                         if (expr != null) {
-                            indenter.line("${labelStr}for (const ${generateVarDecl(stm.vardecl)} of ${generateExpr(expr)})") {
-                                generateStmsCompact(stm.body)
+                            if (expr is BinaryOpExpr && expr.left.getTypeSafe() == IntType && expr.right.getTypeSafe() == IntType && (expr.op == ".." || expr.op == "..<" || expr.op == "until" || expr.op == "downTo")) {
+                                val varg = generateVarDecl(stm.vardecl)
+                                println("expr=$expr")
+                                val comparisonOp = when (expr.op) {
+                                    "downTo" -> ">="
+                                    "..<", "until" -> "<"
+                                    else -> "<="
+                                }
+                                val incrOp = when (expr.op) {
+                                    "downTo" -> "--"
+                                    else -> "++"
+                                }
+                                val LOOPSTART = "\$loopstart"
+                                val LOOPEND = "\$loopend"
+                                indenter.line("const $LOOPSTART = ${generateExpr(expr.left)};")
+                                indenter.line("const $LOOPEND = ${generateExpr(expr.right)};")
+                                indenter.line("${labelStr}for (let $varg = $LOOPSTART; $varg $comparisonOp $LOOPEND; $varg$incrOp)") {
+                                    generateStmsCompact(stm.body)
+                                }
+                            } else {
+                                indenter.line("${labelStr}for (const ${generateVarDecl(stm.vardecl)} of ${generateExpr(expr)})") {
+                                    generateStmsCompact(stm.body)
+                                }
                             }
                         }
                     }

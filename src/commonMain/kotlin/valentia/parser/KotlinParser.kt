@@ -1435,11 +1435,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             ops += op
             exprs += expr
         }
-        if (ops.isEmpty()) {
-            check(exprs.size == 1)
-            return exprs.first()
-        }
-        return OpSeparatedExprs(ops, exprs).enrich(this, spos)
+        return OpSeparatedBinaryExprs(ops, exprs).enrich(this, spos).toSimpleOps()
     }
 
     fun expressionSure(state: ExpressionState? = null): Expr {

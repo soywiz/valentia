@@ -79,6 +79,14 @@ class JSCodegenTest {
         )
     }
 
+    @Test
+    fun testSimpleLoop() {
+        assertEquals("0\n1\n2\n3", genAndRunJs("fun main() { for (n in 0 .. 3) console.log(n) }", printJs = true))
+        assertEquals("0\n1\n2", genAndRunJs("fun main() { for (n in 0 ..< 3) console.log(n) }", printJs = true))
+        assertEquals("0\n1\n2", genAndRunJs("fun main() { for (n in 0 until 3) console.log(n) }", printJs = true))
+        assertEquals("3\n2\n1\n0", genAndRunJs("fun main() { for (n in 3 downTo 0) console.log(n) }", printJs = true))
+    }
+
     val RESOURCES_PREFIX = "src/commonTest/resources"
 
     @Test

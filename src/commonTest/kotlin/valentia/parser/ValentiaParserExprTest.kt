@@ -1,18 +1,18 @@
 package valentia.parser
 
+import valentia.ast.BinaryOpExpr
 import valentia.ast.IntLiteralExpr
-import valentia.ast.OpSeparatedExprs
+import valentia.ast.OpSeparatedBinaryExprs
 import valentia.ast.StmBuilder
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 
 open class ValentiaParserExprTest : StmBuilder {
     @Test
     fun testSimplestExpr() {
         assertEquals(
-            OpSeparatedExprs(listOf("+"), listOf(IntLiteralExpr(1), IntLiteralExpr(5))),
+            1.lit + 5.lit,
             ValentiaParser.expression("1 + \n 5")
         )
     }
@@ -24,7 +24,7 @@ open class ValentiaParserExprTest : StmBuilder {
     @Test
     fun testSimpleExpr() {
         assertEquals(
-            OpSeparatedExprs(listOf("*"), listOf(IntLiteralExpr(1000), IntLiteralExpr(200))),
+            BinaryOpExpr(1000.lit, "*", 200.lit),
             ValentiaParser.expression("1_000 * 2_0_0")
         )
     }
