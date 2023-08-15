@@ -66,7 +66,7 @@ open class JSCodegen {
         when (decl) {
             null -> Unit
             is ClassDecl -> generateClass(decl)
-            is FunDecl -> generateFunction(decl)
+            is FunDecl -> generateFunction(decl, parent)
             is ObjectDecl -> {
                 indenter.line("class ${decl.name}") {
                     indenter.line("static #\$_singleton = null; static get #\$singleton() { if (!this.#\$_singleton) this.#\$_singleton = new Simple(); return this.#\$_singleton;  }")
@@ -88,26 +88,22 @@ open class JSCodegen {
 
     open fun generateClass(clazz: ClassDecl) {
         indenter.line("class ${clazz.name}") {
-            for (decl in clazz.body ?: emptyList()) {
-                when (decl) {
-                    is FunDecl -> {
-                        val params = decl.params.joinToString(", ") { it.id }
-                        indenter.line("${decl.name}($params)") {
-                            decl.body?.let {
-                                generateStmsCompact(transformer.transform(it))
-                            }
-                        }
-                    }
-                    else -> TODO("generateClass: $decl")
-                }
-            }
+            generateDecls(clazz.body, clazz)
         }
     }
 
-    open fun generateFunction(func: FunDecl) {
+    open fun generateFunction(func: FunDecl, parent: Decl?) {
         val params = func.params.joinToString(", ") { it.id }
+
+        //indenter.line("${decl.name}($params)") {
+        //    decl.body?.let {
+        //        generateStmsCompact(transformer.transform(it))
+        //    }
+        //}
+
+        val functionMod = if (parent is ClassOrObjectDecl) "" else "function "
         val suspendMod = if (func.isSuspend) "*" else ""
-        indenter.line("function ${suspendMod}${func.jsName}($params)") {
+        indenter.line("${functionMod}${suspendMod}${func.jsName}($params)") {
             func.body?.let {
                 generateStmsCompact(transformer.transform(it))
             }
@@ -122,6 +118,10 @@ open class JSCodegen {
         fun resolve(funcType: TypeNode): Decl? {
             val items = resolve() ?: return null
             for (item in items) {
+                // @TODO: Check constructors
+                if (item is ClassOrObjectDecl) {
+                    return item
+                }
                 // @TODO: Compat
                 if (funcType == item.getType(DummyResolutionContext)) {
                     return item
@@ -140,6 +140,15 @@ open class JSCodegen {
             //e.printStackTrace()
             return UnknownType
         }
+    }
+
+    fun IdWithContext.resolveSafe(funcType: TypeNode): Decl? {
+        //try {
+            return resolve(funcType)
+        //} catch (e: Throwable) {
+        //    println("ERROR.resolveSafe[id=$id]: ${e.message} :: [context=$context]")
+        //    return null
+        //}
     }
 
     open fun generateExpr(expr: Expr?): Any {
@@ -181,10 +190,15 @@ open class JSCodegen {
                     val funcType = FuncTypeNode(UnknownType, expr.params.map { NamedTypeNode(it.getTypeSafe(
                         DummyResolutionContext
                     )) })
-                    val resolved = res.resolve(funcType)
+                    val resolved = res.resolveSafe(funcType)
                     println("Can't resolve $funcType")
                     println("RESOLVE: $funcType : $resolved")
-                    (resolved?.jsName ?: res.id) + paramsStr
+                    val name = (resolved?.jsName ?: res.id)
+                    if (resolved is ClassOrObjectDecl) {
+                        "(new $name$paramsStr)"
+                    } else {
+                        "$name$paramsStr"
+                    }
                 } else {
                     res.toString() + paramsStr
                 }

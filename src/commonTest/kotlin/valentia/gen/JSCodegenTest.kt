@@ -34,6 +34,18 @@ class JSCodegenTest {
     }
 
     @Test
+    fun testClassInstantiation() {
+        assertEquals(
+            "7",
+            genAndRunJs("""
+                external val console: dynamic
+                class Demo { val a = 7 }
+                fun main() = console.log(Demo().a)
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
     fun testOverload() {
         assertEquals(
             "String\nChar",
