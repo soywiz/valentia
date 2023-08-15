@@ -2319,4 +2319,13 @@ class ValentiaParserFullExamplesTest : StmBuilder {
             }
         """.trimIndent())
     }
+
+    @Test
+    fun test53() {
+        val str = """
+            ""${'"'}${'$'}{array.getArray(2, size = 3).map { it.toInt() }.joinToString(",")}""${'"'}.trimIndent()
+        """.trim()
+        println(ValentiaTokenizer(str).tokenize())
+        ValentiaParser.expression(str)
+    }
 }

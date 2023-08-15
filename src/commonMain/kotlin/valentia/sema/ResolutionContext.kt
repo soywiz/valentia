@@ -1,9 +1,13 @@
 package valentia.sema
 
 import valentia.ast.Decl
+import valentia.ast.TypeNode
 
 fun interface SymbolProvider {
     operator fun get(name: String): List<Decl>?
+    operator fun get(type: TypeNode): List<Decl>? {
+        return get(type.toString())
+    }
 }
 
 object EmptySymbolProvider : SymbolProvider {

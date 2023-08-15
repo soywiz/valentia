@@ -27,14 +27,14 @@ interface DeclBuilder : NodeBuilder {
         block: DeclBuilder.() -> Unit = {},
     ): ClassDecl =
         ClassDecl(
-            "class",
+            ClassKind.CLASS,
             name,
             if (subTypes.isNotEmpty()) subTypes.toList() else emptyList(),
             buildDeclList { block() },
             primaryConstructor = primaryConstructorDecl
         ).also { addDecl(it) }
     fun INTERFACE(name: String, vararg subTypes: SubTypeInfo, block: DeclBuilder.() -> Unit = {}): ClassDecl =
-        ClassDecl("interface", name, if (subTypes.isEmpty()) null else subTypes.toList(), buildDeclList { block() }, primaryConstructor = null).also { addDecl(it) }
+        ClassDecl(ClassKind.INTERFACE, name, if (subTypes.isEmpty()) null else subTypes.toList(), buildDeclList { block() }, primaryConstructor = null).also { addDecl(it) }
     fun FUN(
         name: String,
         ret: TypeNode? = null,

@@ -1,42 +1,45 @@
 package valentia.parser
 
-import valentia.ast.Decl
 import valentia.ast.FileNode
 import java.io.File
 import kotlin.test.Test
 import kotlin.time.Duration
 import kotlin.time.TimeSource
-import kotlin.time.measureTime
 import kotlin.time.measureTimedValue
 
 class ParseValentiaSrc {
     var count = 0
     @Test
-    fun test() {
-        //doTestFolder(File(".."))
-        //doTestFolder(File("./runtime"))
-        doTestFolder(File("."))
-        doTestFolder(File("../korge"))
+    fun testRuntime() {
+        doTestFolder("./runtime")
+    }
+
+    @Test
+    fun testSrc() {
+        //doTestFolder("..")
+        doTestFolder("./src")
+    }
+
+    @Test
+    fun testKorge() {
+        doTestFolder("../korge")
     }
 
     @Test
     fun testParser() {
-        doTest(File("./src/commonMain/kotlin/valentia/parser/KotlinParser.kt"))
+        doTest("./src/commonMain/kotlin/valentia/parser/KotlinParser.kt")
     }
 
-    fun doTestFolder(folder: File) {
-        val files = folder.walkBottomUp().filter { it.extension == "kt" }
+    fun doTestFolder(folder: String) {
+        val files = File(folder).walkBottomUp().filter { it.extension == "kt" }
         for (file in files) {
-            doTest(file)
+            doTest(file.path)
         }
     }
 
-    fun doTest(file: File) {
+    fun doTest(file: String) {
+        val file = File(file)
         println("FILE[${count++}]: $file : ")
-        if (file == File("../korge/kmem/src/commonTest/kotlin/korlibs/memory/NBufferTest.kt")) {
-            println("--> SKIPPING")
-            return
-        }
         val text = file.readText()
         var _timeTokenize: Duration? = null
         var _timeParse: Duration? = null

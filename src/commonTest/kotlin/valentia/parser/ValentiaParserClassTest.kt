@@ -10,7 +10,7 @@ class ValentiaParserClassTest : DeclBuilder, StmBuilder {
     @Test
     fun testAnnotatedClass() {
         assertEquals(
-            ClassDecl(kind = "class", name = "Demo"),
+            ClassDecl(kind = ClassKind.CLASS, name = "Demo"),
             ValentiaParser.topLevelDecl("@Test class Demo")
         )
     }
@@ -18,7 +18,7 @@ class ValentiaParserClassTest : DeclBuilder, StmBuilder {
     @Test
     fun testAnnotationClass() {
         assertEquals(
-            ClassDecl(kind = "class", name = "Demo",
+            ClassDecl(kind = ClassKind.CLASS, name = "Demo",
                 primaryConstructor = PrimaryConstructorDecl(
                     ClassParameter("a", IntType, valOrVar = "val"),
                     ClassParameter("b", StringType, valOrVar = "val"),
@@ -32,14 +32,14 @@ class ValentiaParserClassTest : DeclBuilder, StmBuilder {
     fun testClass() {
         val res = ValentiaParser.topLevelDecl("class Demo(val a: Int, val b: String)")
         assertTrue(res is ClassDecl)
-        assertEquals("class", res.kind)
+        assertEquals(ClassKind.CLASS, res.kind)
         assertEquals("Demo", res.name)
     }
 
     @Test
     fun testSimpleClass() {
         assertEquals(
-            ClassDecl(kind = "class", name = "Test", body = listOf(
+            ClassDecl(kind = ClassKind.CLASS, name = "Test", body = listOf(
                 FUN("demo", null) {
                     STM("println".id("1".lit))
                 }
@@ -56,9 +56,9 @@ class ValentiaParserClassTest : DeclBuilder, StmBuilder {
     fun testInheritance() {
         assertEquals(
             ClassDecl(
-                kind = "class",
+                kind = ClassKind.CLASS,
                 name = "Hello",
-                subTypes = listOf(BasicSubTypeInfo("World".type)),
+                subTypes = listOf(SubTypeInfo("World".type)),
             ),
             ValentiaParser.topLevelDecl("""class Hello : World""")
         )
@@ -68,7 +68,7 @@ class ValentiaParserClassTest : DeclBuilder, StmBuilder {
     fun testConstructorDelegation() {
         assertEquals(
             ClassDecl(
-                kind = "class", name = "Hello", body = listOf(
+                kind = ClassKind.CLASS, name = "Hello", body = listOf(
                     ConstructorDecl(
                         constructorDelegationCall = ConstructorDelegationCall(DelegationCallKind.THIS, listOf(1.lit, 2.lit)),
                     ),
@@ -101,7 +101,7 @@ class ValentiaParserClassTest : DeclBuilder, StmBuilder {
                 _package = Identifier("demo"),
             ) {
                 INTERFACE("Indenter") {
-                    CLASS("Impl", BasicSubTypeInfo("Indenter".type)) {
+                    CLASS("Impl", SubTypeInfo("Indenter".type)) {
                     }
                     FUN("indent")
                 }

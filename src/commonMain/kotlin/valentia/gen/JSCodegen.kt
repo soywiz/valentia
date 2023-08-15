@@ -65,14 +65,8 @@ open class JSCodegen {
         indenter.line("// decl: ${decl}")
         when (decl) {
             null -> Unit
-            is ClassDecl -> generateClass(decl)
+            is ClassOrObjectDecl -> generateClass(decl)
             is FunDecl -> generateFunction(decl, parent)
-            is ObjectDecl -> {
-                indenter.line("class ${decl.name}") {
-                    indenter.line("static #\$_singleton = null; static get #\$singleton() { if (!this.#\$_singleton) this.#\$_singleton = new Simple(); return this.#\$_singleton;  }")
-                    generateDecls(decl.body, decl)
-                }
-            }
             is VariableDecl -> {
                 if (FunctionModifier.EXTERNAL !in decl.modifiers) {
                     val letStr = if (parent !is ClassOrObjectDecl) "let " else ""
@@ -132,8 +126,21 @@ open class JSCodegen {
         }
     }
 
-    open fun generateClass(clazz: ClassDecl) {
-        indenter.line("class ${clazz.name}") {
+    open fun generateClass(clazz: ClassOrObjectDecl) {
+        val subTypes = clazz.subTypes ?: emptyList()
+        var extends: ClassOrObjectDecl? = null
+        for (subType in subTypes) {
+            val decl = symbolProvider[subType.type]?.firstOrNull() as? ClassOrObjectDecl ?: continue
+            if (!decl.kind.isInterface) {
+                extends = decl
+            }
+        }
+        val extendsStr = if (extends != null) " extends ${extends.jsName}" else ""
+        //println("EXTENDS: ${extends}")
+        indenter.line("class ${clazz.name}$extendsStr") {
+            if (clazz is ObjectDecl) {
+                indenter.line("static #\$_singleton = null; static get #\$singleton() { if (!this.#\$_singleton) this.#\$_singleton = new ${clazz.name}(); return this.#\$_singleton;  }")
+            }
             generateDecls(clazz.bodyAll, clazz)
         }
     }
@@ -307,6 +314,7 @@ open class JSCodegen {
                 out += "`"
                 out.joinToString("")
             }
+            is ThisExpr -> "this"
             //is BreakExpr -> if (expr.label != null) "break ${expr.label};" else "break;"
             //is ContinueExpr -> if (expr.label != null) "continue ${expr.label};" else "continue;"
             else -> TODO("generateExpr: $expr")

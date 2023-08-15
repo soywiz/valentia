@@ -182,12 +182,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun classDeclaration(modifiers: Modifiers): ClassDecl {
         debug { "TODO: classDeclaration" }
         val kind = OR(
-            { if (expectOpt("class")) "class" else null },
+            { if (expectOpt("class")) ClassKind.CLASS else null },
             {
                 val isFun = expectOpt("fun")
-                NLs()
-                if (!expectOpt("interface")) return@OR null
-                if (isFun) "fun interface" else "interface"
+                if (!expectOptNLs("interface")) return@OR null
+                if (isFun) ClassKind.FUN_INTERFACE else ClassKind.INTERFACE
             },
         )
         NLs()
@@ -341,11 +340,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         return ORNullable(
             { constructorInvocation() },
             { explicitDelegation() },
-            { userType()?.let { BasicSubTypeInfo(it) } },
+            { userType()?.let { SubTypeInfo(it) } },
             {
                 val isSuspend = expectOpt("suspend")
                 NLs()
-                functionType()?.let { BasicSubTypeInfo(if (isSuspend) it.suspendable() else it) }
+                functionType()?.let { SubTypeInfo(if (isSuspend) it.suspendable() else it) }
             },
         )
     }
@@ -353,12 +352,12 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //constructorInvocation
     //    : userType NL* valueArguments
     //    ;
-    fun constructorInvocation(): ConstructorInvocation? {
+    fun constructorInvocation(): SubTypeInfo? {
         val spos = pos
         val type = userType() ?: return null.also { pos = spos }
         NLs()
         val args = valueArguments() ?: return null.also { pos = spos }
-        return ConstructorInvocation(type, args)
+        return SubTypeInfo(type, args)
     }
 
     //annotatedDelegationSpecifier
@@ -379,7 +378,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //explicitDelegation
     //    : (userType | functionType) NL* BY NL* expression
     //    ;
-    fun explicitDelegation(): ExplicitDelegation? {
+    fun explicitDelegation(): SubTypeInfo? {
         val spos = pos
         val type = ORNullable(
             { userType() },
@@ -388,7 +387,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         if (!expectOptNLs("by")) return null.also { pos = spos }
         NLs()
         val delegate = expressionSure(ExpressionState.DISALLOW_LAMBDA)
-        return ExplicitDelegation(type, delegate)
+        return SubTypeInfo(type, delegate = delegate)
     }
 
     //typeParameters
@@ -1603,10 +1602,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
 
                 is LabelNode -> {
                     if (res is LambdaFunctionExpr) {
-                        println("TODO: LabelNode")
+                        debug { "TODO: LabelNode" }
                         res
                     } else {
-                        println("TODO: LabelNode")
+                        debug { "TODO: LabelNode" }
                         res
                     }
                 }

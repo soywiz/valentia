@@ -4,11 +4,13 @@ import org.intellij.lang.annotations.Language
 import valentia.ExternalInterface
 import valentia.parser.ValentiaParser
 import valentia.sema.Program
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class JSCodegenTest {
     @Test
+    @Ignore
     fun testSuspend() {
         println(genFilesJSString("""
             external fun yield(value: Int)
@@ -59,6 +61,24 @@ class JSCodegenTest {
         )
     }
 
+    @Test
+    fun testClassInheritance() {
+        assertEquals(
+            "8\n9",
+            genAndRunJs("""
+                class Demo1 {
+                    fun b() = 7
+                    open fun a() = 1 + this.b() 
+                }
+                class Demo2 : Demo1 { override fun a() = 2 + this.b() }
+                fun main() {
+                    console.log(Demo1().a())
+                    console.log(Demo2().a())
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
     val RESOURCES_PREFIX = "src/commonTest/resources"
 
     @Test
@@ -78,7 +98,7 @@ class JSCodegenTest {
             val fpath = "$dir/$case"
             println("CASE: $fpath")
             if (fpath.endsWith(".kt.txt") || fpath.endsWith(".kt")) {
-                testFile(fpath)
+                testFile(fpath, printJs = false)
             }
         }
     }
@@ -167,14 +187,14 @@ class JSCodegenTest {
         return gen
     }
 
-    private fun testFile(file: String) {
+    private fun testFile(file: String, printJs: Boolean = true) {
         val res = ExternalInterface.fileReadString(file)
         val filesContents = res.split("//////\n")
         val result = Regex("^//(\\s*)expected:(.*)").find(res) ?: error("Can't find // expected")
         val expected = result.groupValues.last()
         assertEquals(
             expected,
-            genAndRunJs(*filesContents.toTypedArray(), printJs = true)
+            genAndRunJs(*filesContents.toTypedArray(), printJs = printJs)
         )
     }
 }

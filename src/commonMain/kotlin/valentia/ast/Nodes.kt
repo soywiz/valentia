@@ -116,12 +116,16 @@ fun <T : Node> T.enrich(reader: BaseConsumer?, spos: Int, epos: Int): T {
 
 // Sub Types
 
-abstract class SubTypeInfo : Node()
-data class ExplicitDelegation(val type: TypeNode, val delegate: Expr) : SubTypeInfo()
-data class ConstructorInvocation(val type: TypeNode, val args: List<Expr> = listOf()) : SubTypeInfo() {
-    constructor(type: TypeNode, vararg args: Expr) : this(type, args.toList())
+data class SubTypeInfo(
+    /** : parentType */
+    val type: TypeNode,
+    /** : parentType(...args...) */
+    val args: List<Expr>? = null,
+    /** : Interface by expr */
+    val delegate: Expr? = null
+) : Node() {
+    constructor(type: TypeNode, vararg args: Expr, delegate: Expr? = null) : this(type, args.toList(), delegate)
 }
-data class BasicSubTypeInfo(val type: TypeNode) : SubTypeInfo()
 
 // Type
 
@@ -340,10 +344,22 @@ data class ConstructorDecl(
 }
 data class InitDecl(val stm: Stm) : Decl("init")
 data class CompanionObjectDecl(val name: String?) : Decl(name ?: "companion object")
-abstract class ClassOrObjectDecl(name: String) : Decl(name) {
+
+enum class ClassKind(
+    val isInterface: Boolean = false,
+) {
+    OBJECT,
+    CLASS,
+    ENUM_CLASS,
+    INTERFACE(isInterface = true),
+    FUN_INTERFACE(isInterface = true);
+}
+
+abstract class ClassOrObjectDecl(open val name: String, open val kind: ClassKind) : Decl(name) {
     // @TODO: Extract primary constructor val/var to Variable declarations
     open val primaryConstructor: PrimaryConstructorDecl? = null
     open val body: List<Decl>? = null
+    open val subTypes: List<SubTypeInfo>? = null
     val bodyAll by lazy { listOfNotNull(primaryConstructor) + (body ?: emptyList()) }
     val constructors: List<BaseConstructorDecl> by lazy {
         bodyAll.filterIsInstance<BaseConstructorDecl>().also {
@@ -354,18 +370,18 @@ abstract class ClassOrObjectDecl(name: String) : Decl(name) {
     }
 }
 data class ClassDecl(
-    val kind: String,
-    val name: String,
-    val subTypes: List<SubTypeInfo>? = null,
+    override val kind: ClassKind,
+    override val name: String,
+    override val subTypes: List<SubTypeInfo>? = null,
     override val body: List<Decl>? = null,
     override val primaryConstructor: PrimaryConstructorDecl? = null,
-) : ClassOrObjectDecl(name) {
+) : ClassOrObjectDecl(name, kind) {
 }
 data class ObjectDecl(
-    val name: String,
+    override val name: String,
     override val body: List<Decl>? = null,
-    val delegations: List<SubTypeInfo>? = null,
-) : ClassOrObjectDecl(name)
+    override val subTypes: List<SubTypeInfo>? = null,
+) : ClassOrObjectDecl(name, ClassKind.OBJECT)
 data class FunDecl constructor(
     val name: String,
     val params: List<FuncValueParam> = emptyList(),

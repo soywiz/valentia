@@ -176,27 +176,55 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
     fun readStringTripleToken(): StringPartToken {
         val line = currentLine
         return when (peekChar()) {
-            '\$' -> {
-                val spos = pos
-                expect("\$")
-                val tokens: List<Token>? = when {
-                    matches("{") -> expectAndRecoverSure("{", "}") { whileMap({ !matches("}") }) { readToken() } }
-                    peekChar().isLetterOrUndescore() -> listOf(readToken())
-                    else -> null
-                }
-                val str = readAbsoluteRange(spos, pos)
-                if (tokens != null) {
-                    ExpressionStringPartToken(str, tokens)
-                } else {
-                    LiteralStringPartToken(str)
-                }
-            }
-            else -> {
-                LiteralStringPartToken(readUntil { it == '\$' || matches("\"\"\"") }.also {
-                    currentLine += it.countLineBreaks()
-                })
-            }
+            '\$' -> readStringDollar('"', line)
+            else -> LiteralStringPartToken(readUntil { it == '\$' || matches("\"\"\"") }.also {
+                currentLine += it.countLineBreaks()
+            })
         }.also { it.line = line }
+    }
+
+    fun readStringToken(end: Char): StringPartToken {
+        val line = currentLine
+        return when (peekChar()) {
+            end -> unexpected()
+            '\$' -> readStringDollar(end, line)
+            '\\' -> readEscapeSequence()
+            else -> LiteralStringPartToken(readUntil { it == '\$' || it == '\\' || it == end }.also {
+                currentLine += it.countLineBreaks()
+            })
+        }.also { it.line = line }
+    }
+
+    private fun readStringDollar(end: Char, line: Int): StringPartToken {
+        val spos = pos
+        expect("\$")
+        val tokens: List<Token>? = when {
+            matches("{") -> expectAndRecoverSure("{", "}") {
+                val out = arrayListOf<Token>()
+                var curlyLevel = 1
+                while (hasMore) {
+                    if (matches("{")) curlyLevel++
+                    if (matches("}")) {
+                        --curlyLevel
+                        if (curlyLevel == 0) break
+                    }
+                    val tok = readToken()
+                    out += tok
+                }
+                out
+            }
+            peekChar().isLetterOrUndescore() -> listOf(readToken())
+            peekChar() == end -> return LiteralStringPartToken("$").also { it.line = line }
+            else -> {
+                null
+                //TODO("Unsupported after dollar string '${peekChar()}' :: $this")
+            }
+        }
+        val str = readAbsoluteRange(spos, pos)
+        return when {
+            tokens != null -> ExpressionStringPartToken(str, tokens)
+            else -> LiteralStringPartToken(str)
+        }
     }
 
     fun readEscapeSequence(): EscapeStringPartToken {
@@ -218,51 +246,6 @@ class ValentiaTokenizer(str: String) : StrReader(str), BaseParser {
         return EscapeStringPartToken(readAbsoluteRange(spos, pos), rc).also { it.line = currentLine }
     }
 
-    fun readStringToken(end: Char): StringPartToken {
-        val line = currentLine
-        return when (peekChar()) {
-            end -> unexpected()
-            '\$' -> {
-                val spos = pos
-                expect("\$")
-                val tokens: List<Token>? = when {
-                    matches("{") -> expectAndRecoverSure("{", "}") {
-                        val out = arrayListOf<Token>()
-                        var curlyLevel = 1
-                        while (hasMore) {
-                            if (matches("{")) curlyLevel++
-                            if (matches("}")) {
-                                --curlyLevel
-                                if (curlyLevel == 0) break
-                            }
-                            val tok = readToken()
-                            out += tok
-                        }
-                        out
-                    }
-                    peekChar().isLetterOrUndescore() -> listOf(readToken())
-                    peekChar() == end -> return LiteralStringPartToken("$").also { it.line = line }
-                    else -> {
-                        null
-                        //TODO("Unsupported after dollar string '${peekChar()}' :: $this")
-                    }
-                }
-                val str = readAbsoluteRange(spos, pos)
-                when {
-                    tokens != null -> ExpressionStringPartToken(str, tokens)
-                    else -> LiteralStringPartToken(str)
-                }
-            }
-            '\\' -> {
-                readEscapeSequence()
-            }
-            else -> {
-                LiteralStringPartToken(readUntil { it == '\$' || it == '\\' || it == end }.also {
-                    currentLine += it.countLineBreaks()
-                })
-            }
-        }.also { it.line = line }
-    }
 
     override fun reportError(e: Throwable) {
         TODO("Not yet implemented")
