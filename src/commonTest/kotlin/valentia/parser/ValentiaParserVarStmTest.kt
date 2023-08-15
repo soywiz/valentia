@@ -113,9 +113,11 @@ open class ValentiaParserVarStmTest : StmBuilder {
     @Test
     fun test3() {
         assertEquals(
-            null,
-            ValentiaParser.file("""
-                //val IntType: TypeNode get() = "Int".type
+            VariableDecl(
+                "lit", type="BoolLiteralExpr".type,
+                getter = FunDecl("get", body = ReturnStm("BoolLiteralExpr".id(THIS)))
+            ),
+            ValentiaParser.topLevelDecl("""
                 val Boolean.lit: BoolLiteralExpr get() = BoolLiteralExpr(this)
             """.trimIndent()) as? Any?
         )
@@ -124,7 +126,9 @@ open class ValentiaParserVarStmTest : StmBuilder {
     @Test
     fun test4() {
         assertEquals(
-            VariableDecl("prop", expr = "WeakProperty".id(lambdaArg = LAMBDA { STM(0.lit) }), delegation = true, receiver = "C".type),
+            VariableDecl("prop", expr = "WeakProperty".id(lambdaArg = LAMBDA { STM(0.lit) }), delegation = true, receiver = "C".type,
+                modifiers = Modifiers(VisibilityModifier.PRIVATE)
+            ),
             ValentiaParser.topLevelDecl("private var C.prop by WeakProperty { 0 }") as? Any?
         )
     }

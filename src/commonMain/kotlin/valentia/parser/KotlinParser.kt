@@ -679,7 +679,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             if (expectOpt(".")) res else null
         }
         NLs()
-        val decl = OR({ multiVariableDeclaration(modifiers) }, { variableDeclaration(modifiers) }, name = "propertyDeclaration.decl")
+        var decl = OR(
+            { multiVariableDeclaration(modifiers) },
+            { variableDeclaration(modifiers) },
+            name = "propertyDeclaration.decl"
+        )
         opt { typeConstraints() }
         var delegation = false
         NLs()
@@ -688,13 +692,11 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
                 delegation = true
                 propertyDelegate()
             }
-
             expectOpt("=") -> {
                 NLs()
                 val expr = expression()
                 expr
             }
-
             else -> {
                 null
             }
@@ -703,10 +705,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         NLs()
         if (!stm) {
             zeroOrMore {
-                modifiers()
+                val mods = modifiers()
                 when {
-                    matches("get") -> getter()
-                    matches("set") -> setter()
+                    matches("get") -> decl = decl.withGetter(getter(mods))
+                    matches("set") -> decl = decl.withSetter(setter(mods))
                     else -> return@zeroOrMore null
                 }
                 NLs()
@@ -719,7 +721,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             if (expr != null) it.withAssignment(
                 expr,
                 delegation = delegation,
-                receiver = receiver
+                receiver = receiver,
             ) else it
         }
     }
@@ -737,45 +739,49 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : modifiers? GET
     //      (NL* LPAREN NL* RPAREN (NL* COLON NL* type)? NL* functionBody)?
     //    ;
-    fun getter(modifiers: Modifiers = modifiers()): Any? {
+    fun getter(modifiers: Modifiers = modifiers()): FunDecl? {
         if (!expectOpt("get")) return null
+        var retType: TypeNode? = null
+        var body: Stm? = null
         opt {
             NLs()
-            val res = expectAndRecover("(", ")", nullIfNotMatching = true) {
-                NLs()
-            } ?: return@opt null
-            opt {
+            val res = expectAndRecover("(", ")", nullIfNotMatching = true) { NLs() } ?: return@opt null
+            retType = opt {
                 if (!expectOptNLs(":")) return@opt null
                 NLs()
                 type()
             }
             NLs()
-            functionBody()
+            body = functionBody()
         }
-        return Unit
+        return FunDecl("get", retType = retType, body = body, modifiers = modifiers)
     }
 
     //setter
     //    : modifiers? SET
     //      (NL* LPAREN NL* functionValueParameterWithOptionalType (NL* COMMA)? NL* RPAREN (NL* COLON NL* type)? NL* functionBody)?
     //    ;
-    fun setter(modifiers: Modifiers = modifiers()): Any? {
+    fun setter(modifiers: Modifiers = modifiers()): FunDecl? {
         if (!expectOpt("set")) return null
+        var retType: TypeNode? = null
+        var body: Stm? = null
+        var params: List<FuncValueParam> = emptyList()
         opt {
             NLs()
-            val res = expectAndRecover("(", ")", nullIfNotMatching = true) {
+            val res: ParameterOptType = expectAndRecover("(", ")", nullIfNotMatching = true) {
                 NLs()
                 functionValueParameterWithOptionalType().also { expectOptNLs(",") }
             } ?: return@opt null
-            opt {
+            params = listOf(res.toFuncValueParam())
+            retType = opt {
                 if (!expectOptNLs(":")) return@opt null
                 NLs()
                 type()
             }
             NLs()
-            functionBody()
+            body = functionBody()
         }
-        return Unit
+        return FunDecl("set", params = params, retType = retType, body = body, modifiers = modifiers)
     }
 
     //parametersWithOptionalType

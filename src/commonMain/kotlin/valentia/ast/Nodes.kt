@@ -332,6 +332,8 @@ data class VariableDecl(
     val receiver: TypeNode? = null,
     val annotations: Annotations = Annotations.EMPTY,
     val modifiers: Modifiers = Modifiers.EMPTY,
+    val getter: FunDecl? = null,
+    val setter: FunDecl? = null,
 ) : VariableDeclBase(id, modifiers)
 data class MultiVariableDecl(
     val decls: List<VariableDecl>,
@@ -343,7 +345,28 @@ data class MultiVariableDecl(
 ) : VariableDeclBase(decls.joinToString(",") { it.declName }, modifiers) {
     constructor(vararg decls: VariableDecl, expr: Expr? = null, modifiers: Modifiers = Modifiers.EMPTY) : this(decls.toList(), expr, modifiers = modifiers)
 }
-fun <T : VariableDeclBase> T.withAssignment(expr: Expr, delegation: Boolean = false, receiver: TypeNode? = null): T {
+
+fun <T : VariableDeclBase> T.withSetter(
+    setter: FunDecl?
+): T = when (this) {
+    is VariableDecl -> this.copy(setter = setter) as T
+    is MultiVariableDecl -> TODO("Unsupported setter for destructuring")
+    else -> TODO()
+}
+
+fun <T : VariableDeclBase> T.withGetter(
+    getter: FunDecl?
+): T = when (this) {
+    is VariableDecl -> this.copy(getter = getter) as T
+    is MultiVariableDecl -> TODO("Unsupported setter for destructuring")
+    else -> TODO()
+}
+
+fun <T : VariableDeclBase> T.withAssignment(
+    expr: Expr,
+    delegation: Boolean = false,
+    receiver: TypeNode? = null
+): T {
     return when (this) {
         is VariableDecl -> this.copy(expr = expr, delegation = delegation, receiver = receiver) as T
         is MultiVariableDecl -> this.copy(expr = expr, delegation = delegation, receiver = receiver) as T
@@ -407,6 +430,8 @@ data class Parameter(val id: String, val type: TypeNode)
 data class ParameterOptType(val id: String, val type: TypeNode?, val modifiers: Modifiers? = null, val expr: Expr? = null)
 data class FuncValueParam(val id: String, val type: TypeNode)
 data class TypeParameter(val id: String, val type: TypeNode?)
+
+fun ParameterOptType.toFuncValueParam(): FuncValueParam = FuncValueParam(id, type ?: UnknownType)
 
 data class ClassParameter(val id: String)
 
