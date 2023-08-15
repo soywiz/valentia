@@ -84,3 +84,21 @@ tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile::class.java).all 
         //freeCompilerArgs += listOf("-Xreport-perf")
     }
 }
+
+val fatJar = task("fatJar", type = Jar::class) {
+    archiveBaseName.set("${project.name}-fat")
+    manifest {
+        attributes["Implementation-Title"] = "Gradle Jar File Example"
+        attributes["Implementation-Version"] = version
+        attributes["Main-Class"] = application.mainClass
+    }
+    from({ configurations.runtimeClasspath.get().files.map { if (it.isDirectory) it else zipTree(it) } })
+    with(tasks["jar"] as CopySpec)
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks {
+    "build" {
+        dependsOn(fatJar)
+    }
+}

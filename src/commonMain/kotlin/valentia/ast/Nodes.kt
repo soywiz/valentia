@@ -32,11 +32,13 @@ data class Modifiers(val items: List<Any> = emptyList()) {
     }
     constructor(vararg items: Any) : this(items.toList())
     val modifiers by lazy { items.filterIsInstance<Modifier>().toSet() }
+    val modifiersSet by lazy { ModifiersSet(*modifiers.toTypedArray()) }
     val annotations by lazy { Annotations(items.filterIsInstance<AnnotationNodes>()) }
     val labels by lazy { items.filterIsInstance<LabelNode>() }
     val label by lazy { labels.firstOrNull() }
     fun isEmpty(): Boolean = items.isEmpty()
-    operator fun contains(item: Modifier): Boolean = item in modifiers
+    //operator fun contains(item: Modifier): Boolean = item in modifiers
+    operator fun contains(item: Modifier): Boolean = item in modifiersSet
     val isEnum: Boolean get() = ClassModifier.ENUM in this
 }
 
@@ -169,81 +171,94 @@ fun TypeNode.nullable(): NullableType {
 
 // Modifiers
 
+inline class ModifiersSet(val values: Int) {
+    operator fun plus(other: ModifiersSet): ModifiersSet = ModifiersSet(this.values or other.values)
+    operator fun contains(item: Modifier): Boolean = (values and (1 shl item.index)) != 0
+    companion object {
+        operator fun invoke(vararg modifiers: Modifier): ModifiersSet {
+            var out = 0
+            for (mod in modifiers) out = out or (1 shl mod.index)
+            return ModifiersSet(out)
+        }
+    }
+}
+
 interface Modifier : ModifierOrAnnotation {
     val id: String
+    val index: Int
 }
-enum class ClassModifier(override val id: String) : Modifier {
-    ENUM("enum"), SEALED("sealed"), ANNOTATION("annotation"), DATA("data"), INNER("inner"), VALUE("value");
+enum class ClassModifier(override val id: String, override val index: Int) : Modifier {
+    ENUM("enum", 0), SEALED("sealed", 1), ANNOTATION("annotation", 2), DATA("data", 3), INNER("inner", 4), VALUE("value", 5);
     override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
-enum class MemberModifier(override val id: String) : Modifier {
-    OVERRIDE("override"), LATE_INIT("lateinit");
+enum class MemberModifier(override val id: String, override val index: Int) : Modifier {
+    OVERRIDE("override", 6), LATE_INIT("lateinit", 7);
     override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
-enum class VisibilityModifier(override val id: String) : Modifier {
-    PUBLIC("public"), PRIVATE("private"), INTERNAL("internal"), PROTECTED("protected");
+enum class VisibilityModifier(override val id: String, override val index: Int) : Modifier {
+    PUBLIC("public", 8), PRIVATE("private", 9), INTERNAL("internal", 10), PROTECTED("protected", 11);
     override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
-enum class VarianceModifier(override val id: String) : Modifier {
-    IN("in"), OUT("out");
+enum class VarianceModifier(override val id: String, override val index: Int) : Modifier {
+    IN("in", 12), OUT("out", 13);
     override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
-enum class FunctionModifier(override val id: String) : Modifier {
-    TAILREC("tailrec"), OPERATOR("operator"), INFIX("infix"), INLINE("inline"), EXTERNAL("external"), SUSPEND("suspend");
+enum class FunctionModifier(override val id: String, override val index: Int) : Modifier {
+    TAILREC("tailrec", 14), OPERATOR("operator", 15), INFIX("infix", 16), INLINE("inline", 17), EXTERNAL("external", 18), SUSPEND("suspend", 19);
     override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
-enum class PropertyModifier(override val id: String) : Modifier {
-    CONST("const");
+enum class PropertyModifier(override val id: String, override val index: Int) : Modifier {
+    CONST("const", 20);
     override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
-enum class InheritanceModifier(override val id: String) : Modifier {
-    ABSTRACT("abstract"), FINAL("final"), OPEN("open");
+enum class InheritanceModifier(override val id: String, override val index: Int) : Modifier {
+    ABSTRACT("abstract", 21), FINAL("final", 22), OPEN("open", 23);
     override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
-enum class ParameterModifier(override val id: String) : Modifier {
-    VARARG("vararg"), NOINLINE("noinline"), CROSSINLINE("crossinline");
+enum class ParameterModifier(override val id: String, override val index: Int) : Modifier {
+    VARARG("vararg", 24), NOINLINE("noinline", 25), CROSSINLINE("crossinline", 26);
     override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
-enum class ReificationModifier(override val id: String) : Modifier {
-    REIFIED("reified");
+enum class ReificationModifier(override val id: String, override val index: Int) : Modifier {
+    REIFIED("reified", 27);
     override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
-enum class PlatformModifier(override val id: String) : Modifier {
-    EXPECT("expect"), ACTUAL("actual");
+enum class PlatformModifier(override val id: String, override val index: Int) : Modifier {
+    EXPECT("expect", 28), ACTUAL("actual", 29);
     override fun toString(): String = id
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
 }
 
-enum class AnnotationUseSite(override val id: String) : Modifier {
+enum class AnnotationUseSite(val id: String) {
     FIELD("field"), PROPERTY("property"), GET("get"), SET("set"), RECEIVER("receiver"),
     PARAM("param"), SETPARAM("setparam"), DELEGATE("delegate"), FILE("file");
     override fun toString(): String = id
@@ -272,13 +287,18 @@ data class ConstructorDecl(
 ) : Decl("constructor")
 data class InitDecl(val stm: Stm) : Decl("init")
 data class CompanionObjectDecl(val name: String?) : Decl(name ?: "companion object")
+open class ClassOrObjectDecl(name: String) : Decl(name)
 data class ClassDecl(
     val kind: String,
     val name: String,
     val subTypes: List<SubTypeInfo>? = null,
     val body: List<Decl>? = null,
-) : Decl(name)
-data class ObjectDecl(val name: String) : Decl(name)
+) : ClassOrObjectDecl(name)
+data class ObjectDecl(
+    val name: String,
+    val body: List<Decl>? = null,
+    val delegations: List<SubTypeInfo>? = null,
+) : ClassOrObjectDecl(name)
 data class FunDecl constructor(
     val name: String,
     val params: List<FuncValueParam> = emptyList(),
@@ -300,7 +320,10 @@ data class FunDecl constructor(
         //TODO("${this::class} $this")
     }
 }
-sealed abstract class VariableDeclBase(declName: String) : Decl(declName)
+sealed abstract class VariableDeclBase(
+    declName: String,
+    modifiers: Modifiers = Modifiers.EMPTY,
+) : Decl(declName)
 data class VariableDecl(
     val id: String,
     val type: TypeNode? = null,
@@ -308,15 +331,17 @@ data class VariableDecl(
     val delegation: Boolean = false,
     val receiver: TypeNode? = null,
     val annotations: Annotations = Annotations.EMPTY,
-) : VariableDeclBase(id)
+    val modifiers: Modifiers = Modifiers.EMPTY,
+) : VariableDeclBase(id, modifiers)
 data class MultiVariableDecl(
     val decls: List<VariableDecl>,
     val expr: Expr? = null,
     val delegation: Boolean = false,
     val type: TypeNode? = null,
     val receiver: TypeNode? = null,
-) : VariableDeclBase(decls.joinToString(",") { it.declName }) {
-    constructor(vararg decls: VariableDecl, expr: Expr? = null) : this(decls.toList(), expr)
+    val modifiers: Modifiers = Modifiers.EMPTY,
+) : VariableDeclBase(decls.joinToString(",") { it.declName }, modifiers) {
+    constructor(vararg decls: VariableDecl, expr: Expr? = null, modifiers: Modifiers = Modifiers.EMPTY) : this(decls.toList(), expr, modifiers = modifiers)
 }
 fun <T : VariableDeclBase> T.withAssignment(expr: Expr, delegation: Boolean = false, receiver: TypeNode? = null): T {
     return when (this) {

@@ -618,7 +618,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //variableDeclaration
     //    : annotation* NL* simpleIdentifier (NL* COLON NL* type)?
     //    ;
-    fun variableDeclaration(): VariableDecl? {
+    fun variableDeclaration(modifiers: Modifiers): VariableDecl? {
         val spos = pos
         val annotations = annotations(atLeastOne = false)
         NLs()
@@ -627,24 +627,24 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val type = if (expectOpt(":")) {
             NLs(); type()
         } else null
-        return VariableDecl(id, type, annotations = annotations)
+        return VariableDecl(id, type, annotations = annotations, modifiers = modifiers)
     }
 
     //multiVariableDeclaration
     //    : LPAREN NL* variableDeclaration (NL* COMMA NL* variableDeclaration)* (NL* COMMA)? NL* RPAREN
     //    ;
-    fun multiVariableDeclaration(): MultiVariableDecl? {
+    fun multiVariableDeclaration(modifiers: Modifiers): MultiVariableDecl? {
         if (!matches("(")) return null
         val vars = expectAndRecover("(", ")", nullIfNotMatching = true) {
             parseListNew(trailingSeparator = true, end = { matches(")") }) {
-                variableDeclaration()
+                variableDeclaration(Modifiers.EMPTY)
             }
         } ?: return null
-        return MultiVariableDecl(vars)
+        return MultiVariableDecl(vars, modifiers = modifiers)
     }
 
-    fun variableDeclarationOrMultiVariableDeclaration(): VariableDeclBase {
-        return OR({ variableDeclaration() }, { multiVariableDeclaration() })
+    fun variableDeclarationOrMultiVariableDeclaration(modifers: Modifiers): VariableDeclBase {
+        return OR({ variableDeclaration(modifers) }, { multiVariableDeclaration(modifers) })
     }
 
     //propertyDeclaration
@@ -679,7 +679,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             if (expectOpt(".")) res else null
         }
         NLs()
-        val decl = OR({ multiVariableDeclaration() }, { variableDeclaration() }, name = "propertyDeclaration.decl")
+        val decl = OR({ multiVariableDeclaration(modifiers) }, { variableDeclaration(modifiers) }, name = "propertyDeclaration.decl")
         opt { typeConstraints() }
         var delegation = false
         NLs()
@@ -860,7 +860,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             NLs()
             classBody()
         }
-        return ObjectDecl(name)
+        return ObjectDecl(name, body, delegations)
     }
 
     //secondaryConstructor
@@ -1298,7 +1298,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         var vardecl: VariableDeclBase? = null
         expectAndRecoverSure("(", ")") {
             annotations = annotations()
-            vardecl = variableDeclarationOrMultiVariableDeclaration()
+            vardecl = variableDeclarationOrMultiVariableDeclaration(Modifiers.EMPTY)
             expect("in")
             NLs()
             expr = expressionSure(ExpressionState.INSIDE_PARENTHESIZED_EXPR)
@@ -2195,14 +2195,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun lambdaParameter(): VariableDeclBase? {
         if (matches("(")) {
-            val mvd = multiVariableDeclaration()
+            val mvd = multiVariableDeclaration(Modifiers.EMPTY)
             NLs()
             val type = if (expectOpt(":")) {
                 NLs(); type()
             } else null
             return mvd?.copy(type = type)
         } else {
-            return variableDeclaration()
+            return variableDeclaration(Modifiers.EMPTY)
         }
     }
 
@@ -2352,7 +2352,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
                 NLs()
                 if (!expectOpt("val")) return@opt null
                 NLs()
-                decl = variableDeclaration()
+                decl = variableDeclaration(Modifiers.EMPTY)
                 NLs()
                 ASSIGNMENT()
                 NLs()
