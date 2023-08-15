@@ -83,7 +83,10 @@ open class ValentiaParserVarStmTest : StmBuilder {
     fun testDelegated1() {
         assertEquals(
             FILE {
-                 CLASS("NumberToken", ConstructorInvocation("Token".type, "number".id), data = true) {
+                 CLASS("NumberToken", ConstructorInvocation("Token".type, "number".id), data = true, primaryConstructorDecl = PrimaryConstructorDecl(
+                     ClassParameter.VAL("number" to StringType),
+                 )
+                 ) {
                      VAL("numberCleanedUp", type = StringType, expr = "lazy".id(lambdaArg = LAMBDA { STM("".lit) }), delegation = true)
                  }
             },

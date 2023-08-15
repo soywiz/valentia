@@ -19,4 +19,5 @@ actual object ExternalInterface : ExternalInterfaceBase() {
     override fun fileExists(path: String): Boolean = File(path).exists()
     override fun fileWrite(path: String, content: ByteArray) = File(path).writeBytes(content)
     override fun fileRead(path: String): ByteArray = File(path).readBytes()
+    override fun fileList(path: String): List<String> = (File(path).listFiles() ?: emptyArray()).map { it.name }
 }

@@ -197,6 +197,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         NLs()
         val mods = modifiers()
         val primaryConstructor = if (matches("constructor") || matches("(")) primaryConstructor(mods) else null
+        //val primaryConstructor = if (matches("constructor") || matches("(")) primaryConstructor() else null
         NLs()
         val subTypes = if (expectOpt(":")) {
             NLs(); delegationSpecifiers()
@@ -215,18 +216,23 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             null
         }
         NLs()
-        return ClassDecl(kind = kind, name = className, subTypes = subTypes, body = decls)
+        return ClassDecl(kind = kind, name = className, subTypes = subTypes, body = decls, primaryConstructor = primaryConstructor)
     }
 
     // primaryConstructor
     //    : (modifiers? CONSTRUCTOR NL*)? classParameters
     //    ;
-    fun primaryConstructor(mods: Modifiers = modifiers()): List<ClassParameter> {
+    fun primaryConstructor(mods: Modifiers = modifiers()): PrimaryConstructorDecl {
         debug { "TODO: primaryConstructor" }
+        //val mods: Modifiers? = opt {
+        //    modifiers().also {
+        //        if (expectOpt("constructor")) NLs()
+        //    }
+        //}
         if (expectOpt("constructor")) {
             NLs()
         }
-        return classParameters()
+        return PrimaryConstructorDecl(classParameters(), modifiers = mods ?: Modifiers.EMPTY)
     }
 
     //classBody
@@ -278,7 +284,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val expr = if (expectOptNLs("=")) {
             NLs(); expression()
         } else null
-        return ClassParameter(id)
+        return ClassParameter(id, type, expr, valOrVar, modifiers)
     }
 
     fun <T> parseListNew(
@@ -886,7 +892,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         }
         NLs()
         val body = opt { block() }
-        return ConstructorDecl(params = params, body = body, constructorDelegationCall = constructorDelegationCall)
+        return ConstructorDecl(params = params, body = body, constructorDelegationCall = constructorDelegationCall, modifiers = modifiers)
     }
 
     //constructorDelegationCall
@@ -896,7 +902,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val kind = expectAny("this", "super")
         NLs()
         val args = valueArguments() ?: return null
-        return ConstructorDelegationCall(kind, args)
+        return ConstructorDelegationCall(DelegationCallKind.BY_ID[kind], args)
     }
 
     // SECTION: enumClasses
@@ -1262,7 +1268,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun controlStructureBody(): Stm {
         //return OR({ statement() }, { block() })
         return when {
-            matches("{") -> OR({ lambdaLiteral()?.let { ExprStm(it) } }, { block() })
+            //matches("{") -> OR({ lambdaLiteral()?.let { ExprStm(it) } }, { block() })
+            matches("{") -> OR({ block() }, { lambdaLiteral()?.let { ExprStm(it) } })
             else -> statement()
         } ?: error("controlStructureBody")
     }
@@ -1272,7 +1279,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun block(): Stm? {
         if (!matches("{")) return null
-        return expectAndRecoverSure("{", "}", reason = "block") {
+        return expectAndRecover("{", "}", nullIfNotMatching = true, reason = "block") {
             NLs()
             if (!matches("}")) {
                 Stms(statements()).also { NLs() }

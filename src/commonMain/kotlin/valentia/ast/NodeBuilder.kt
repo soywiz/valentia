@@ -19,17 +19,29 @@ interface DeclBuilder : NodeBuilder {
 
     fun VAL(name: String, expr: Expr? = null, type: TypeNode? = null, delegation: Boolean = false): VariableDecl = VariableDecl(name, type, expr, delegation = delegation).also { addDecl(it) }
     fun VAR(name: String, expr: Expr? = null, type: TypeNode? = null, delegation: Boolean = false): VariableDecl = VariableDecl(name, type, expr, delegation = delegation).also { addDecl(it) }
-    fun CLASS(name: String, vararg subTypes: SubTypeInfo, data: Boolean = false, block: DeclBuilder.() -> Unit = {}): ClassDecl =
-        ClassDecl("class", name, if (subTypes.isNotEmpty()) subTypes.toList() else emptyList(), buildDeclList { block() }).also { addDecl(it) }
+    fun CLASS(
+        name: String,
+        vararg subTypes: SubTypeInfo,
+        data: Boolean = false,
+        primaryConstructorDecl: PrimaryConstructorDecl? = null,
+        block: DeclBuilder.() -> Unit = {},
+    ): ClassDecl =
+        ClassDecl(
+            "class",
+            name,
+            if (subTypes.isNotEmpty()) subTypes.toList() else emptyList(),
+            buildDeclList { block() },
+            primaryConstructor = primaryConstructorDecl
+        ).also { addDecl(it) }
     fun INTERFACE(name: String, vararg subTypes: SubTypeInfo, block: DeclBuilder.() -> Unit = {}): ClassDecl =
-        ClassDecl("interface", name, subTypes.toList(), buildDeclList { block() }).also { addDecl(it) }
+        ClassDecl("interface", name, if (subTypes.isEmpty()) null else subTypes.toList(), buildDeclList { block() }, primaryConstructor = null).also { addDecl(it) }
     fun FUN(
         name: String,
         ret: TypeNode? = null,
         vararg params: Pair<String, TypeNode>,
-        block: StmBuilder.() -> Unit = {}
+        block: (StmBuilder.() -> Unit)? = null
     ): FunDecl =
-        FunDecl(name, params.map { FuncValueParam(it.first, it.second) }, retType = ret, body = StmBuilder.buildStms { block() }).also { addDecl(it) }
+        FunDecl(name, params.map { FuncValueParam(it.first, it.second) }, retType = ret, body = block?.let { func -> StmBuilder.buildStms { func() } }).also { addDecl(it) }
 
     fun FILE(
         shebang: String? = null,

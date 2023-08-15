@@ -1,5 +1,6 @@
 package valentia.ast
 
+import valentia.ast.NodeBuilder.Companion.type
 import valentia.parser.BaseConsumer
 import valentia.sema.ResolutionContext
 import valentia.sema.SymbolProvider
@@ -133,23 +134,29 @@ data class DefinitelyNonNullableType(
     val mods2: Modifiers,
 ) : TypeNode()
 
-data class NamedTypeNode(val type: TypeNode, val name: String? = null) {
+data class NamedTypeNode(val type: TypeNode?, val name: String? = null) {
     constructor(param: Parameter) : this(param.type, param.id)
+    override fun toString(): String = if (name != null) "$name: $type" else "$type"
 }
 
 data class UnificationExprType(val exprs: List<ExprOrStm>) : TypeNode() {
     constructor(vararg exprs: ExprOrStm?) : this(exprs.filterNotNull())
 }
-data class FuncTypeNode(val ret: TypeNode?, val params: List<NamedTypeNode>, val receiver: TypeNode? = null, val suspendable: Boolean = false) : TypeNode()
+data class FuncTypeNode(val ret: TypeNode?, val params: List<NamedTypeNode>, val receiver: TypeNode? = null, val suspendable: Boolean = false) : TypeNode() {
+    override fun toString(): String = "(${params.joinToString(", ")}) -> $ret"
+}
 data class MultiType(val types: List<TypeNode>) : TypeNode() {
     constructor(vararg types: TypeNode) : this(types.toList())
 }
-data class SimpleType(val name: String) : TypeNode()
+data class SimpleType(val name: String) : TypeNode() {
+    override fun toString(): String = name
+}
 data class GenericType(val type: TypeNode, val generics: List<TypeNode>) : TypeNode()
 data class NullableType(val type: TypeNode) : TypeNode()
 
-val UnknownType = SimpleType("unknown")
 val DynamicType = SimpleType("dynamic")
+val NothingType = SimpleType("Nothing")
+val UnknownType = SimpleType("Unknown")
 val BoolType = SimpleType("Boolean")
 val CharType = SimpleType("Char")
 val StringType = SimpleType("String")
@@ -279,24 +286,84 @@ data class TypeAliasDecl(
     val types: List<TypeParameter>? = null,
     val modifiers: Modifiers = Modifiers(),
 ) : Decl(id)
-data class ConstructorDelegationCall(val kind: String, val exprs: List<Expr>)
+enum class DelegationCallKind(val id: String) {
+    THIS("this"), SUPER("super");
+    companion object {
+        val BY_ID = entries.associateBy { it.id }
+    }
+}
+data class ConstructorDelegationCall(
+    val kind: DelegationCallKind?,
+    val exprs: List<Expr>,
+) : Node() {
+    var parent: BaseConstructorDecl? = null
+    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode =
+        FuncTypeNode(parent?.parent?.getType(resolutionContext), exprs.map { NamedTypeNode(it.getType(resolutionContext)) })
+}
+
+abstract class BaseConstructorDecl() : Decl("constructor") {
+    var parent: ClassOrObjectDecl? = null
+    abstract val modifiers: Modifiers
+    abstract val params: List<FuncValueParam>
+    open val constructorDelegationCall: ConstructorDelegationCall? = null
+    open val body: Stm? = null
+    val jsHash by lazy { params.map { it.type }.hashCode() and 0x7FFFFFFF }
+    override val jsName by lazy {
+        if (params.isEmpty()) "\$constructor" else "\$constructor\$${jsHash.toString(16)}"
+    }
+    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+        val retType = parent?.declName?.type ?: UnknownType
+        return FuncTypeNode(retType, params.map { it.toNamedTypeNode() })
+    }
+}
+
+data class PrimaryConstructorDecl(
+    val classParams: List<ClassParameter> = emptyList(),
+    override val modifiers: Modifiers = Modifiers.EMPTY,
+) : BaseConstructorDecl() {
+    constructor(vararg classParams: ClassParameter, modifiers: Modifiers = Modifiers.EMPTY) : this(classParams.toList(), modifiers)
+    constructor(vararg pairs: Pair<String, TypeNode>, modifiers: Modifiers = Modifiers.EMPTY) : this(pairs.map { ClassParameter(it.first, it.second) }, modifiers)
+
+    override val params: List<FuncValueParam> = classParams.map {
+        FuncValueParam(it.id, it.type)
+    }
+}
 data class ConstructorDecl(
-    val params: List<FuncValueParam> = emptyList(),
-    val body: Stm? = null,
-    val constructorDelegationCall: ConstructorDelegationCall? = null,
-) : Decl("constructor")
+    override val params: List<FuncValueParam> = emptyList(),
+    override val body: Stm? = null,
+    override val constructorDelegationCall: ConstructorDelegationCall? = null,
+    override val modifiers: Modifiers = Modifiers.EMPTY,
+) : BaseConstructorDecl() {
+    init {
+        constructorDelegationCall?.parent = this
+    }
+}
 data class InitDecl(val stm: Stm) : Decl("init")
 data class CompanionObjectDecl(val name: String?) : Decl(name ?: "companion object")
-open class ClassOrObjectDecl(name: String) : Decl(name)
+abstract class ClassOrObjectDecl(name: String) : Decl(name) {
+    // @TODO: Extract primary constructor val/var to Variable declarations
+    open val primaryConstructor: PrimaryConstructorDecl? = null
+    open val body: List<Decl>? = null
+    val bodyAll by lazy { listOfNotNull(primaryConstructor) + (body ?: emptyList()) }
+    val constructors: List<BaseConstructorDecl> by lazy {
+        bodyAll.filterIsInstance<BaseConstructorDecl>().also {
+            for (constructor in it) {
+                constructor.parent = this
+            }
+        }
+    }
+}
 data class ClassDecl(
     val kind: String,
     val name: String,
     val subTypes: List<SubTypeInfo>? = null,
-    val body: List<Decl>? = null,
-) : ClassOrObjectDecl(name)
+    override val body: List<Decl>? = null,
+    override val primaryConstructor: PrimaryConstructorDecl? = null,
+) : ClassOrObjectDecl(name) {
+}
 data class ObjectDecl(
     val name: String,
-    val body: List<Decl>? = null,
+    override val body: List<Decl>? = null,
     val delegations: List<SubTypeInfo>? = null,
 ) : ClassOrObjectDecl(name)
 data class FunDecl constructor(
@@ -428,12 +495,27 @@ data class ThrowExpr(val expr: Expr) : Expr()
 
 data class Parameter(val id: String, val type: TypeNode)
 data class ParameterOptType(val id: String, val type: TypeNode?, val modifiers: Modifiers? = null, val expr: Expr? = null)
-data class FuncValueParam(val id: String, val type: TypeNode)
+data class FuncValueParam(val id: String, val type: TypeNode?)
 data class TypeParameter(val id: String, val type: TypeNode?)
 
 fun ParameterOptType.toFuncValueParam(): FuncValueParam = FuncValueParam(id, type ?: UnknownType)
+fun FuncValueParam.toNamedTypeNode(): NamedTypeNode = NamedTypeNode(this.type, this.id)
 
-data class ClassParameter(val id: String)
+data class ClassParameter(
+    val id: String,
+    val type: TypeNode? = null,
+    val expr: Expr? = null,
+    val valOrVar: String? = null,
+    val modifiers: Modifiers = Modifiers.EMPTY,
+) {
+    companion object {
+        fun VAL(id: String, type: TypeNode? = null): ClassParameter = ClassParameter(id, type, valOrVar = "val")
+        fun VAR(id: String, type: TypeNode? = null): ClassParameter = ClassParameter(id, type, valOrVar = "var")
+
+        fun VAL(pair: Pair<String, TypeNode>): ClassParameter = ClassParameter(pair.first, pair.second, valOrVar = "val")
+        fun VAR(pair: Pair<String, TypeNode>): ClassParameter = ClassParameter(pair.first, pair.second, valOrVar = "var")
+    }
+}
 
 enum class UnaryPreOp(val str: String) {
     INCR("++"), DECR("--"), MINUS("-"), PLUS("+"), EXCL("!");

@@ -75,11 +75,57 @@ open class JSCodegen {
             }
             is VariableDecl -> {
                 if (FunctionModifier.EXTERNAL !in decl.modifiers) {
-                    if (parent is ClassOrObjectDecl) {
-                        indenter.line("${decl.jsName} = ${generateExpr(decl.expr)};")
+                    val letStr = if (parent !is ClassOrObjectDecl) "let " else ""
+                    if (decl.getter != null) {
+                        indenter.line("get ${letStr}${decl.jsName}()") {
+                            generateStm(decl.getter.body)
+                        }
                     } else {
-                        indenter.line("let ${decl.jsName} = ${generateExpr(decl.expr)};")
+                        indenter.line("${letStr}${decl.jsName} = ${generateExpr(decl.expr)};")
                     }
+                }
+            }
+            is BaseConstructorDecl -> {
+                if (decl is PrimaryConstructorDecl) {
+                    for (p in decl.classParams) {
+                        if (p.valOrVar != null) {
+                            // @TODO: Detect type to set to null, or to number, etc.
+                            indenter.line("${p.id} = null;")
+                        }
+                    }
+                }
+
+                val params = decl.params.toJsString()
+                indenter.line("${decl.jsName}($params)") {
+                    if (decl is PrimaryConstructorDecl) {
+                        for (p in decl.classParams) {
+                            if (p.valOrVar != null) {
+                                indenter.line("this.${p.id} = ${p.id};")
+                            }
+                        }
+                    }
+                    val delegatedCall = decl.constructorDelegationCall
+                    if (delegatedCall != null) {
+                        when (delegatedCall.kind) {
+                            DelegationCallKind.THIS -> {
+                                val callType = delegatedCall.getType(DummyResolutionContext)
+                                val clazz = parent as ClassOrObjectDecl
+                                val parentConstructor = clazz?.constructors?.firstOrNull {
+                                    val constructorType = it.getTypeSafe(DummyResolutionContext)
+                                    TypeMatching.canAssignTo(
+                                        callType,
+                                        constructorType,
+                                    )
+                                }
+                                //println("parentConstructor=$parentConstructor")
+                                indenter.line("this.${parentConstructor?.jsName}(${delegatedCall.exprs.joinToString(", ") { generateExpr(it).toString() }});")
+                            }
+                            DelegationCallKind.SUPER -> TODO()
+                            null -> TODO()
+                        }
+                    }
+                    generateStm(decl.body)
+                    indenter.line("return this;")
                 }
             }
             else -> TODO("decl=$decl")
@@ -88,12 +134,12 @@ open class JSCodegen {
 
     open fun generateClass(clazz: ClassDecl) {
         indenter.line("class ${clazz.name}") {
-            generateDecls(clazz.body, clazz)
+            generateDecls(clazz.bodyAll, clazz)
         }
     }
 
     open fun generateFunction(func: FunDecl, parent: Decl?) {
-        val params = func.params.joinToString(", ") { it.id }
+        val params = func.params.toJsString()
 
         //indenter.line("${decl.name}($params)") {
         //    decl.body?.let {
@@ -120,10 +166,21 @@ open class JSCodegen {
             for (item in items) {
                 // @TODO: Check constructors
                 if (item is ClassOrObjectDecl) {
-                    return item
+                    for (constructor in item.constructors) {
+                        val constructorFuncType = constructor.getType(DummyResolutionContext)
+                        if (TypeMatching.canAssignTo(funcType, constructorFuncType)) {
+                            return constructor
+                        }
+                    }
+                    if (funcType is FuncTypeNode) {
+                        if (funcType.params.isEmpty()) {
+                            return item
+                        }
+                    }
+                    TODO("Can't find constructor for $funcType")
                 }
                 // @TODO: Compat
-                if (funcType == item.getType(DummyResolutionContext)) {
+                if (TypeMatching.canAssignTo(funcType, item.getType(DummyResolutionContext))) {
                     return item
                 }
             }
@@ -187,17 +244,31 @@ open class JSCodegen {
                 val res = generateExpr(expr.expr)
                 val paramsStr = "(" + expr.paramsPlusLambda.joinToString(", ") { generateExpr(it).toString() } + ")"
                 if (res is IdWithContext) {
-                    val funcType = FuncTypeNode(UnknownType, expr.params.map { NamedTypeNode(it.getTypeSafe(
-                        DummyResolutionContext
-                    )) })
+                    //val exprType = expr.expr.getTypeSafe(DummyResolutionContext)
+                    val exprType = UnknownType
+                    //println("exprType=$exprType")
+                    val funcType = FuncTypeNode(
+                        exprType,
+                        expr.params.map { NamedTypeNode(it.getTypeSafe(DummyResolutionContext)) }
+                    )
                     val resolved = res.resolveSafe(funcType)
-                    println("Can't resolve $funcType")
-                    println("RESOLVE: $funcType : $resolved")
+                    //println("Can't resolve $funcType")
+                    //println("RESOLVE: $funcType : $resolved")
                     val name = (resolved?.jsName ?: res.id)
-                    if (resolved is ClassOrObjectDecl) {
-                        "(new $name$paramsStr)"
-                    } else {
-                        "$name$paramsStr"
+                    when (resolved) {
+                        is ClassOrObjectDecl -> {
+                            "(new $name$paramsStr)"
+                        }
+                        is BaseConstructorDecl -> {
+                            "(new ${resolved.parent?.jsName}).${resolved.jsName}$paramsStr"
+                        }
+                        is FunDecl -> {
+                            "$name$paramsStr"
+                        }
+                        else -> {
+                            //"$name$paramsStr"
+                            TODO("resolved=$resolved, expr=${expr.expr}")
+                        }
                     }
                 } else {
                     res.toString() + paramsStr
@@ -219,6 +290,23 @@ open class JSCodegen {
             }
             is BreakExpr -> throw UnsupportedOperationException("break expression not supported")
             is ContinueExpr -> throw UnsupportedOperationException("continue expression not supported")
+            is InterpolatedStringExpr -> {
+                val out = arrayListOf<String>()
+                out += "`"
+                for (chunk in expr.chunks) {
+                    when (chunk) {
+                        is InterpolatedStringExpr.StringChunk -> {
+                            out += chunk.string
+                        }
+                        is InterpolatedStringExpr.ExpressionChunk -> {
+                            val exprStr = generateExpr(chunk.expr).toString()
+                            out += "\${$exprStr}"
+                        }
+                    }
+                }
+                out += "`"
+                out.joinToString("")
+            }
             //is BreakExpr -> if (expr.label != null) "break ${expr.label};" else "break;"
             //is ContinueExpr -> if (expr.label != null) "continue ${expr.label};" else "continue;"
             else -> TODO("generateExpr: $expr")
@@ -263,8 +351,9 @@ open class JSCodegen {
         indenter.line("}")
     }
 
-    open fun generateStm(stm: Stm) {
+    open fun generateStm(stm: Stm?) {
         when (stm) {
+            null -> Unit
             is AssignStm -> {
                 indenter.line("${generateExpr(stm.lvalue)} ${stm.op} ${generateExpr(stm.expr)};")
             }
@@ -340,4 +429,14 @@ open class JSCodegen {
             null -> TODO("vardecl=null")
         }
     }
+
+    fun TypeNode.toJsString(): String = when (this) {
+        is SimpleType -> this.name
+        else -> "$this"
+    }
+
+    fun  List<FuncValueParam>.toJsString(): String {
+        return this.joinToString(", ") { "${it.id} /*: ${it.type?.toJsString()}*/" }
+    }
+
 }

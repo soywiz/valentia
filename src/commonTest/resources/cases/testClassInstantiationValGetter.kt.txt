@@ -1,0 +1,4 @@
+// expected:7
+external val console: dynamic
+class Demo { val a: Int get() = 7 }
+fun main() = console.log(Demo().a)

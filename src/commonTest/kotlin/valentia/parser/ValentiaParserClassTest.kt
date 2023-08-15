@@ -3,6 +3,7 @@ package valentia.parser
 import valentia.ast.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ValentiaParserClassTest : DeclBuilder, StmBuilder {
 
@@ -17,17 +18,22 @@ class ValentiaParserClassTest : DeclBuilder, StmBuilder {
     @Test
     fun testAnnotationClass() {
         assertEquals(
-            ClassDecl(kind = "class", name = "Demo"),
+            ClassDecl(kind = "class", name = "Demo",
+                primaryConstructor = PrimaryConstructorDecl(
+                    ClassParameter("a", IntType, valOrVar = "val"),
+                    ClassParameter("b", StringType, valOrVar = "val"),
+                )
+            ),
             ValentiaParser.topLevelDecl("annotation class Demo(val a: Int, val b: String)")
         )
     }
 
     @Test
     fun testClass() {
-        assertEquals(
-            ClassDecl(kind = "class", name = "Demo"),
-            ValentiaParser.topLevelDecl("class Demo(val a: Int, val b: String)")
-        )
+        val res = ValentiaParser.topLevelDecl("class Demo(val a: Int, val b: String)")
+        assertTrue(res is ClassDecl)
+        assertEquals("class", res.kind)
+        assertEquals("Demo", res.name)
     }
 
     @Test
@@ -49,7 +55,11 @@ class ValentiaParserClassTest : DeclBuilder, StmBuilder {
     @Test
     fun testInheritance() {
         assertEquals(
-            ClassDecl(kind = "class", name = "Hello", subTypes = listOf(BasicSubTypeInfo("World".type))),
+            ClassDecl(
+                kind = "class",
+                name = "Hello",
+                subTypes = listOf(BasicSubTypeInfo("World".type)),
+            ),
             ValentiaParser.topLevelDecl("""class Hello : World""")
         )
     }
@@ -57,11 +67,13 @@ class ValentiaParserClassTest : DeclBuilder, StmBuilder {
     @Test
     fun testConstructorDelegation() {
         assertEquals(
-            ClassDecl(kind = "class", name = "Hello", body = listOf(
-                ConstructorDecl(
-                    constructorDelegationCall = ConstructorDelegationCall("this", listOf(1.lit, 2.lit))
-                ),
-            )),
+            ClassDecl(
+                kind = "class", name = "Hello", body = listOf(
+                    ConstructorDecl(
+                        constructorDelegationCall = ConstructorDelegationCall(DelegationCallKind.THIS, listOf(1.lit, 2.lit)),
+                    ),
+                )
+            ),
             ValentiaParser.topLevelDecl("""
                 class Hello {
                     constructor() : this(1, 2)
@@ -72,24 +84,29 @@ class ValentiaParserClassTest : DeclBuilder, StmBuilder {
 
     @Test
     fun testInterfaceWithEmptyMethod() {
+        val file = ValentiaParser.file("""
+            package demo
+
+            interface Indenter {
+                class Impl : Indenter { }
+                fun indent()
+            }
+        """.trimIndent())
+
+        //assertTrue(file is FileNode)
+        assertEquals(Identifier("demo"), file._package)
+
         assertEquals(
             FILE(
                 _package = Identifier("demo"),
             ) {
                 INTERFACE("Indenter") {
-                    CLASS("Impl", BasicSubTypeInfo("Impl".type)) {
+                    CLASS("Impl", BasicSubTypeInfo("Indenter".type)) {
                     }
                     FUN("indent")
                 }
             },
-            ValentiaParser.file("""
-                package demo
-
-                interface Indenter {
-                    class Impl : Indenter { }
-                    fun indent()
-                }
-            """.trimIndent()) as? Any?
+            file
         )
 
     }

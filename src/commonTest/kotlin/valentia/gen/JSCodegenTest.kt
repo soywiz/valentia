@@ -10,12 +10,16 @@ import kotlin.test.assertEquals
 class JSCodegenTest {
     @Test
     fun testSuspend() {
-        println(genFilesJSString("""suspend fun test() {
-            test@for (n in 0 until 10) {
-                yield(n)
-                break@test
+        println(genFilesJSString("""
+            external fun yield(value: Int)
+            
+            suspend fun test() {
+                test@for (n in 0 until 10) {
+                    yield(n)
+                    break@test
+                }
             }
-        }"""))
+        """.trimIndent()))
         println(genFilesJSString("suspend fun test() { }"))
         println(genFilesJSString("suspend fun test() = 1"))
     }
@@ -38,11 +42,45 @@ class JSCodegenTest {
         assertEquals(
             "7",
             genAndRunJs("""
-                external val console: dynamic
                 class Demo { val a = 7 }
                 fun main() = console.log(Demo().a)
             """.trimIndent(), printJs = true)
         )
+    }
+
+    @Test
+    fun testClassInstantiationFunCalling() {
+        assertEquals(
+            "7",
+            genAndRunJs("""
+                class Demo { fun a() = 7 }
+                fun main() = console.log(Demo().a())
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    val RESOURCES_PREFIX = "src/commonTest/resources"
+
+    @Test
+    fun testClassInstantiationValGetter() =
+        testFile("$RESOURCES_PREFIX/cases/testClassInstantiationValGetter.kt.txt")
+
+    @Test
+    fun testClassMultipleConstructor() =
+        testFile("$RESOURCES_PREFIX/cases/testClassMultipleConstructor.kt.txt")
+
+    @Test
+    fun testAllFiles() {
+        val dir = "$RESOURCES_PREFIX/cases"
+        val cases = ExternalInterface.fileList(dir)
+        println("testAllFiles=$cases")
+        for (case in cases) {
+            val fpath = "$dir/$case"
+            println("CASE: $fpath")
+            if (fpath.endsWith(".kt.txt") || fpath.endsWith(".kt")) {
+                testFile(fpath)
+            }
+        }
     }
 
     @Test
@@ -94,7 +132,7 @@ class JSCodegenTest {
         assertEquals("hello world", runJsCode("console.log('hello world')").trim())
     }
 
-    fun genAndRunJs(vararg filesContent: String, extraArgs: List<Any> = emptyList(), trim: Boolean = true, printJs: Boolean = false): String {
+    fun genAndRunJs(@Language("kotlin") vararg filesContent: String, extraArgs: List<Any> = emptyList(), trim: Boolean = true, printJs: Boolean = false): String {
         val jsCode = genFilesJSString(*filesContent)
         if (printJs) println(jsCode)
         return runJsCode(jsCode, *extraArgs.toTypedArray()).let { if (trim) it.trim() else it }
@@ -123,9 +161,20 @@ class JSCodegenTest {
         val program = Program()
         val module = program.getModule(null)
         for (content in filesContent) {
-            module.addFile(ValentiaParser.file(content))
+            module.addFile(ValentiaParser.file("$content\nexternal val console: dynamic\n"))
         }
         gen.generateProgram(program)
         return gen
+    }
+
+    private fun testFile(file: String) {
+        val res = ExternalInterface.fileReadString(file)
+        val filesContents = res.split("//////\n")
+        val result = Regex("^//(\\s*)expected:(.*)").find(res) ?: error("Can't find // expected")
+        val expected = result.groupValues.last()
+        assertEquals(
+            expected,
+            genAndRunJs(*filesContents.toTypedArray(), printJs = true)
+        )
     }
 }

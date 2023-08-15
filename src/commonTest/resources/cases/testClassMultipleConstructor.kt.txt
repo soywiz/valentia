@@ -1,0 +1,10 @@
+// expected:10
+external val console: dynamic
+
+class Demo(val a: String) {
+    constructor(a: Int) : this("${a * 2}")
+}
+
+// ////
+
+fun main() = console.log(Demo(5).a)
