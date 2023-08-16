@@ -1,6 +1,7 @@
 package valentia.parser
 
 import valentia.ast.*
+import kotlin.coroutines.suspendCoroutine
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

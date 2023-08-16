@@ -16,6 +16,7 @@ open class JSCodegen {
     }
 
     open fun generateProgram(program: Program) {
+        indenter.line("#!/usr/bin/env -S deno run -A --unstable")
         for (module in program.modulesById.values) {
             generateModule(module)
         }
@@ -145,6 +146,9 @@ open class JSCodegen {
         }
     }
 
+    //var headerLine: Indenter.Line? = null
+    var transformContext = TransformUnsupportedNodes.TransformContext()
+
     open fun generateFunction(func: FunDecl, parent: Decl?) {
         val params = func.params.toJsString()
 
@@ -158,7 +162,17 @@ open class JSCodegen {
         val suspendMod = if (func.isSuspend) "*" else ""
         indenter.line("${functionMod}${suspendMod}${func.jsName}($params)") {
             func.body?.let {
-                generateStmsCompact(transformer.transform(it))
+                val oldContext = transformContext
+                val headerLine = indenter.line("")
+                try {
+                    transformContext = TransformUnsupportedNodes.TransformContext()
+                    generateStmsCompact(transformer.transform(it))
+                } finally {
+                    for (temp in transformContext.temps) {
+                        headerLine.str += "let ${temp};"
+                    }
+                    transformContext = oldContext
+                }
             }
         }
         if (func.name == "main") {
@@ -325,6 +339,7 @@ open class JSCodegen {
             is ThisExpr -> "this"
             //is BreakExpr -> if (expr.label != null) "break ${expr.label};" else "break;"
             //is ContinueExpr -> if (expr.label != null) "continue ${expr.label};" else "continue;"
+            is TempExpr -> "${expr.temp}"
             else -> TODO("generateExpr: $expr")
         }
     }
@@ -374,7 +389,7 @@ open class JSCodegen {
                 indenter.line("${generateExpr(stm.lvalue)} ${stm.op} ${generateExpr(stm.expr)};")
             }
             is IfStm -> {
-                val (pre, expr) = transformer.ensure(stm.cond)
+                val (pre, expr) = transformer.ensure(stm.cond, transformContext)
                 pre?.let { generateStm(pre) }
                 if (expr != null) {
                     val lin = indenter.line("if (${generateExpr(expr)})") {
@@ -391,7 +406,7 @@ open class JSCodegen {
                 val labelStr = if (stm.modifiers.label != null) "${stm.modifiers.label?.id}: " else ""
                 when (stm) {
                     is ForLoopStm -> {
-                        val (pre, expr) = transformer.ensure(stm.expr)
+                        val (pre, expr) = transformer.ensure(stm.expr, transformContext)
                         pre?.let { generateStm(pre) }
                         if (expr != null) {
                             if (expr is BinaryOpExpr && expr.left.getTypeSafe() == IntType && expr.right.getTypeSafe() == IntType && (expr.op == ".." || expr.op == "..<" || expr.op == "until" || expr.op == "downTo")) {
@@ -421,7 +436,7 @@ open class JSCodegen {
                         }
                     }
                     is WhileLoopStm -> {
-                        val (pre, expr) = transformer.ensure(stm.cond)
+                        val (pre, expr) = transformer.ensure(stm.cond, transformContext)
                         pre?.let { generateStm(pre) }
                         if (expr != null) {
                             indenter.line("${labelStr}while (${generateExpr(expr)})") {
@@ -440,7 +455,7 @@ open class JSCodegen {
                 }
             }
             is ExprStm -> {
-                val (pre, expr) = transformer.ensure(stm.expr)
+                val (pre, expr) = transformer.ensure(stm.expr, transformContext)
                 pre?.let { generateStm(pre) }
                 expr?.let { indenter.line("${generateExpr(expr)};") }
             }
@@ -449,7 +464,7 @@ open class JSCodegen {
                     indenter.line("return;")
                     return
                 }
-                val (pre, expr) = transformer.ensure(stm.expr)
+                val (pre, expr) = transformer.ensure(stm.expr, transformContext)
                 pre?.let { generateStm(pre) }
                 expr?.let { indenter.line("return ${generateExpr(expr)};") }
             }

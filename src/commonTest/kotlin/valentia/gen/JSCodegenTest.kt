@@ -169,7 +169,8 @@ class JSCodegenTest {
     fun runJsCode(jsCode: String, vararg extraArgs: Any): String {
         val tempFile = "${ExternalInterface.TEMP}/valentia.temp.js"
         ExternalInterface.fileWriteString(tempFile, jsCode)
-        val out = ExternalInterface.exec("node", tempFile, *extraArgs.map { it.toString() }.toTypedArray())
+        ExternalInterface.makeExecutable(tempFile)
+        val out = ExternalInterface.exec("deno", "run", "-A", "--unstable", tempFile, *extraArgs.map { it.toString() }.toTypedArray())
         if (out.exitCode != 0) {
             error("ERROR: $out")
         }

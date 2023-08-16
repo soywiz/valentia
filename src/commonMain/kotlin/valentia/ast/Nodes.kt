@@ -5,7 +5,7 @@ import valentia.parser.BaseConsumer
 import valentia.sema.ResolutionContext
 import valentia.sema.SymbolProvider
 
-abstract class Node {
+sealed class Node {
     var reader: BaseConsumer? = null
     var spos: Int = -1
     var epos: Int = -1
@@ -43,7 +43,7 @@ data class Modifiers(val items: List<Any> = emptyList()) {
     val isEnum: Boolean get() = ClassModifier.ENUM in this
 }
 
-abstract class ExprOrStm : Node() {
+sealed class ExprOrStm : Node() {
     fun toStm(): Stm = when (this) {
         is Stm -> this
         is Expr -> ExprStm(this)
@@ -280,7 +280,7 @@ enum class AnnotationUseSite(val id: String) {
 
 // Decl
 
-open class Decl(val declName: String) : Node() {
+sealed class Decl(val declName: String) : Node() {
     open val jsName: String get() = declName
 }
 
@@ -467,14 +467,14 @@ data class Identifier(val parts: List<String>) : Expr() {
 
 // Expressions
 
-abstract class Expr : ExprOrStm()
+sealed class Expr : ExprOrStm()
 
 data class LambdaFunctionExpr(val stms: List<Stm> = emptyList(), val params: List<VariableDeclBase>? = null) : Expr() {
 }
 
 data class AnonymousFunctionExpr(val decl: FunDecl) : Expr()
 
-abstract class AssignableExpr : Expr()
+sealed class AssignableExpr : Expr()
 
 data class NavigationExpr(val op: String, val expr: Expr, val key: Any) : AssignableExpr()
 
@@ -501,7 +501,9 @@ data class CollectionLiteralExpr(val items: List<Expr>) : Expr()
 data class TryCatchExpr(val body: Node, val catches: List<Catch> = emptyList(), val finally: Stm? = null) : Expr() {
     data class Catch(val local: String, val type: TypeNode, val body: Stm)
 }
-data class Temp(val type: TypeNode) : Expr()
+data class Temp(val type: TypeNode, val id: Int) : Expr() {
+    override fun toString(): String = "\$temp\$$id"
+}
 data class SuperExpr(val label: String? = null, val type: TypeNode? = null) : AssignableExpr()
 data class IfExpr(val cond: Expr, val trueBody: ExprOrStm, val falseBody: ExprOrStm? = null) : Expr()
 data class BreakExpr(val label: String? = null) : Expr()
@@ -564,6 +566,7 @@ data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr() {
 }
 
 data class IdentifierExpr(val id: String) : AssignableExpr()
+data class TempExpr(val temp: Temp) : AssignableExpr()
 
 data class OpSeparatedBinaryExprs(val ops: List<String>, val exprs: List<Expr>) : Expr() {
     fun toSimpleOps(): Expr {
@@ -596,7 +599,7 @@ data class StringLiteralExpr(val value: String) : LiteralExpr(value) {
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = StringType
 }
 data class InterpolatedStringExpr(val chunks: List<Chunk>) : Expr() {
-    interface Chunk
+    sealed interface Chunk
     data class StringChunk(val string: String) : Chunk
     data class ExpressionChunk(val expr: Expr) : Chunk
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = StringType
@@ -614,7 +617,7 @@ data class ThisExpr(val id: String?) : AssignableExpr() {
 // Statements
 
 
-open class Stm : ExprOrStm()
+sealed class Stm : ExprOrStm()
 
 fun Stm.withModifiers(mods: Modifiers): Stm {
     if (mods.isEmpty()) return this

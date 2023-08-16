@@ -20,4 +20,8 @@ actual object ExternalInterface : ExternalInterfaceBase() {
     override fun fileWrite(path: String, content: ByteArray) = File(path).writeBytes(content)
     override fun fileRead(path: String): ByteArray = File(path).readBytes()
     override fun fileList(path: String): List<String> = (File(path).listFiles() ?: emptyArray()).map { it.name }
+
+    override fun makeExecutable(path: String) {
+        File(path).setExecutable(true)
+    }
 }

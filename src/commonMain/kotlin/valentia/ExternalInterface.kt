@@ -18,6 +18,7 @@ open class ExternalInterfaceBase {
     open fun fileExists(path: String): Boolean = fileStat(path) != null
     fun fileWriteString(path: String, content: String): Unit = fileWrite(path, content.encodeToByteArray())
     fun fileReadString(path: String): String = fileRead(path).decodeToString()
+    open fun makeExecutable(path: String): Unit = Unit
 }
 
 expect object ExternalInterface : ExternalInterfaceBase
