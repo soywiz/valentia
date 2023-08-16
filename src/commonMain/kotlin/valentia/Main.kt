@@ -19,21 +19,33 @@ fun main(args: Array<String>) {
                 println("")
                 println("valentia <command> <args>")
                 println("")
+                println("  [source] : <file.kt>/<folder>/<package.valentia>")
+                println("")
                 println("  version  - Displays version")
                 println("  help     - Shows this help")
-                println("  run   <file.kt>/<folder>/<package.valentia>")
+                println("  run       [source]   - Compiles & runs generated code with Deno")
+                println("  compile   [source] > [output.js]  - Generates JS code")
                 println("")
                 println("Example:")
                 println("")
                 println("  valentia run file.kt")
+                println("  valentia compile file.kt > output.js")
                 println("")
                 return
             }
             "run", "-r", "-run", "--run" -> {
                 val files = items.toList()
                 items.clear()
+                if (files.isEmpty()) error("Missing file/s to execute")
                 ValentiaCompiler.compileAndRun(files)
             }
+            "compile", "-c", "-compile", "--compile" -> {
+                val files = items.toList()
+                items.clear()
+                if (files.isEmpty()) error("Missing file/s to compile")
+                println(ValentiaCompiler.compile(files))
+            }
+            else -> error("Unknown command $item")
         }
     }
 }

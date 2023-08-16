@@ -22,7 +22,13 @@ object ValentiaCompiler {
 
     fun compileAndRun(files: List<String>) {
         //println("Source:")
-        println(compile(files))
+        val js = compile(files)
+        //println(js)
+        val jsFile = "/tmp/valentia.temp.js"
+        ExternalInterface.fileWriteString(jsFile, js)
+        val res = ExternalInterface.exec("deno", "run", "-A", "--unstable", jsFile)
+        print(res.stdout)
+        print(res.stderr)
         //println("---")
     }
 }

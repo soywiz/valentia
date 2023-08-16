@@ -168,8 +168,8 @@ open class JSCodegen {
                     transformContext = TransformUnsupportedNodes.TransformContext()
                     generateStmsCompact(transformer.transform(it))
                 } finally {
-                    for (temp in transformContext.temps) {
-                        headerLine.str += "let ${temp};"
+                    if (transformContext.temps.isNotEmpty()) {
+                        headerLine.str += "let " + transformContext.temps.joinToString(", ") { "$it" } + ";"
                     }
                     transformContext = oldContext
                 }
@@ -411,7 +411,7 @@ open class JSCodegen {
                         if (expr != null) {
                             if (expr is BinaryOpExpr && expr.left.getTypeSafe() == IntType && expr.right.getTypeSafe() == IntType && (expr.op == ".." || expr.op == "..<" || expr.op == "until" || expr.op == "downTo")) {
                                 val varg = generateVarDecl(stm.vardecl)
-                                println("expr=$expr")
+                                //println("expr=$expr")
                                 val comparisonOp = when (expr.op) {
                                     "downTo" -> ">="
                                     "..<", "until" -> "<"
@@ -421,10 +421,10 @@ open class JSCodegen {
                                     "downTo" -> "--"
                                     else -> "++"
                                 }
-                                val LOOPSTART = "\$loopstart"
-                                val LOOPEND = "\$loopend"
-                                indenter.line("const $LOOPSTART = ${generateExpr(expr.left)};")
-                                indenter.line("const $LOOPEND = ${generateExpr(expr.right)};")
+                                val LOOPSTART = transformContext.createTemp(IntType)
+                                val LOOPEND = transformContext.createTemp(IntType)
+                                indenter.line("$LOOPSTART = ${generateExpr(expr.left)};")
+                                indenter.line("$LOOPEND = ${generateExpr(expr.right)};")
                                 indenter.line("${labelStr}for (let $varg = $LOOPSTART; $varg $comparisonOp $LOOPEND; $varg$incrOp)") {
                                     generateStmsCompact(stm.body)
                                 }
