@@ -10,6 +10,7 @@ The compiler can be embedded as library and also allows compiling code in the br
 * [x] Use a tokenizer to make it faster and simpler
 * [ ] `[WIP]` Step 2: Compilation into modern JS: classes, generators for coroutines, etc.
 * [ ] Step 2a: Be able to compile itself and to run in Deno, Node.JS and the Browser
+* [ ] Optimization: Add all binary operators on a single call to reduce recursion, then re-sort based on operator precedence
 * [ ] Step 3: Compilation into WASM or C++? If WASM 2 C already exists we could skip C++
 * [ ] Step 4: Recovery, code completion, LSP?
 * [ ] Step 5: New features: static if, Numeric coercion, etc.
@@ -25,6 +26,19 @@ The compiler can be embedded as library and also allows compiling code in the br
 It can work on the browser, Deno and Node.JS,
 It skips the JVM, Android and Kotlin/Native targets
 and focuses on JS and eventually other source-code level targets like C++.
+
+## Expected new scenarios
+
+* Being able to compile on the browser, simplifying and allowing people to try and modify snippets directly in the browser without requiring a backend.
+* Faster or equiparable compilation times while reducing the number of targets. Much faster on CI since it won't include K/N or Android targets.
+* Not depending on the JVM.
+* Simpler compiler plugins.
+* Simplified tooling for projects.
+* Hugely reduced download times: not gradle, not all the JVM, not all those libraries. Just a single Deno executable plus likely around 1MB or compiler and runtime.
+* Reflection on all the targets, allowing to implement some scenarios without extra plugins.
+* Hot reloading on JS.
+* Being able to use the compiler as a Library, allowing Kotlin to be used as scripting on JS.
+* Allow to use existing Kotlin/JS libraries from source.
 
 ## Sandbox ideas
 
