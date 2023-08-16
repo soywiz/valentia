@@ -1,6 +1,6 @@
 # Valentia Compiler
 
-Valentia is a Kotlin Compiler fully written in Kotlin,
+Valentia (spelled Valentía in Spanish) is a Kotlin Compiler fully written in Kotlin,
 that aims to generate JS and in the future C++/WASM code.
 
 It is designed to generate dependency-less JS Deno/Browser code and in the future C++ or WASM code too.
