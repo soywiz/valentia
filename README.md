@@ -15,6 +15,7 @@ The compiler can be embedded as library and also allows compiling code in the br
 * [ ] Step 5: New features: static if, Numeric coercion, etc.
 * [ ] Extra: Support for source-code-based plugins for AST transformation and code generation
 * [ ] Extra: API support for passing the AST to functions like C# LINQ
+* [ ] Extra: Reflection support: annotation, types, etc. for annotated elements.
 * [ ] Project descriptor: Create project descriptor using TOML. For example cargo.toml
 * [ ] No multiple folders for targets. Use annotations, static ifs, etc.. Just `src`, `test`, `resources` and `testresources` by default. For Kotlin compatibility it can use `src/commonMain` and `src/jsMain`
 * [ ] Resources are copied along the generated `.js`/executable file.
@@ -53,6 +54,47 @@ const wasmModule = new WebAssembly.Module(wasmCode);
 const wasmInstance = new WebAssembly.Instance(wasmModule);
 const sum = wasmInstance.exports.sum as CallableFunction;
 console.log(sum(1, 2));
+```
+
+```js
+class MyModule {
+    // Alternatively embed here as base64
+    #wasmFile = "sum.wasm";
+    #wasmInstance = new WebAssembly.Instance(new WebAssembly.Module(Deno.readFileSync(this.#wasmFile)));
+    #exports = this.#wasmInstance.exports;
+    memory = this.#wasmInstance.memory;
+
+    constructor() {
+    }
+    
+    sum(a, b) {
+        return this.#exports.sum(a, b);
+    }
+}
+```
+
+for example:
+
+```js
+function base64ToArrayBuffer(base64) {
+    var binaryString = atob(base64);
+    var bytes = new Uint8Array(binaryString.length);
+    for (var i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+    return bytes.buffer;
+}
+
+class MyModule {
+    #wasmContent = base64ToArrayBuffer("AGFzbQEAAAABBwFgAn9/AX8DAgEABAUBcAEBAQUDAQAABhQDfwBBCAt/AUGIgAILfwBBiIACCwcQAgNzdW0AAAZtZW1vcnkCAAkGAQBBAQsACgoBCAAgACABag8L");
+    #wasmInstance = new WebAssembly.Instance(new WebAssembly.Module(this.#wasmContent));
+    #exports = this.#wasmInstance.exports;
+    memory = this.#wasmInstance.memory;
+    
+    sum(a, b) {
+        return this.#exports.sum(a, b);
+    }
+}
+
+console.log(new MyModule().sum(1, 2));
 ```
 
 ### Deno FFI
@@ -110,5 +152,5 @@ SDL.SDL_QuitSubSystem(0x00000020);
 [dependencies]
 # github: org.repo = "tag/commithash"
 # github: org.repo.folder = "tag/commithash"
-korlibs.korge.kds = "1.0.0"
+korlibs.korge.kds = "4.0.4"
 ```

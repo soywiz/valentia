@@ -51,7 +51,9 @@ fun main(args: Array<String>) {
                 items.clear()
                 println("TODO")
             }
-            else -> error("Unknown command $item")
+            else -> {
+                error("Unknown command $item")
+            }
         }
     }
 }
