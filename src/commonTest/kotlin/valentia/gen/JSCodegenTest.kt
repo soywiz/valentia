@@ -136,7 +136,24 @@ class JSCodegenTest {
                 fun min(a: Int, b: Int): Int { return if (a < b) a else b }
                 fun main() {
                     console.log(min(1, 2))
-                    console.log(min(4, -3))
+                    console.log(min(+4, -3))
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
+    fun testIntegerAddition() {
+        0 until 10
+        assertEquals(
+            "-1073741824\n2\n949312677\n1018518717\n69206040",
+            genAndRunJs("""
+                fun main() {
+                    console.log(2147483648 + 1073741824)
+                    console.log(-2147483647 + -2147483647)
+                    console.log(213212312 xor 874512445)
+                    console.log(213212312 or 874512445)
+                    console.log(213212312 and 874512445)
                 }
             """.trimIndent(), printJs = true)
         )

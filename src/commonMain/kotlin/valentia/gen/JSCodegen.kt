@@ -254,6 +254,7 @@ open class JSCodegen {
                 val exprStr = generateExpr(expr.expr)
                 when (expr.op) {
                     UnaryPreOp.MINUS -> "-($exprStr)"
+                    UnaryPreOp.PLUS -> "+($exprStr)"
                     else -> TODO("Unsupported $expr")
                 }
             }
@@ -264,7 +265,24 @@ open class JSCodegen {
             //    }
             //}
             is BinaryOpExpr -> {
-                "" + generateExpr(expr.left) + " " + expr.op + " " + generateExpr(expr.right)
+                val leftType = expr.left.getTypeSafe()
+                val rightType = expr.right.getTypeSafe()
+                val leftStr = generateExpr(expr.left)
+                val rightStr = generateExpr(expr.right)
+                val op = when (expr.op) {
+                    "xor" -> "^"
+                    "or" -> "|"
+                    "and" -> "&"
+                    "shl" -> "<<"
+                    "shr" -> ">>"
+                    else -> expr.op
+                }
+                when {
+                    leftType == IntType && rightType == IntType -> "((($leftStr) $op ($rightStr))|0)"
+                    else -> "(($leftStr) $op ($rightStr))"
+                }
+
+
             }
             is CallExpr -> {
                 //val symbols = symbolProvider[expr.id]
