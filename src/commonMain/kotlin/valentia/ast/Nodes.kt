@@ -3,9 +3,9 @@ package valentia.ast
 import valentia.ast.NodeBuilder.Companion.type
 import valentia.parser.BaseConsumer
 import valentia.sema.ResolutionContext
-import valentia.sema.SymbolProvider
+import valentia.util.Extra
 
-sealed class Node {
+sealed class Node : Extra by Extra.Mixin() {
     var reader: BaseConsumer? = null
     var spos: Int = -1
     var epos: Int = -1
@@ -92,12 +92,9 @@ data class FileNode(
     val fileAnnotations: List<AnnotationNodes> = emptyList(),
     val imports: List<ImportNode> = emptyList(),
     val topLevelDecls: List<Decl> = emptyList(),
-) : Node() {
+) : Node(), Extra by Extra.Mixin() {
     val symbolsByName by lazy {
         topLevelDecls.groupBy { it.declName }
-    }
-    val symbolProvider = SymbolProvider {
-        symbolsByName[it] ?: emptyList()
     }
 }
 
@@ -462,6 +459,7 @@ fun <T : VariableDeclBase> T.withAssignment(
 data class Identifier(val parts: List<String>) : Expr() {
     constructor(str: String) : this(str.split("."))
     val fqname: String = parts.joinToString(".")
+    val lastPart: String get() = parts.lastOrNull() ?: ""
     override fun toString(): String = "Identifier($fqname)"
 }
 
@@ -505,6 +503,7 @@ data class Temp(val type: TypeNode, val id: Int) : Expr() {
     override fun toString(): String = "\$temp\$$id"
 }
 data class SuperExpr(val label: String? = null, val type: TypeNode? = null) : AssignableExpr()
+data class TernaryExpr(val cond: Expr, val trueExpr: Expr, val falseExpr: Expr) : Expr()
 data class IfExpr(val cond: Expr, val trueBody: ExprOrStm, val falseBody: ExprOrStm? = null) : Expr()
 data class BreakExpr(val label: String? = null) : Expr()
 data class ContinueExpr(val label: String? = null) : Expr()
@@ -637,6 +636,7 @@ data class TryCatchStm(val body: Stm, val catches: List<Catch> = emptyList(), va
 
 data class ReturnStm(val expr: Expr?) : Stm()
 data class IfStm(val cond: Expr, val btrue: Stm, val bfalse: Stm? = null) : Stm()
+data class ThrowStm(val expr: Expr) : Stm()
 data class AssignStm(val lvalue: Expr, val op: String, val expr: Expr) : Stm()
 data class BreakStm(val label: String? = null) : Stm()
 data class ContinueStm(val label: String? = null) : Stm()

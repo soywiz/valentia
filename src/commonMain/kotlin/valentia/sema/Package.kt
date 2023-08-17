@@ -3,8 +3,9 @@ package valentia.sema
 import valentia.ast.Decl
 import valentia.ast.FileNode
 import valentia.ast.Identifier
+import valentia.util.Extra
 
-class Package(val identifier: Identifier?) {
+class Package(val identifier: Identifier?) : Extra by Extra.Mixin() {
     val symbols = LinkedHashMap<String, ArrayList<Decl>>()
     val files = arrayListOf<FileNode>()
 

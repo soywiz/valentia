@@ -25,33 +25,23 @@ open class JSCodegen {
         }
     }
     open fun generateModule(module: Module) {
-        for (file in module.filesByPackage.values) {
+        for (file in module.packagesById.values) {
             generatePackage(file)
         }
     }
 
     open fun generatePackage(pack: Package) {
         indenter.line("// package: ${pack.identifier}")
-        for (file in pack.files) {
-            generateFile(file)
-        }
-    }
-
-    var symbolProvider: SymbolProvider = EmptySymbolProvider
-
-    fun <T> pushSymbolProvider(symbolProvider: SymbolProvider, block: () -> T): T {
-        val parent = this.symbolProvider
-        try {
-            this.symbolProvider = this.symbolProvider + symbolProvider
-            return block()
-        } finally {
-            this.symbolProvider = parent
+        pushResolutionContext(PackageResolutionContext(pack)) {
+            for (file in pack.files) {
+                generateFile(file)
+            }
         }
     }
 
     open fun generateFile(file: FileNode) {
         indenter.line("// topLevelDecls: ${file.topLevelDecls.size}")
-        pushSymbolProvider(file.symbolProvider) {
+        pushResolutionContext(FileResolutionContext(file)) {
             generateDecls(file.topLevelDecls, null)
         }
     }
@@ -73,10 +63,17 @@ open class JSCodegen {
                     val letStr = if (parent !is ClassOrObjectDecl) "let " else ""
                     if (decl.getter != null) {
                         indenter.line("get ${letStr}${decl.jsName}()") {
-                            generateStm(decl.getter.body)
+                            generateStm(decl.getter.body, parent)
                         }
                     } else {
-                        indenter.line("${letStr}${decl.jsName} = ${generateExpr(decl.expr)};")
+                        val expr = decl.expr
+                        var assign = ""
+                        if (expr != null) {
+                            val (pre, expr) = transformer.ensure(decl.expr, transformContext)
+                            pre?.let { generateStm(pre, parent) }
+                            assign = " = ${generateExpr(expr)}"
+                        }
+                        indenter.line("${letStr}${decl.jsName}$assign;")
                     }
                 }
             }
@@ -106,7 +103,7 @@ open class JSCodegen {
                                 val callType = delegatedCall.getType(DummyResolutionContext)
                                 val clazz = parent as ClassOrObjectDecl
                                 val parentConstructor = clazz?.constructors?.firstOrNull {
-                                    val constructorType = it.getTypeSafe(DummyResolutionContext)
+                                    val constructorType = it.getTypeSafe()
                                     TypeMatching.canAssignTo(
                                         callType,
                                         constructorType,
@@ -119,7 +116,7 @@ open class JSCodegen {
                             null -> TODO()
                         }
                     }
-                    generateStm(decl.body)
+                    generateStm(decl.body, parent)
                     indenter.line("return this;")
                 }
             }
@@ -128,21 +125,23 @@ open class JSCodegen {
     }
 
     open fun generateClass(clazz: ClassOrObjectDecl) {
-        val subTypes = clazz.subTypes ?: emptyList()
-        var extends: ClassOrObjectDecl? = null
-        for (subType in subTypes) {
-            val decl = symbolProvider[subType.type]?.firstOrNull() as? ClassOrObjectDecl ?: continue
-            if (!decl.kind.isInterface) {
-                extends = decl
+        pushResolutionContext(ClassResolutionContext(clazz)) {
+            val subTypes = clazz.subTypes ?: emptyList()
+            var extends: ClassOrObjectDecl? = null
+            for (subType in subTypes) {
+                val decl = currentResolutionContext[subType.type]?.decls?.firstOrNull() as? ClassOrObjectDecl ?: continue
+                if (!decl.kind.isInterface) {
+                    extends = decl
+                }
             }
-        }
-        val extendsStr = if (extends != null) " extends ${extends.jsName}" else ""
-        //println("EXTENDS: ${extends}")
-        indenter.line("class ${clazz.name}$extendsStr") {
-            if (clazz is ObjectDecl) {
-                indenter.line("static #\$_singleton = null; static get #\$singleton() { if (!this.#\$_singleton) this.#\$_singleton = new ${clazz.name}(); return this.#\$_singleton;  }")
+            val extendsStr = if (extends != null) " extends ${extends.jsName}" else ""
+            //println("EXTENDS: ${extends}")
+            indenter.line("class ${clazz.name}$extendsStr") {
+                if (clazz is ObjectDecl) {
+                    indenter.line("static #\$_singleton = null; static get #\$singleton() { if (!this.#\$_singleton) this.#\$_singleton = new ${clazz.name}(); return this.#\$_singleton;  }")
+                }
+                generateDecls(clazz.bodyAll, clazz)
             }
-            generateDecls(clazz.bodyAll, clazz)
         }
     }
 
@@ -166,7 +165,7 @@ open class JSCodegen {
                 val headerLine = indenter.line("")
                 try {
                     transformContext = TransformUnsupportedNodes.TransformContext()
-                    generateStmsCompact(transformer.transform(it))
+                    generateStmsCompact(transformer.transform(it), parent)
                 } finally {
                     if (transformContext.temps.isNotEmpty()) {
                         headerLine.str += "let " + transformContext.temps.joinToString(", ") { "$it" } + ";"
@@ -180,48 +179,30 @@ open class JSCodegen {
         }
     }
 
-    data class IdWithContext(val id: String, val context: SymbolProvider) {
-        fun resolve(): List<Decl>? = context[id]
-        fun resolve(funcType: TypeNode): Decl? {
-            val items = resolve() ?: return null
-            for (item in items) {
-                // @TODO: Check constructors
-                if (item is ClassOrObjectDecl) {
-                    for (constructor in item.constructors) {
-                        val constructorFuncType = constructor.getType(DummyResolutionContext)
-                        if (TypeMatching.canAssignTo(funcType, constructorFuncType)) {
-                            return constructor
-                        }
-                    }
-                    if (funcType is FuncTypeNode) {
-                        if (funcType.params.isEmpty()) {
-                            return item
-                        }
-                    }
-                    TODO("Can't find constructor for $funcType")
-                }
-                // @TODO: Compat
-                if (TypeMatching.canAssignTo(funcType, item.getType(DummyResolutionContext))) {
-                    return item
-                }
-            }
-            return null
+    var currentResolutionContext: ResolutionContext = DummyResolutionContext
+
+    fun <T> pushResolutionContext(resolutionContext: ResolutionContext, block: () -> T): T {
+        val oldResolutionContext = currentResolutionContext
+        try {
+            currentResolutionContext = resolutionContext + currentResolutionContext
+            return block()
+        } finally {
+            currentResolutionContext = oldResolutionContext
         }
-        override fun toString(): String = id
     }
 
     fun Node.getTypeSafe(): TypeNode {
         // @TODO: Get from this context
-        return getTypeSafe(DummyResolutionContext)
+        return getTypeSafe(currentResolutionContext)
     }
 
     fun Node.getTypeSafe(resolutionContext: ResolutionContext): TypeNode {
-        try {
-            return getType(resolutionContext)
+        return try {
+            getType(resolutionContext)
         } catch (e: Throwable) {
             println("ERROR[UnknownType]: ${e.message}")
             //e.printStackTrace()
-            return UnknownType
+            UnknownType
         }
     }
 
@@ -237,7 +218,7 @@ open class JSCodegen {
     open fun generateExpr(expr: Expr?): Any {
         return when (expr) {
             null -> "null"
-            is IdentifierExpr -> IdWithContext(expr.id, symbolProvider)
+            is IdentifierExpr -> IdWithContext(expr.id, currentResolutionContext)
             is BoolLiteralExpr -> "${expr.value}"
             is IntLiteralExpr -> "${expr.value}"
             is CharLiteralExpr -> "${expr.value.code}"
@@ -255,6 +236,7 @@ open class JSCodegen {
                 when (expr.op) {
                     UnaryPreOp.MINUS -> "-($exprStr)"
                     UnaryPreOp.PLUS -> "+($exprStr)"
+                    UnaryPreOp.EXCL -> "!($exprStr)"
                     else -> TODO("Unsupported $expr")
                 }
             }
@@ -281,8 +263,6 @@ open class JSCodegen {
                     leftType == IntType && rightType == IntType -> "((($leftStr) $op ($rightStr))|0)"
                     else -> "(($leftStr) $op ($rightStr))"
                 }
-
-
             }
             is CallExpr -> {
                 //val symbols = symbolProvider[expr.id]
@@ -291,30 +271,25 @@ open class JSCodegen {
                 val res = generateExpr(expr.expr)
                 val paramsStr = "(" + expr.paramsPlusLambda.joinToString(", ") { generateExpr(it).toString() } + ")"
                 if (res is IdWithContext) {
-                    //val exprType = expr.expr.getTypeSafe(DummyResolutionContext)
+                    //val exprType = expr.expr.getTypeSafe()
                     val exprType = UnknownType
                     //println("exprType=$exprType")
                     val funcType = FuncTypeNode(
                         exprType,
-                        expr.params.map { NamedTypeNode(it.getTypeSafe(DummyResolutionContext)) }
+                        expr.params.map { NamedTypeNode(it.getTypeSafe()) }
                     )
                     val resolved = res.resolveSafe(funcType)
                     //println("Can't resolve $funcType")
                     //println("RESOLVE: $funcType : $resolved")
                     val name = (resolved?.jsName ?: res.id)
+                    //"$name$paramsStr"
                     when (resolved) {
-                        is ClassOrObjectDecl -> {
-                            "(new $name$paramsStr)"
-                        }
-                        is BaseConstructorDecl -> {
-                            "(new ${resolved.parent?.jsName}).${resolved.jsName}$paramsStr"
-                        }
-                        is FunDecl -> {
-                            "$name$paramsStr"
-                        }
+                        is ClassOrObjectDecl -> "(new $name$paramsStr)"
+                        is BaseConstructorDecl -> "(new ${resolved.parent?.jsName}).${resolved.jsName}$paramsStr"
+                        is FunDecl -> "$name$paramsStr"
+                        //is IdentifierExpr -> "$name$paramsStr"
                         else -> {
-                            //"$name$paramsStr"
-                            TODO("resolved=$resolved, expr=${expr.expr}")
+                            TODO("resolved=$resolved, expr=${expr.expr}, res=$res, funcType=$funcType, res.resolve[${res.resolve().decls.size}]=${res.resolve()}")
                         }
                     }
                 } else {
@@ -331,7 +306,7 @@ open class JSCodegen {
             }
             is LambdaFunctionExpr -> {
                 val str = initLambdaBlock {
-                    for (stm in expr.stms) generateStm(stm)
+                    for (stm in expr.stms) generateStm(stm, null)
                 }
                 "() => { $str }"
             }
@@ -358,6 +333,12 @@ open class JSCodegen {
             //is BreakExpr -> if (expr.label != null) "break ${expr.label};" else "break;"
             //is ContinueExpr -> if (expr.label != null) "continue ${expr.label};" else "continue;"
             is TempExpr -> "${expr.temp}"
+            is TernaryExpr -> {
+                val cond = generateExpr(expr.cond).toString()
+                val trueStr = generateExpr(expr.trueExpr).toString()
+                val falseStr = generateExpr(expr.falseExpr).toString()
+                "(($cond) ? ($trueStr) : ($falseStr))"
+            }
             else -> TODO("generateExpr: $expr")
         }
     }
@@ -384,11 +365,11 @@ open class JSCodegen {
 
 
 
-    fun generateStmsCompact(stm: Stm?) {
+    fun generateStmsCompact(stm: Stm?, parent: Decl?) {
         when (stm) {
             null -> return
-            is Stms -> for (stm in stm.stms) generateStm(stm)
-            else -> generateStm(stm)
+            is Stms -> for (stm in stm.stms) generateStm(stm, parent)
+            else -> generateStm(stm, parent)
         }
     }
 
@@ -399,8 +380,11 @@ open class JSCodegen {
         }
         indenter.line("}")
     }
+    open fun generateStm(stm: Stm?, parent: Decl?) {
+        _generateStm(transformer.ensure(stm, transformContext), parent)
+    }
 
-    open fun generateStm(stm: Stm?) {
+    open fun _generateStm(stm: Stm?, parent: Decl?) {
         when (stm) {
             null -> Unit
             is AssignStm -> {
@@ -408,14 +392,14 @@ open class JSCodegen {
             }
             is IfStm -> {
                 val (pre, expr) = transformer.ensure(stm.cond, transformContext)
-                pre?.let { generateStm(pre) }
+                pre?.let { generateStm(pre, parent) }
                 if (expr != null) {
                     val lin = indenter.line("if (${generateExpr(expr)})") {
-                        generateStmsCompact(stm.btrue)
+                        generateStmsCompact(stm.btrue, parent)
                     }
                     if (stm.bfalse != null) {
                         lin ELSE {
-                            generateStmsCompact(stm.bfalse)
+                            generateStmsCompact(stm.bfalse, parent)
                         }
                     }
                 }
@@ -425,7 +409,7 @@ open class JSCodegen {
                 when (stm) {
                     is ForLoopStm -> {
                         val (pre, expr) = transformer.ensure(stm.expr, transformContext)
-                        pre?.let { generateStm(pre) }
+                        pre?.let { generateStm(pre, parent) }
                         if (expr != null) {
                             if (expr is BinaryOpExpr && expr.left.getTypeSafe() == IntType && expr.right.getTypeSafe() == IntType && (expr.op == ".." || expr.op == "..<" || expr.op == "until" || expr.op == "downTo")) {
                                 val varg = generateVarDecl(stm.vardecl)
@@ -444,21 +428,21 @@ open class JSCodegen {
                                 indenter.line("$LOOPSTART = ${generateExpr(expr.left)};")
                                 indenter.line("$LOOPEND = ${generateExpr(expr.right)};")
                                 indenter.line("${labelStr}for (let $varg = $LOOPSTART; $varg $comparisonOp $LOOPEND; $varg$incrOp)") {
-                                    generateStmsCompact(stm.body)
+                                    generateStmsCompact(stm.body, parent)
                                 }
                             } else {
                                 indenter.line("${labelStr}for (const ${generateVarDecl(stm.vardecl)} of ${generateExpr(expr)})") {
-                                    generateStmsCompact(stm.body)
+                                    generateStmsCompact(stm.body, parent)
                                 }
                             }
                         }
                     }
                     is WhileLoopStm -> {
                         val (pre, expr) = transformer.ensure(stm.cond, transformContext)
-                        pre?.let { generateStm(pre) }
+                        pre?.let { generateStm(pre, parent) }
                         if (expr != null) {
                             indenter.line("${labelStr}while (${generateExpr(expr)})") {
-                                generateStmsCompact(stm.body)
+                                generateStmsCompact(stm.body, parent)
                             }
                         }
                     }
@@ -468,13 +452,13 @@ open class JSCodegen {
             is Stms -> {
                 indenter.line("") {
                     for (stm in stm.stms) {
-                        generateStm(stm)
+                        generateStm(stm, parent)
                     }
                 }
             }
             is ExprStm -> {
                 val (pre, expr) = transformer.ensure(stm.expr, transformContext)
-                pre?.let { generateStm(pre) }
+                pre?.let { generateStm(pre, parent) }
                 expr?.let { indenter.line("${generateExpr(expr)};") }
             }
             is ReturnStm -> {
@@ -483,18 +467,20 @@ open class JSCodegen {
                     return
                 }
                 val (pre, expr) = transformer.ensure(stm.expr, transformContext)
-                pre?.let { generateStm(pre) }
+                pre?.let { generateStm(pre, parent) }
                 expr?.let { indenter.line("return ${generateExpr(expr)};") }
             }
             is BreakStm -> indenter.line("break ${stm.label ?: ""};")
             is ContinueStm -> indenter.line("continue ${stm.label ?: ""};")
+            is DeclStm -> generateDecl(stm.decl, parent)
+            is ThrowStm -> indenter.line("throw ${generateExpr(stm.expr)};")
             else -> TODO("generateStm: $stm")
         }
     }
 
     private fun generateVarDecl(vardecl: VariableDeclBase?): String {
         return when (vardecl) {
-            is MultiVariableDecl -> "(" + vardecl.decls.map { it.id }.joinToString(", ") + ")"
+            is MultiVariableDecl -> "(" + vardecl.decls.joinToString(", ") { it.id } + ")"
             is VariableDecl -> vardecl.id
             null -> TODO("vardecl=null")
         }

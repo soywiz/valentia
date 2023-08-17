@@ -2,6 +2,7 @@ package valentia.sema
 
 import valentia.ast.FuncTypeNode
 import valentia.ast.TypeNode
+import valentia.ast.UnknownType
 
 object TypeMatching {
     fun canAssignTo(src: TypeNode?, dst: TypeNode?): Boolean {
@@ -14,6 +15,8 @@ object TypeMatching {
             //TODO("$src -> $dst")
             return true
         }
+        if (src == UnknownType) return true
+        if (dst == UnknownType) return true
         if (src == dst) {
             return true
         }

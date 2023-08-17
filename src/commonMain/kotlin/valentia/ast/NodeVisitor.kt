@@ -80,6 +80,7 @@ open class NodeVisitor {
             is ReturnStm -> visit(stm)
             is Stms -> visit(stm)
             is TryCatchStm -> visit(stm)
+            is ThrowStm -> visit(stm)
         }
     }
 
@@ -127,6 +128,9 @@ open class NodeVisitor {
         }
         visit(stm.finally)
     }
+    open fun visit(stm: ThrowStm) {
+        visit(stm.expr)
+    }
 
     open fun visit(expr: Expr?) {
         when (expr) {
@@ -157,6 +161,7 @@ open class NodeVisitor {
             is TypeTestExpr -> visit(expr)
             is UnaryPreOpExpr -> visit(expr)
             is WhenExpr -> visit(expr)
+            is TernaryExpr -> visit(expr)
         }
     }
     open fun visit(expr: AnonymousFunctionExpr) { }
@@ -184,6 +189,11 @@ open class NodeVisitor {
         visit(expr.cond)
         visitExprOrStm(expr.trueBody)
         visitExprOrStm(expr.falseBody)
+    }
+    open fun visit(expr: TernaryExpr) {
+        visit(expr.cond)
+        visitExprOrStm(expr.trueExpr)
+        visitExprOrStm(expr.falseExpr)
     }
     open fun visit(expr: IncompleteExpr) { }
     open fun visit(expr: InterpolatedStringExpr) {

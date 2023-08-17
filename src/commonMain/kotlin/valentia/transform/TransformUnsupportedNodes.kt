@@ -15,12 +15,45 @@ class TransformUnsupportedNodes(val supported: (Node) -> Boolean) {
         }
     }
 
+    fun ensure(stm: Stm?, ctx: TransformContext): Stm? {
+        return when (stm) {
+            null -> null
+            is ExprStm -> {
+                val expr = stm.expr
+                when (expr) {
+                    is IfExpr -> IfStm(expr.cond, expr.trueBody.toStm(), expr.falseBody?.toStm())
+                    is ThrowExpr -> ThrowStm(expr.expr)
+                    else -> stm
+                }
+            }
+            is Stms -> {
+                Stms(stm.stms.mapNotNull { ensure(it, ctx) })
+            }
+            else -> return stm
+        }
+    }
+
     fun ensure(expr: Expr, ctx: TransformContext): Pair<Stm?, Expr?> {
         when (expr) {
             is ReturnExpr -> {
                 return ReturnStm(expr.expr) to null
             }
             is IfExpr -> {
+                if (
+                    (expr.trueBody is ExprStm || expr.trueBody is Expr) &&
+                    (expr.falseBody is ExprStm || expr.falseBody is Expr)
+                ) {
+                    val trueBody = expr.trueBody
+                    val falseBody = expr.falseBody
+                    return null to TernaryExpr(
+                        expr.cond,
+                        if (trueBody is ExprStm) trueBody.expr else trueBody as Expr,
+                        if (falseBody is ExprStm) falseBody.expr else falseBody as Expr,
+                    )
+                }
+                if (expr.trueBody is Expr && expr.falseBody is Expr) {
+                    return null to TernaryExpr(expr.cond, expr.trueBody, expr.falseBody)
+                }
                 if (expr.falseBody == null) {
                     return IfStm(expr.cond, expr.trueBody.toStm()) to null
                 }

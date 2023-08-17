@@ -10,6 +10,65 @@ import kotlin.test.assertEquals
 
 class JSCodegenTest {
     @Test
+    fun testIfTernary() {
+        assertEquals(
+            "a\nb",
+            genAndRunJs("""
+                fun main() {
+                    val a = 10
+                    val b = if (a == 10) "a" else "b"
+                    val c = if (a != 10) "a" else "b"
+                    console.log(b)
+                    console.log(c)
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
+    fun testIterator() {
+        assertEquals(
+            "7",
+            genAndRunJs("""
+                external fun println(v: Any?)
+                
+                interface Iterator<out T> {
+                    operator fun next(): T
+                    operator fun hasNext(): Boolean
+                }
+                interface Iterable<out T> {
+                    operator fun iterator(): Iterator<T>
+                }
+                abstract class IntIterator : Iterator<Int> {
+                    override final fun next() = nextInt()
+                    abstract fun nextInt(): Int
+                }
+                internal class IntProgressionIterator(first: Int, last: Int, val step: Int) : IntIterator() {
+                    private val finalElement: Int = last
+                    private var hasNext: Boolean = if (step > 0) first <= last else first >= last
+                    private var next: Int = if (hasNext) first else finalElement
+                    override fun hasNext(): Boolean = hasNext
+                    override fun nextInt(): Int {
+                        val value = next
+                        if (value == finalElement) {
+                            if (!hasNext) throw kotlin.NoSuchElementException()
+                            hasNext = false
+                        } else {
+                            next += step
+                        }
+                        return value
+                    }
+                }
+                fun main() {
+                    for (n in IntProgressionIterator(0, 10, +4)) {
+                        println(n)
+                    }
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
     @Ignore
     fun testSuspend() {
         println(genFilesJSString("""
