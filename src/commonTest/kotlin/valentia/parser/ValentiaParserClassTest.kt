@@ -20,8 +20,8 @@ class ValentiaParserClassTest : DeclBuilder, StmBuilder {
         assertEquals(
             ClassDecl(kind = ClassKind.CLASS, name = "Demo",
                 primaryConstructor = PrimaryConstructorDecl(
-                    ClassParameter("a", IntType, valOrVar = "val"),
-                    ClassParameter("b", StringType, valOrVar = "val"),
+                    ClassParameter("a", IntType, kind = VariableKind.VAL),
+                    ClassParameter("b", StringType, kind = VariableKind.VAL),
                 )
             ),
             ValentiaParser.topLevelDecl("annotation class Demo(val a: Int, val b: String)")

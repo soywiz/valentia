@@ -26,7 +26,7 @@ open class JSCodegen {
             generateModule(module)
         }
         if (hasMainFunction) {
-            indenter.line("main([])")
+            indenter.line("main\$1([])")
         }
     }
     open fun generateModule(module: Module) {
@@ -70,7 +70,11 @@ open class JSCodegen {
             is VariableDecl -> {
                 if (FunctionModifier.EXTERNAL !in decl.modifiers) {
                     val settingFieldConstructor = ctx?.settingFieldConstructor == true
-                    val letStr = if (settingFieldConstructor) "this." else if (parent !is ClassOrObjectDecl) "let " else ""
+                    val letStr = when {
+                        settingFieldConstructor -> "this."
+                        parent !is ClassOrObjectDecl -> "let "
+                        else -> ""
+                    }
                     if (decl.getter != null) {
                         indenter.line("get ${letStr}${decl.jsName}()") {
                             generateStm(decl.getter.body, parent)
@@ -92,7 +96,7 @@ open class JSCodegen {
 
                 if (decl is PrimaryConstructorDecl) {
                     for (p in decl.classParams) {
-                        if (p.valOrVar != null) {
+                        if (p.kind != null) {
                             // @TODO: Detect type to set to null, or to number, etc.
                             indenter.line("${p.id} = null;")
                         }
@@ -103,7 +107,7 @@ open class JSCodegen {
                 indenter.line("${decl.jsName}($params)") {
                     if (decl is PrimaryConstructorDecl) {
                         for (p in decl.classParams) {
-                            if (p.valOrVar != null) {
+                            if (p.kind != null) {
                                 indenter.line("this.${p.id} = ${p.id};")
                             }
                         }
@@ -192,13 +196,25 @@ open class JSCodegen {
 
         val functionMod = if (parent is ClassOrObjectDecl) "" else "function "
         val suspendMod = if (func.isSuspend) "*" else ""
+        if (func.jsName == "next\$1") {
+            indenter.line("*[Symbol.iterator]()") {
+                line("while (this.hasNext\$1())") {
+                    line("yield this.next\$1();")
+                }
+            }
+            //indenter.line("next()") {
+            //    line("const done = !this.hasNext\$1();")
+            //    line("if (done) return { done: true };")
+            //    line("return { value: this.next\$1(), done: false };")
+            //}
+        }
         indenter.line("${functionMod}${suspendMod}${func.jsName}($params)") {
             func.body?.let {
                 val oldContext = transformContext
                 val headerLine = indenter.line("").also { it.opt = true }
                 try {
                     transformContext = TransformUnsupportedNodes.TransformContext()
-                    generateStmsCompact(transformer.transform(it), parent)
+                    generateStmsCompact(transformer.transform(it), func)
                 } finally {
                     if (transformContext.temps.isNotEmpty()) {
                         headerLine.str += "let " + transformContext.temps.joinToString(", ") { "$it" } + ";"
@@ -387,9 +403,6 @@ open class JSCodegen {
             else -> true
         }
     }
-
-
-
 
     fun generateStmsCompact(stm: Stm?, parent: Decl?) {
         when (stm) {

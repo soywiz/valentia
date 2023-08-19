@@ -392,8 +392,15 @@ abstract class ClassOrObjectDecl(open val name: String, open val kind: ClassKind
     open val primaryConstructor: PrimaryConstructorDecl? = null
     open val body: List<Decl>? = null
     open val subTypes: List<SubTypeInfo>? = null
+
+    val primaryVals by lazy {
+        primaryConstructor?.classParams
+            ?.mapNotNull { it.kind?.let { kind -> VariableDecl(it.id, it.type, it.expr, kind = kind, synth = true) } }
+            ?: emptyList()
+    }
+
     val bodyAll by lazy {
-        (listOfNotNull(primaryConstructor) + (body ?: emptyList())).also { list ->
+        (primaryVals + listOfNotNull(primaryConstructor) + (body ?: emptyList())).also { list ->
             for (it in list) it.parentNode = this
         }
     }
@@ -432,7 +439,8 @@ data class FunDecl constructor(
 ) : Decl(name) {
     val jsHash by lazy { params.map { it.type }.hashCode() and 0x7FFFFFFF }
     override val jsName by lazy {
-        if (params.isEmpty()) name else "$name\$${jsHash.toString(16)}"
+        //if (params.isEmpty()) name else "$name\$${jsHash.toString(16)}"
+        "$name\$${jsHash.toString(16)}"
     }
 
     val isSuspend: Boolean get() = FunctionModifier.SUSPEND in modifiers
@@ -444,8 +452,18 @@ data class FunDecl constructor(
 }
 sealed abstract class VariableDeclBase(
     declName: String,
-    modifiers: Modifiers = Modifiers.EMPTY,
-) : Decl(declName)
+) : Decl(declName) {
+    abstract val modifiers: Modifiers
+    abstract val kind: VariableKind
+}
+
+enum class VariableKind(val id: String) {
+    VAL("val"), VAR("var");
+    companion object {
+        val BY_ID = entries.associateBy { it.id }
+    }
+}
+
 data class VariableDecl(
     val id: String,
     val type: TypeNode? = null,
@@ -453,10 +471,12 @@ data class VariableDecl(
     val delegation: Boolean = false,
     val receiver: TypeNode? = null,
     val annotations: Annotations = Annotations.EMPTY,
-    val modifiers: Modifiers = Modifiers.EMPTY,
+    override val modifiers: Modifiers = Modifiers.EMPTY,
     val getter: FunDecl? = null,
     val setter: FunDecl? = null,
-) : VariableDeclBase(id, modifiers) {
+    override val kind: VariableKind = VariableKind.VAL,
+    val synth: Boolean = false,
+) : VariableDeclBase(id) {
     val isField get() = !delegation && getter == null && setter == null
 }
 data class MultiVariableDecl(
@@ -465,8 +485,9 @@ data class MultiVariableDecl(
     val delegation: Boolean = false,
     val type: TypeNode? = null,
     val receiver: TypeNode? = null,
-    val modifiers: Modifiers = Modifiers.EMPTY,
-) : VariableDeclBase(decls.joinToString(",") { it.declName }, modifiers) {
+    override val modifiers: Modifiers = Modifiers.EMPTY,
+    override val kind: VariableKind = VariableKind.VAL,
+) : VariableDeclBase(decls.joinToString(",") { it.declName }) {
     constructor(vararg decls: VariableDecl, expr: Expr? = null, modifiers: Modifiers = Modifiers.EMPTY) : this(decls.toList(), expr, modifiers = modifiers)
 }
 
@@ -566,15 +587,15 @@ data class ClassParameter(
     val id: String,
     val type: TypeNode? = null,
     val expr: Expr? = null,
-    val valOrVar: String? = null,
+    val kind: VariableKind? = null,
     val modifiers: Modifiers = Modifiers.EMPTY,
 ) {
     companion object {
-        fun VAL(id: String, type: TypeNode? = null): ClassParameter = ClassParameter(id, type, valOrVar = "val")
-        fun VAR(id: String, type: TypeNode? = null): ClassParameter = ClassParameter(id, type, valOrVar = "var")
+        fun VAL(id: String, type: TypeNode? = null): ClassParameter = ClassParameter(id, type, kind = VariableKind.VAL)
+        fun VAR(id: String, type: TypeNode? = null): ClassParameter = ClassParameter(id, type, kind = VariableKind.VAR)
 
-        fun VAL(pair: Pair<String, TypeNode>): ClassParameter = ClassParameter(pair.first, pair.second, valOrVar = "val")
-        fun VAR(pair: Pair<String, TypeNode>): ClassParameter = ClassParameter(pair.first, pair.second, valOrVar = "var")
+        fun VAL(pair: Pair<String, TypeNode>): ClassParameter = ClassParameter(pair.first, pair.second, kind = VariableKind.VAL)
+        fun VAR(pair: Pair<String, TypeNode>): ClassParameter = ClassParameter(pair.first, pair.second, kind = VariableKind.VAR)
     }
 }
 

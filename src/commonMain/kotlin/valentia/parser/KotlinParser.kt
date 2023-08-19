@@ -270,7 +270,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun classParameter(): ClassParameter {
         debug { "TODO: classParameter" }
         var modifiers: Modifiers = modifiers()
-        val valOrVar = expectAnyOpt("val", "var")
+        val valOrVar = expectAnyOpt(VariableKind.BY_ID)
         NLs()
         //val id: String = simpleIdentifier()
         val id: String = simpleIdentifierOpt()
@@ -623,7 +623,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //variableDeclaration
     //    : annotation* NL* simpleIdentifier (NL* COLON NL* type)?
     //    ;
-    fun variableDeclaration(modifiers: Modifiers): VariableDecl? {
+    fun variableDeclaration(modifiers: Modifiers, kind: VariableKind): VariableDecl? {
         val spos = pos
         val annotations = annotations(atLeastOne = false)
         NLs()
@@ -632,24 +632,24 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val type = if (expectOpt(":")) {
             NLs(); type()
         } else null
-        return VariableDecl(id, type, annotations = annotations, modifiers = modifiers)
+        return VariableDecl(id, type, annotations = annotations, modifiers = modifiers, kind = kind)
     }
 
     //multiVariableDeclaration
     //    : LPAREN NL* variableDeclaration (NL* COMMA NL* variableDeclaration)* (NL* COMMA)? NL* RPAREN
     //    ;
-    fun multiVariableDeclaration(modifiers: Modifiers): MultiVariableDecl? {
+    fun multiVariableDeclaration(modifiers: Modifiers, kind: VariableKind): MultiVariableDecl? {
         if (!matches("(")) return null
         val vars = expectAndRecover("(", ")", nullIfNotMatching = true) {
             parseListNew(trailingSeparator = true, end = { matches(")") }) {
-                variableDeclaration(Modifiers.EMPTY)
+                variableDeclaration(Modifiers.EMPTY, kind)
             }
         } ?: return null
-        return MultiVariableDecl(vars, modifiers = modifiers)
+        return MultiVariableDecl(vars, modifiers = modifiers, kind = kind)
     }
 
-    fun variableDeclarationOrMultiVariableDeclaration(modifers: Modifiers): VariableDeclBase {
-        return OR({ variableDeclaration(modifers) }, { multiVariableDeclaration(modifers) })
+    fun variableDeclarationOrMultiVariableDeclaration(modifers: Modifiers, kind: VariableKind): VariableDeclBase {
+        return OR({ variableDeclaration(modifers, kind) }, { multiVariableDeclaration(modifers, kind) })
     }
 
     //propertyDeclaration
@@ -666,8 +666,9 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun propertyDeclaration(modifiers: Modifiers, stm: Boolean = false): VariableDeclBase? {
         debug { "TODO: propertyDeclaration" }
-        val kind = peek().str
-        if (!expectOpt("val") && !expectOpt("var")) return null
+
+        val kind = VariableKind.BY_ID[peek().str] ?: return null
+        read()
         //expectAny("val", "var")
         val typeParams = typeParametersOpt()
         val receiver = opt {
@@ -685,8 +686,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         }
         NLs()
         var decl = OR(
-            { multiVariableDeclaration(modifiers) },
-            { variableDeclaration(modifiers) },
+            { multiVariableDeclaration(modifiers, kind) },
+            { variableDeclaration(modifiers, kind) },
             name = "propertyDeclaration.decl"
         )
         opt { typeConstraints() }
@@ -1312,7 +1313,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         var vardecl: VariableDeclBase? = null
         expectAndRecoverSure("(", ")") {
             annotations = annotations()
-            vardecl = variableDeclarationOrMultiVariableDeclaration(Modifiers.EMPTY)
+            vardecl = variableDeclarationOrMultiVariableDeclaration(Modifiers.EMPTY, VariableKind.VAL)
             expect("in")
             NLs()
             expr = expressionSure(ExpressionState.INSIDE_PARENTHESIZED_EXPR)
@@ -2208,14 +2209,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    ;
     fun lambdaParameter(): VariableDeclBase? {
         if (matches("(")) {
-            val mvd = multiVariableDeclaration(Modifiers.EMPTY)
+            val mvd = multiVariableDeclaration(Modifiers.EMPTY, VariableKind.VAL)
             NLs()
             val type = if (expectOpt(":")) {
                 NLs(); type()
             } else null
             return mvd?.copy(type = type)
         } else {
-            return variableDeclaration(Modifiers.EMPTY)
+            return variableDeclaration(Modifiers.EMPTY, VariableKind.VAL)
         }
     }
 
@@ -2365,7 +2366,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
                 NLs()
                 if (!expectOpt("val")) return@opt null
                 NLs()
-                decl = variableDeclaration(Modifiers.EMPTY)
+                decl = variableDeclaration(Modifiers.EMPTY, VariableKind.VAL)
                 NLs()
                 ASSIGNMENT()
                 NLs()

@@ -30,7 +30,7 @@ class JSCodegenTest {
     @Test
     fun testIterator() {
         assertEquals(
-            "7",
+            "0\n2\n4\n6\n8\n10",
             genAndRunJs("""
                 external fun println(v: Any?)
                 
@@ -52,7 +52,7 @@ class JSCodegenTest {
                     override fun hasNext(): Boolean = hasNext
                     override fun nextInt(): Int {
                         val value = next
-                        if (value == finalElement) {
+                        if (value >= finalElement) {
                             if (!hasNext) throw kotlin.NoSuchElementException()
                             hasNext = false
                         } else {
@@ -62,8 +62,8 @@ class JSCodegenTest {
                     }
                 }
                 fun main() {
-                    for (n in IntProgressionIterator(0, 10, +4)) {
-                        println(n)
+                    for (n in IntProgressionIterator(0, 10, +2)) {
+                        console.log(n)
                     }
                 }
             """.trimIndent(), printJs = true)

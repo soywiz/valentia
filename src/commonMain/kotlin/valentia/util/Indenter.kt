@@ -38,10 +38,10 @@ interface Indenter {
     fun indent()
     fun unindent()
 
-    fun line(str: String, suffix: String = " {", newline: String = "}", block: () -> Unit): Line {
+    fun line(str: String, suffix: String = " {", newline: String = "}", block: Indenter.() -> Unit): Line {
         line("$str$suffix")
         indent {
-            block()
+            block(this)
         }
         return line(newline)
     }
