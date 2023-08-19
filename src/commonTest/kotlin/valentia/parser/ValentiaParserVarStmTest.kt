@@ -25,7 +25,7 @@ open class ValentiaParserVarStmTest : StmBuilder {
     @Test
     fun testVarLazyDelegatedStatement() {
         assertEquals(
-            STM(VAR("a", expr = CallExpr("lazy".id, lambdaArg = LAMBDA { STM(1.lit) }), delegation = true)),
+            STM(VAR("a", expr = "lazy".id(lambdaArg = LAMBDA { STM(1.lit) }), delegation = true)),
             ValentiaParser.statement("var a by lazy { 1 }") as Any
         )
     }

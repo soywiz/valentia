@@ -1,6 +1,24 @@
 package valentia.ast
 
 open class NodeVisitor {
+    open fun visit(program: Program) {
+        for (module in program.modulesById.values) {
+            visit(module)
+        }
+    }
+
+    open fun visit(module: Module) {
+        for (pack in module.packagesById.values) {
+            visit(pack)
+        }
+    }
+
+    open fun visit(pack: Package) {
+        for (file in pack.files) {
+            visit(file)
+        }
+    }
+
     open fun visit(file: FileNode) {
         for (import in file.imports) visit(import)
         for (decl in file.topLevelDecls) visit(decl)
@@ -54,6 +72,9 @@ open class NodeVisitor {
         for (decl in decl.decls) visit(decl)
     }
     open fun visit(decl: VariableDecl) {
+        visit(decl.expr)
+        visit(decl.getter)
+        visit(decl.setter)
     }
     open fun visitExprOrStm(exprOrStm: ExprOrStm?) {
         when (exprOrStm) {
@@ -139,7 +160,7 @@ open class NodeVisitor {
             is AssignableExpr -> visit(expr)
             is BinaryOpExpr -> visit(expr)
             is BreakExpr -> visit(expr)
-            is CallExpr -> visit(expr)
+            is BaseCallExpr -> visit(expr)
             is CallableReferenceExt -> visit(expr)
             is CastExpr -> visit(expr)
             is CollectionLiteralExpr -> visit(expr)
@@ -171,9 +192,17 @@ open class NodeVisitor {
         visit(expr.right)
     }
     open fun visit(expr: BreakExpr) { }
+    open fun visit(expr: BaseCallExpr) {
+        when (expr) {
+            is CallExpr -> visit(expr)
+            is CallIdExpr -> visit(expr)
+        }
+        visit(expr.paramsPlusLambda)
+    }
     open fun visit(expr: CallExpr) {
         visit(expr.expr)
-        visit(expr.paramsPlusLambda)
+    }
+    open fun visit(expr: CallIdExpr) {
     }
     open fun visit(expr: CallableReferenceExt) { }
     open fun visit(expr: CastExpr) {

@@ -29,10 +29,10 @@ operator fun SymbolProvider.plus(other: SymbolProvider): SymbolProvider =
 
 */
 
-data class IdWithContext(val id: String, val context: ResolutionContext) {
+data class IdWithContext(val id: String, val context: ResolutionContext, val addThis: Boolean) {
     fun resolve(): DeclCollection = context[id]
     fun resolve(type: TypeNode): Decl? = resolve().findMatch(type)
-    override fun toString(): String = id
+    override fun toString(): String = if (addThis) "this.$id" else id
 }
 
 inline class DeclCollection(val decls: List<Decl>) {
@@ -64,6 +64,7 @@ inline class DeclCollection(val decls: List<Decl>) {
 }
 
 fun interface ResolutionContext {
+    val node: Node? get() = null
     operator fun get(name: String): DeclCollection = resolve(name)
     operator fun get(type: TypeNode): DeclCollection = resolve(type.toString())
     fun resolve(id: String): DeclCollection
@@ -77,6 +78,8 @@ operator fun ResolutionContext.plus(other: ResolutionContext): ResolutionContext
 }
 
 open class ListResolutionContext(val resolutions: List<ResolutionContext>) : ResolutionContext {
+    override val node: Node? get() = resolutions.getOrNull(0)?.node
+
     constructor(vararg resolutions: ResolutionContext) : this(resolutions.toList())
     override fun resolve(id: String): DeclCollection = DeclCollection(resolutions.flatMap { it.resolve(id).decls })
 }
@@ -97,6 +100,7 @@ private val Package.allDeclsByName: LinkedHashMap<String, ArrayList<Decl>> by Ex
 /** Resolves all public declarations in this package */
 open class PackageResolutionContext(val pack: Package) : ResolutionContext {
     val allDeclsByName = pack.allDeclsByName
+    override val node: Node? get() = pack
 
     override fun resolve(id: String): DeclCollection {
         return DeclCollection(pack.allDeclsByName[id] ?: emptyList())
@@ -116,6 +120,7 @@ val FileNode.importsById by Extra.PropertyThis { imports.associateBy { it.identi
 /** Resolves imports and private declarations */
 open class FileResolutionContext(val file: FileNode) : ResolutionContext {
     val importsById = file.importsById
+    override val node: Node? get() = file
     override fun resolve(id: String): DeclCollection {
         return DeclCollection(file.topDeclsByName[id] ?: emptyList())
     }
@@ -126,5 +131,15 @@ val ClassOrObjectDecl.classMembersById: Map<String, List<Decl>> by Extra.Propert
 }
 open class ClassResolutionContext(val clazz: ClassOrObjectDecl) : ResolutionContext {
     val classMembersById = clazz.classMembersById
+    override val node: Node? get() = clazz
     override fun resolve(id: String): DeclCollection = DeclCollection(classMembersById[id] ?: emptyList())
+}
+
+open class FunResolutionContext(val func: FunDecl) : ResolutionContext {
+    override val node: Node? get() = func
+    override fun resolve(id: String): DeclCollection {
+        //DeclCollection(classMembersById[id] ?: emptyList())
+        println("@TODO: FunResolutionContext.resolve: $func")
+        return DeclCollection(emptyList())
+    }
 }

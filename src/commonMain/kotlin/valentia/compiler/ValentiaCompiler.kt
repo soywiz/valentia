@@ -1,10 +1,9 @@
 package valentia.compiler
 
 import valentia.ExternalInterface
-import valentia.ast.FileNode
+import valentia.ast.Program
 import valentia.gen.JSCodegen
 import valentia.parser.ValentiaParser
-import valentia.sema.Program
 
 object ValentiaCompiler {
     fun compile(files: List<String>): String {

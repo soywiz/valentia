@@ -147,7 +147,11 @@ interface NodeBuilder {
     fun Expr.notNull(): UnaryPostOpExpr = UnaryPostOpExpr(this, UnaryPostOp.NOT_NULL)
     operator fun Expr.get(vararg indices: Expr): IndexedExpr = IndexedExpr(this, indices.toList())
     operator fun Expr.get(dot: String): NavigationExpr = NavigationExpr(".", this, dot)
-    operator fun Expr.invoke(vararg params: Expr, lambdaArg: Expr? = null, typeArgs: List<TypeNode>? = null): CallExpr = CallExpr(this, params.toList(), lambdaArg, typeArgs)
+    operator fun Expr.invoke(vararg params: Expr, lambdaArg: Expr? = null, typeArgs: List<TypeNode>? = null): BaseCallExpr =
+        when (this) {
+            is IdentifierExpr -> CallIdExpr(this.id, params.toList(), lambdaArg, typeArgs)
+            else -> CallExpr(this, params.toList(), lambdaArg, typeArgs)
+        }
     fun Expr.infix(key: String, expr: Expr): Expr = BinaryOpExpr(this, key, expr)
     operator fun Expr.unaryMinus(): UnaryPreOpExpr = UnaryPreOpExpr(UnaryPreOp.MINUS, this)
     operator fun Expr.unaryPlus(): UnaryPreOpExpr = UnaryPreOpExpr(UnaryPreOp.PLUS, this)

@@ -2,8 +2,8 @@ package valentia.gen
 
 import org.intellij.lang.annotations.Language
 import valentia.ExternalInterface
+import valentia.ast.Program
 import valentia.parser.ValentiaParser
-import valentia.sema.Program
 import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -70,7 +70,7 @@ class JSCodegenTest {
 
     @Test
     @Ignore
-    fun testSuspend() {
+    fun testSuspending() {
         println(genFilesJSString("""
             external fun yield(value: Int)
             

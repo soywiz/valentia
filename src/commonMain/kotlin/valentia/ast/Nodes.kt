@@ -11,6 +11,7 @@ sealed class Node : Extra by Extra.Mixin() {
     var epos: Int = -1
     val rangeStr: String? get() = reader?.readAbsoluteRange(spos, epos)
     var nodeAnnotations: Annotations? = null
+    var parentNode: Node? = null
 
     private var _cachedType: TypeNode? = null
     protected open fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode =
@@ -18,6 +19,39 @@ sealed class Node : Extra by Extra.Mixin() {
     fun getType(resolutionContext: ResolutionContext): TypeNode {
         if (_cachedType == null) _cachedType = getTypeUncached(resolutionContext)
         return _cachedType!!
+    }
+}
+
+class Program : Node() {
+    val modulesById = LinkedHashMap<String?, Module>()
+
+    fun getModule(id: String?): Module {
+        return modulesById.getOrPut(id) { Module(id) }
+    }
+}
+
+class Module(val id: String? = null) : Node() {
+    val packagesById = LinkedHashMap<Identifier?, Package>()
+
+    fun getPackage(identifier: Identifier?): Package {
+        return packagesById.getOrPut(identifier) { Package(identifier) }
+    }
+
+    fun addFile(file: FileNode) {
+        getPackage(file._package).addFile(file)
+    }
+}
+open class Package(val identifier: Identifier?) : Node() {
+    val symbols = LinkedHashMap<String, ArrayList<Decl>>()
+    val files = arrayListOf<FileNode>()
+
+    private fun getSymbolsByName(name: String): ArrayList<Decl> = symbols.getOrPut(name) { arrayListOf() }
+
+    fun addFile(file: FileNode) {
+        files += file
+        file.symbolsByName.map { (name, decls) ->
+            getSymbolsByName(name).addAll(decls)
+        }
     }
 }
 
@@ -357,7 +391,13 @@ abstract class ClassOrObjectDecl(open val name: String, open val kind: ClassKind
     open val primaryConstructor: PrimaryConstructorDecl? = null
     open val body: List<Decl>? = null
     open val subTypes: List<SubTypeInfo>? = null
-    val bodyAll by lazy { listOfNotNull(primaryConstructor) + (body ?: emptyList()) }
+    val bodyAll by lazy {
+        (listOfNotNull(primaryConstructor) + (body ?: emptyList())).also { list ->
+            for (it in list) it.parentNode = this
+        }
+    }
+    val fields by lazy { bodyAll.filterIsInstance<VariableDecl>().filter { it.isField } }
+    val properties by lazy { bodyAll.filterIsInstance<VariableDecl>().filter { !it.isField } }
     val constructors: List<BaseConstructorDecl> by lazy {
         bodyAll.filterIsInstance<BaseConstructorDecl>().also {
             for (constructor in it) {
@@ -378,7 +418,8 @@ data class ObjectDecl(
     override val name: String,
     override val body: List<Decl>? = null,
     override val subTypes: List<SubTypeInfo>? = null,
-) : ClassOrObjectDecl(name, ClassKind.OBJECT)
+) : ClassOrObjectDecl(name, ClassKind.OBJECT) {
+}
 data class FunDecl constructor(
     val name: String,
     val params: List<FuncValueParam> = emptyList(),
@@ -414,7 +455,9 @@ data class VariableDecl(
     val modifiers: Modifiers = Modifiers.EMPTY,
     val getter: FunDecl? = null,
     val setter: FunDecl? = null,
-) : VariableDeclBase(id, modifiers)
+) : VariableDeclBase(id, modifiers) {
+    val isField get() = !delegation && getter == null && setter == null
+}
 data class MultiVariableDecl(
     val decls: List<VariableDecl>,
     val expr: Expr? = null,
@@ -550,8 +593,20 @@ enum class UnaryPostOp(val str: String) {
 }
 
 data class CastExpr(val expr: Expr, val targetType: TypeNode, val kind: String) : Expr()
-data class CallExpr(val expr: Expr, val params: List<Expr> = emptyList(), val lambdaArg: Expr? = null, val typeArgs: List<TypeNode>? = null) : Expr() {
+sealed class BaseCallExpr : Expr() {
+    abstract val params: List<Expr>
+    abstract val lambdaArg: Expr?
+    abstract val typeArgs: List<TypeNode>?
     val paramsPlusLambda by lazy { params + listOfNotNull(lambdaArg) }
+
+    open fun getFuncType(resolutionContext: ResolutionContext): FuncTypeNode = FuncTypeNode(null, params.map { NamedTypeNode(it.getType(resolutionContext)) })
+}
+data class CallExpr(val expr: Expr, override val params: List<Expr> = emptyList(), override val lambdaArg: Expr? = null, override val typeArgs: List<TypeNode>? = null) : BaseCallExpr() {
+    override fun getFuncType(resolutionContext: ResolutionContext): FuncTypeNode = FuncTypeNode(expr.getType(resolutionContext), params.map { NamedTypeNode(it.getType(resolutionContext)) })
+}
+data class CallIdExpr(val id: String, override val params: List<Expr> = emptyList(), override val lambdaArg: Expr? = null, override val typeArgs: List<TypeNode>? = null) : BaseCallExpr() {
+    var resolvedDecl: Decl? = null
+    var addThis: Boolean = false
 }
 data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : AssignableExpr()
 data class UnaryPostOpExpr(val expr: Expr, val op: UnaryPostOp) : AssignableExpr()
@@ -564,7 +619,15 @@ data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr() {
     }
 }
 
-data class IdentifierExpr(val id: String) : AssignableExpr()
+data class IdentifierExpr(val id: String) : AssignableExpr() {
+    var addThis: Boolean = false
+    var resolutionContext: ResolutionContext? = null
+    //var resolvedDecl: Decl? = null
+
+    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+        return resolutionContext.resolve(id).decls.firstOrNull()?.getType(resolutionContext) ?: UnknownType
+    }
+}
 data class TempExpr(val temp: Temp) : AssignableExpr()
 
 data class OpSeparatedBinaryExprs(val ops: List<String>, val exprs: List<Expr>) : Expr() {

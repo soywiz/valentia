@@ -16,6 +16,8 @@ open class JSCodegen {
     }
 
     open fun generateProgram(program: Program) {
+        SemaResolver().visit(program)
+
         indenter.line("#!/usr/bin/env -S deno run -A --unstable")
         for (module in program.modulesById.values) {
             generateModule(module)
@@ -46,21 +48,26 @@ open class JSCodegen {
         }
     }
 
-    open fun generateDecls(decls: List<Decl?>?, parent: Decl?) {
+    open fun generateDecls(decls: List<Decl?>?, parent: Decl?, ctx: GenerateContext? = null) {
         for (decl in (decls ?: emptyList())) {
-            generateDecl(decl, parent)
+            generateDecl(decl, parent, ctx)
         }
     }
 
-    open fun generateDecl(decl: Decl?, parent: Decl?) {
-        indenter.line("// decl: ${decl}")
+    data class GenerateContext(
+        val settingFieldConstructor: Boolean = false,
+    )
+
+    open fun generateDecl(decl: Decl?, parent: Decl?, ctx: GenerateContext?) {
+        //indenter.line("// decl: ${decl}")
         when (decl) {
             null -> Unit
             is ClassOrObjectDecl -> generateClass(decl)
             is FunDecl -> generateFunction(decl, parent)
             is VariableDecl -> {
                 if (FunctionModifier.EXTERNAL !in decl.modifiers) {
-                    val letStr = if (parent !is ClassOrObjectDecl) "let " else ""
+                    val settingFieldConstructor = ctx?.settingFieldConstructor == true
+                    val letStr = if (settingFieldConstructor) "this." else if (parent !is ClassOrObjectDecl) "let " else ""
                     if (decl.getter != null) {
                         indenter.line("get ${letStr}${decl.jsName}()") {
                             generateStm(decl.getter.body, parent)
@@ -78,6 +85,8 @@ open class JSCodegen {
                 }
             }
             is BaseConstructorDecl -> {
+                val clazzDecl = parent as ClassOrObjectDecl
+
                 if (decl is PrimaryConstructorDecl) {
                     for (p in decl.classParams) {
                         if (p.valOrVar != null) {
@@ -94,6 +103,10 @@ open class JSCodegen {
                             if (p.valOrVar != null) {
                                 indenter.line("this.${p.id} = ${p.id};")
                             }
+                        }
+                        for (field in clazzDecl.fields) {
+                            generateDecl(field, decl, GenerateContext(settingFieldConstructor = true))
+                            //indenter.line("this.${field.jsName} = null;")
                         }
                     }
                     val delegatedCall = decl.constructorDelegationCall
@@ -140,7 +153,24 @@ open class JSCodegen {
                 if (clazz is ObjectDecl) {
                     indenter.line("static #\$_singleton = null; static get #\$singleton() { if (!this.#\$_singleton) this.#\$_singleton = new ${clazz.name}(); return this.#\$_singleton;  }")
                 }
-                generateDecls(clazz.bodyAll, clazz)
+                if (clazz.primaryConstructor != null) {
+                    for (decl in clazz.bodyAll.filterIsInstance<VariableDecl>().filter { !it.delegation }) {
+                        val type = decl.getTypeSafe()
+                        val nullValue = when (type) {
+                            IntType, CharType -> "0"
+                            BoolType -> "false"
+                            else -> "null"
+                        }
+                        indenter.line("${decl.jsName} = $nullValue;")
+                        //generateDecl(decl, clazz)
+                    }
+                }
+
+                //generateDecls(clazz.bodyAll, clazz)
+                for (decl in clazz.bodyAll) {
+                    if (clazz.primaryConstructor != null && (decl is VariableDecl && decl.isField)) continue
+                    generateDecl(decl, clazz, null)
+                }
             }
         }
     }
@@ -218,7 +248,13 @@ open class JSCodegen {
     open fun generateExpr(expr: Expr?): Any {
         return when (expr) {
             null -> "null"
-            is IdentifierExpr -> IdWithContext(expr.id, currentResolutionContext)
+            is IdentifierExpr -> {
+                println("expr=$expr : parent=${expr.parentNode} : ${expr.resolutionContext}")
+                val resolved = expr.resolutionContext!!.resolve(expr.id)
+                println(resolved)
+                val node = expr.resolutionContext?.node
+                IdWithContext(expr.id, expr.resolutionContext!!, expr.addThis)
+            }
             is BoolLiteralExpr -> "${expr.value}"
             is IntLiteralExpr -> "${expr.value}"
             is CharLiteralExpr -> "${expr.value.code}"
@@ -264,37 +300,27 @@ open class JSCodegen {
                     else -> "(($leftStr) $op ($rightStr))"
                 }
             }
+            is CallIdExpr -> {
+                val resolved = expr.resolvedDecl ?: return "\$CALL_ID!!!!"
+                val name = resolved.jsName
+                val thisStr = if (expr.addThis) "this." else ""
+                val paramsStr = "(" + expr.paramsPlusLambda.joinToString(", ") { generateExpr(it).toString() } + ")"
+                when (resolved) {
+                    is ClassOrObjectDecl -> "(new $name$paramsStr)"
+                    is BaseConstructorDecl -> "(new ${resolved.parent?.jsName}).${resolved.jsName}$paramsStr"
+                    is FunDecl -> "$thisStr$name$paramsStr"
+                    //is IdentifierExpr -> "$name$paramsStr"
+                    else -> TODO("resolved=$resolved, expr=$expr")
+                }
+            }
             is CallExpr -> {
                 //val symbols = symbolProvider[expr.id]
                 //println("expr.id=${expr.id} : $symbols")
 
-                val res = generateExpr(expr.expr)
+                val exprExpr = expr.expr
+                val resStr = generateExpr(exprExpr)
                 val paramsStr = "(" + expr.paramsPlusLambda.joinToString(", ") { generateExpr(it).toString() } + ")"
-                if (res is IdWithContext) {
-                    //val exprType = expr.expr.getTypeSafe()
-                    val exprType = UnknownType
-                    //println("exprType=$exprType")
-                    val funcType = FuncTypeNode(
-                        exprType,
-                        expr.params.map { NamedTypeNode(it.getTypeSafe()) }
-                    )
-                    val resolved = res.resolveSafe(funcType)
-                    //println("Can't resolve $funcType")
-                    //println("RESOLVE: $funcType : $resolved")
-                    val name = (resolved?.jsName ?: res.id)
-                    //"$name$paramsStr"
-                    when (resolved) {
-                        is ClassOrObjectDecl -> "(new $name$paramsStr)"
-                        is BaseConstructorDecl -> "(new ${resolved.parent?.jsName}).${resolved.jsName}$paramsStr"
-                        is FunDecl -> "$name$paramsStr"
-                        //is IdentifierExpr -> "$name$paramsStr"
-                        else -> {
-                            TODO("resolved=$resolved, expr=${expr.expr}, res=$res, funcType=$funcType, res.resolve[${res.resolve().decls.size}]=${res.resolve()}")
-                        }
-                    }
-                } else {
-                    res.toString() + paramsStr
-                }
+                "$resStr$paramsStr"
             }
             is NavigationExpr -> {
                 if (expr.op != ".") error("Unsupported ${expr.op}")
@@ -431,7 +457,7 @@ open class JSCodegen {
                                     generateStmsCompact(stm.body, parent)
                                 }
                             } else {
-                                indenter.line("${labelStr}for (const ${generateVarDecl(stm.vardecl)} of ${generateExpr(expr)})") {
+                                indenter.line("${labelStr}for (const ${generateVarDecl(stm.vardecl)} of (${generateExpr(expr)}))") {
                                     generateStmsCompact(stm.body, parent)
                                 }
                             }
@@ -472,7 +498,7 @@ open class JSCodegen {
             }
             is BreakStm -> indenter.line("break ${stm.label ?: ""};")
             is ContinueStm -> indenter.line("continue ${stm.label ?: ""};")
-            is DeclStm -> generateDecl(stm.decl, parent)
+            is DeclStm -> generateDecl(stm.decl, parent, null)
             is ThrowStm -> indenter.line("throw ${generateExpr(stm.expr)};")
             else -> TODO("generateStm: $stm")
         }

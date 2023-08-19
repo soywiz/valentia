@@ -1854,7 +1854,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             return null
         }
 
-        return CallExpr(expr, args ?: emptyList(), lambdaArg, typeArgs)
+        return when (expr) {
+            is IdentifierExpr -> CallIdExpr(expr.id, args ?: emptyList(), lambdaArg, typeArgs)
+            else -> CallExpr(expr, args ?: emptyList(), lambdaArg, typeArgs)
+        }
     }
 
     //annotatedLambda
