@@ -16,7 +16,10 @@ open class JSCodegen {
     }
 
     open fun generateProgram(program: Program) {
-        SemaResolver().visit(program)
+        if (!program.semaResolved) {
+            TODO("Not performed semantic analysis")
+            SemaResolver.resolve(program)
+        }
 
         indenter.line("#!/usr/bin/env -S deno run -A --unstable")
         for (module in program.modulesById.values) {
@@ -192,7 +195,7 @@ open class JSCodegen {
         indenter.line("${functionMod}${suspendMod}${func.jsName}($params)") {
             func.body?.let {
                 val oldContext = transformContext
-                val headerLine = indenter.line("")
+                val headerLine = indenter.line("").also { it.opt = true }
                 try {
                     transformContext = TransformUnsupportedNodes.TransformContext()
                     generateStmsCompact(transformer.transform(it), parent)
@@ -249,11 +252,8 @@ open class JSCodegen {
         return when (expr) {
             null -> "null"
             is IdentifierExpr -> {
-                println("expr=$expr : parent=${expr.parentNode} : ${expr.resolutionContext}")
-                val resolved = expr.resolutionContext!!.resolve(expr.id)
-                println(resolved)
-                val node = expr.resolutionContext?.node
-                IdWithContext(expr.id, expr.resolutionContext!!, expr.addThis)
+                val name = expr.id
+                if (expr.addThis) "this.$name" else name
             }
             is BoolLiteralExpr -> "${expr.value}"
             is IntLiteralExpr -> "${expr.value}"

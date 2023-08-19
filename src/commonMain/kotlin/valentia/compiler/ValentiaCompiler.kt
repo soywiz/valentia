@@ -4,19 +4,44 @@ import valentia.ExternalInterface
 import valentia.ast.Program
 import valentia.gen.JSCodegen
 import valentia.parser.ValentiaParser
+import valentia.sema.SemaResolver
+import kotlin.jvm.JvmName
+import kotlin.time.measureTime
+
+data class FileWithContents(val file: String, val content: String) {
+    constructor(content: String) : this("unknown.kt", content)
+}
+
+data class CompileResult(val codegen: JSCodegen) {
+    val jsString by lazy {
+        codegen.indenter.indentToString()
+    }
+}
 
 object ValentiaCompiler {
-    fun compile(files: List<String>): String {
+    @JvmName("compileFilePaths")
+    fun compile(files: List<String>): CompileResult =
+        compile(files.map { FileWithContents(it, ExternalInterface.fileReadString(it)) })
+
+    fun compile(files: List<FileWithContents>): CompileResult {
         val program = Program()
         val module = program.getModule(null)
-        for (file in files) {
-            val fileContent = ExternalInterface.fileReadString(file)
-            val fileNode = ValentiaParser.file(fileContent)
-            module.addFile(fileNode)
+        val parsingTime = measureTime {
+            for (file in files) {
+                val fileContent = file.content
+                val fileNode = ValentiaParser.file(fileContent)
+                module.addFile(fileNode)
+            }
         }
+        val semanticAnalysisTime = measureTime { SemaResolver.resolve(program) }
+
         val codegen = JSCodegen()
-        codegen.generateProgram(program)
-        return codegen.indenter.indentToString()
+        val generateCodeTime = measureTime {
+            codegen.generateProgram(program)
+        }
+
+        println("parsingTime=$parsingTime, semanticAnalysisTime=$semanticAnalysisTime, generateCodeTime=$generateCodeTime")
+        return CompileResult(codegen)
     }
 
     fun compileAndRun(files: List<String>) {
@@ -24,7 +49,7 @@ object ValentiaCompiler {
         val js = compile(files)
         //println(js)
         val jsFile = "/tmp/valentia.temp.js"
-        ExternalInterface.fileWriteString(jsFile, js)
+        ExternalInterface.fileWriteString(jsFile, js.jsString)
         val res = ExternalInterface.exec("deno", "run", "-A", "--unstable", jsFile)
         print(res.stdout)
         print(res.stderr)

@@ -3,6 +3,8 @@ package valentia.gen
 import org.intellij.lang.annotations.Language
 import valentia.ExternalInterface
 import valentia.ast.Program
+import valentia.compiler.FileWithContents
+import valentia.compiler.ValentiaCompiler
 import valentia.parser.ValentiaParser
 import kotlin.test.Ignore
 import kotlin.test.Test
@@ -262,6 +264,8 @@ class JSCodegenTest {
         @Language("kotlin")
         vararg filesContent: String
     ): JSCodegen {
+        return ValentiaCompiler.compile(filesContent.map { FileWithContents(it) }).codegen
+        /*
         val gen = JSCodegen()
         val program = Program()
         val module = program.getModule(null)
@@ -270,6 +274,7 @@ class JSCodegenTest {
         }
         gen.generateProgram(program)
         return gen
+        */
     }
 
     private fun testFile(file: String, printJs: Boolean = true) {

@@ -139,7 +139,7 @@ open class FunResolutionContext(val func: FunDecl) : ResolutionContext {
     override val node: Node? get() = func
     override fun resolve(id: String): DeclCollection {
         //DeclCollection(classMembersById[id] ?: emptyList())
-        println("@TODO: FunResolutionContext.resolve: $func")
+        //println("@TODO: FunResolutionContext.resolve: $func")
         return DeclCollection(emptyList())
     }
 }

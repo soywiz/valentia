@@ -5,6 +5,7 @@ open class NodeVisitor {
         for (module in program.modulesById.values) {
             visit(module)
         }
+        program.semaResolved = true
     }
 
     open fun visit(module: Module) {

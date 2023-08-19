@@ -23,6 +23,7 @@ sealed class Node : Extra by Extra.Mixin() {
 }
 
 class Program : Node() {
+    var semaResolved = false
     val modulesById = LinkedHashMap<String?, Module>()
 
     fun getModule(id: String?): Module {

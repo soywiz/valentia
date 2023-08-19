@@ -17,7 +17,9 @@ interface Indenter {
             --level
         }
 
-        override fun indentToString(): String = lines.joinToString("\n")
+        override fun indentToString(): String {
+            return lines.filter { !it.opt || it.str != "" }.joinToString("\n")
+        }
 
         override fun toString(): String = indentToString()
     }
@@ -28,6 +30,7 @@ interface Indenter {
     }
 
     data class Line(val indentLevel: Int, var str: String) {
+        var opt: Boolean = false
         override fun toString(): String = "${INDENT_LEVELS[indentLevel]}$str"
     }
 

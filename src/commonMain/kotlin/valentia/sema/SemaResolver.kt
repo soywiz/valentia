@@ -3,6 +3,13 @@ package valentia.sema
 import valentia.ast.*
 
 class SemaResolver : NodeVisitor() {
+    companion object {
+        fun resolve(program: Program): Program {
+            SemaResolver().visit(program)
+            return program
+        }
+    }
+
     override fun visit(pack: Package) {
         pushResolutionContext(PackageResolutionContext(pack)) {
             super.visit(pack)
