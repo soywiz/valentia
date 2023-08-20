@@ -196,15 +196,15 @@ open class NodeVisitor {
     open fun visit(expr: BaseCallExpr) {
         when (expr) {
             is CallExpr -> visit(expr)
-            is CallIdExpr -> visit(expr)
+            //is CallIdExpr -> visit(expr)
         }
         visit(expr.paramsPlusLambda)
     }
     open fun visit(expr: CallExpr) {
         visit(expr.expr)
     }
-    open fun visit(expr: CallIdExpr) {
-    }
+    //open fun visit(expr: CallIdExpr) {
+    //}
     open fun visit(expr: CallableReferenceExt) { }
     open fun visit(expr: CastExpr) {
         visit(expr.expr)

@@ -17,8 +17,8 @@ interface DeclBuilder : NodeBuilder {
     fun addDecl(decl: Decl) {
     }
 
-    fun VAL(name: String, expr: Expr? = null, type: TypeNode? = null, delegation: Boolean = false): VariableDecl = VariableDecl(name, type, expr, delegation = delegation).also { addDecl(it) }
-    fun VAR(name: String, expr: Expr? = null, type: TypeNode? = null, delegation: Boolean = false): VariableDecl = VariableDecl(name, type, expr, delegation = delegation).also { addDecl(it) }
+    fun VAL(name: String, expr: Expr? = null, type: TypeNode? = null, delegation: Boolean = false): VariableDecl = VariableDecl(name, type, expr, delegation = delegation, kind = VariableKind.VAL).also { addDecl(it) }
+    fun VAR(name: String, expr: Expr? = null, type: TypeNode? = null, delegation: Boolean = false): VariableDecl = VariableDecl(name, type, expr, delegation = delegation, kind = VariableKind.VAR).also { addDecl(it) }
     fun CLASS(
         name: String,
         vararg subTypes: SubTypeInfo,
@@ -149,7 +149,7 @@ interface NodeBuilder {
     operator fun Expr.get(dot: String): NavigationExpr = NavigationExpr(".", this, dot)
     operator fun Expr.invoke(vararg params: Expr, lambdaArg: Expr? = null, typeArgs: List<TypeNode>? = null): BaseCallExpr =
         when (this) {
-            is IdentifierExpr -> CallIdExpr(this.id, params.toList(), lambdaArg, typeArgs)
+            //is IdentifierExpr -> CallIdExpr(null, this.id, ".", params.toList(), lambdaArg, typeArgs)
             else -> CallExpr(this, params.toList(), lambdaArg, typeArgs)
         }
     fun Expr.infix(key: String, expr: Expr): Expr = BinaryOpExpr(this, key, expr)

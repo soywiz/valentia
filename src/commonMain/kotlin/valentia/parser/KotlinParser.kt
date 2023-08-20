@@ -1834,11 +1834,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val spos = pos
         val typeArgs = opt { typeArguments() }
         //val args = opt { valueArguments() }
-        val args = if (matches("(")) {
-            valueArguments()
-        } else {
-            null
-        }
+        val args = if (matches("(")) valueArguments() else null
+        val sargs = args ?: emptyList()
 
         val lambdaArg = if (state?.allowLambda != false) {
             if (args == null) {
@@ -1856,8 +1853,9 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         }
 
         return when (expr) {
-            is IdentifierExpr -> CallIdExpr(expr.id, args ?: emptyList(), lambdaArg, typeArgs)
-            else -> CallExpr(expr, args ?: emptyList(), lambdaArg, typeArgs)
+            //is IdentifierExpr -> CallIdExpr(null, expr.id, ".", sargs, lambdaArg, typeArgs)
+            //is NavigationExpr -> CallIdExpr(expr.expr, expr.key.toString(), expr.op, sargs, lambdaArg, typeArgs)
+            else -> CallExpr(expr, sargs, lambdaArg, typeArgs)
         }
     }
 

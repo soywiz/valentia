@@ -267,9 +267,18 @@ open class JSCodegen {
     open fun generateExpr(expr: Expr?): Any {
         return when (expr) {
             null -> "null"
+            //        is ClassOrObjectDecl -> "(new $name$paramsStr)"
+            //        is BaseConstructorDecl -> "(new ${resolved.parent?.jsName}).${resolved.jsName}$paramsStr"
+            //        is FunDecl -> "$thisStr$name$paramsStr"
             is IdentifierExpr -> {
-                val name = expr.id
-                if (expr.addThis) "this.$name" else name
+                val thisStr = if (expr.addThis) "this." else ""
+                val resolved = expr.resolvedDecl
+                val name = resolved?.jsName ?: expr.id
+                when (resolved) {
+                    is BaseConstructorDecl -> "(new ${resolved.parent?.jsName}).$name"
+                    else -> "$thisStr$name"
+                }
+
             }
             is BoolLiteralExpr -> "${expr.value}"
             is IntLiteralExpr -> "${expr.value}"
@@ -316,19 +325,19 @@ open class JSCodegen {
                     else -> "(($leftStr) $op ($rightStr))"
                 }
             }
-            is CallIdExpr -> {
-                val resolved = expr.resolvedDecl ?: return "\$CALL_ID!!!!"
-                val name = resolved.jsName
-                val thisStr = if (expr.addThis) "this." else ""
-                val paramsStr = "(" + expr.paramsPlusLambda.joinToString(", ") { generateExpr(it).toString() } + ")"
-                when (resolved) {
-                    is ClassOrObjectDecl -> "(new $name$paramsStr)"
-                    is BaseConstructorDecl -> "(new ${resolved.parent?.jsName}).${resolved.jsName}$paramsStr"
-                    is FunDecl -> "$thisStr$name$paramsStr"
-                    //is IdentifierExpr -> "$name$paramsStr"
-                    else -> TODO("resolved=$resolved, expr=$expr")
-                }
-            }
+            //is CallIdExpr -> {
+            //    val resolved = expr.resolvedDecl ?: return "\$CALL_ID!!!!"
+            //    val name = resolved.jsName
+            //    val thisStr = if (expr.addThis) "this." else ""
+            //    val paramsStr = "(" + expr.paramsPlusLambda.joinToString(", ") { generateExpr(it).toString() } + ")"
+            //    when (resolved) {
+            //        is ClassOrObjectDecl -> "(new $name$paramsStr)"
+            //        is BaseConstructorDecl -> "(new ${resolved.parent?.jsName}).${resolved.jsName}$paramsStr"
+            //        is FunDecl -> "$thisStr$name$paramsStr"
+            //        //is IdentifierExpr -> "$name$paramsStr"
+            //        else -> TODO("resolved=$resolved, expr=$expr")
+            //    }
+            //}
             is CallExpr -> {
                 //val symbols = symbolProvider[expr.id]
                 //println("expr.id=${expr.id} : $symbols")
@@ -342,7 +351,7 @@ open class JSCodegen {
                 if (expr.op != ".") error("Unsupported ${expr.op}")
                 val keyStr = when (expr.key) {
                     is Expr -> generateExpr(expr.key)
-                    else -> expr.key.toString()
+                    else -> expr.resolvedDecl?.jsName ?: expr.key.toString()
                 }
                 "${generateExpr(expr.expr)}.$keyStr"
             }

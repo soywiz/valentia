@@ -9,7 +9,7 @@ open class ValentiaParserVarStmTest : StmBuilder {
     @Test
     fun testVarDelegatedStatement() {
         assertEquals(
-            STM(VariableDecl("a", expr = 1.lit, delegation = true)),
+            STM(VariableDecl("a", expr = 1.lit, delegation = true, kind = VariableKind.VAR)),
             ValentiaParser.statement("var a by 1") as Any
         )
     }
@@ -33,7 +33,7 @@ open class ValentiaParserVarStmTest : StmBuilder {
     @Test
     fun testVarStatement() {
         assertEquals(
-            STM(VariableDecl("a")),
+            STM(VariableDecl("a", kind = VariableKind.VAR)),
             ValentiaParser.statement("var a") as Any
         )
     }
@@ -41,7 +41,7 @@ open class ValentiaParserVarStmTest : StmBuilder {
     @Test
     fun testMultiVarStatement() {
         assertEquals(
-            STM(MultiVariableDecl(VariableDecl("a"), VariableDecl("b"))),
+            STM(MultiVariableDecl(VariableDecl("a", kind = VariableKind.VAR), VariableDecl("b", kind = VariableKind.VAR), kind = VariableKind.VAR)),
             ValentiaParser.statement("var (a, b)") as Any
         )
     }
@@ -49,7 +49,7 @@ open class ValentiaParserVarStmTest : StmBuilder {
     @Test
     fun testVarTypeStatement() {
         assertEquals(
-            STM(VariableDecl("a", IntType)),
+            STM(VariableDecl("a", IntType, kind = VariableKind.VAR)),
             ValentiaParser.statement("var a: Int") as Any
         )
     }
@@ -57,7 +57,7 @@ open class ValentiaParserVarStmTest : StmBuilder {
     @Test
     fun testVarWithAssignmentStatement() {
         assertEquals(
-            STM(VariableDecl("a", expr = 10.lit)),
+            STM(VariableDecl("a", expr = 10.lit, kind = VariableKind.VAR)),
             ValentiaParser.statement("var a = 10") as Any
         )
     }
@@ -65,7 +65,7 @@ open class ValentiaParserVarStmTest : StmBuilder {
     @Test
     fun testVarTypeWithAssignmentStatement() {
         assertEquals(
-            STM(VariableDecl("a", IntType, expr = 10.lit)),
+            STM(VariableDecl("a", IntType, expr = 10.lit, kind = VariableKind.VAR)),
             ValentiaParser.statement("var a: Int = 10") as Any
         )
     }
@@ -74,7 +74,7 @@ open class ValentiaParserVarStmTest : StmBuilder {
     fun testDestructuring() {
         assertEquals(
             STM(
-                MultiVariableDecl(VariableDecl("a"), VariableDecl("b", IntType), expr = 10.lit.infix("to", 20.lit))
+                MultiVariableDecl(VariableDecl("a", kind = VariableKind.VAR), VariableDecl("b", IntType, kind = VariableKind.VAR), expr = 10.lit.infix("to", 20.lit), kind = VariableKind.VAR)
             ),
             ValentiaParser.statement("var (a, b: Int) = 10 to 20") as? Any?
         )
@@ -131,7 +131,7 @@ open class ValentiaParserVarStmTest : StmBuilder {
     fun test4() {
         assertEquals(
             VariableDecl("prop", expr = "WeakProperty".id(lambdaArg = LAMBDA { STM(0.lit) }), delegation = true, receiver = "C".type,
-                modifiers = Modifiers(VisibilityModifier.PRIVATE)
+                modifiers = Modifiers(VisibilityModifier.PRIVATE), kind = VariableKind.VAR
             ),
             ValentiaParser.topLevelDecl("private var C.prop by WeakProperty { 0 }") as? Any?
         )
