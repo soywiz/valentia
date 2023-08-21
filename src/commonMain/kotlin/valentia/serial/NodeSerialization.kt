@@ -12,7 +12,7 @@ interface NodeSerializationCommon {
 
 open class NodeSerializer : BinaryWriter(), NodeSerializationCommon {
     val stringPool = StringPool()
-    val typePool = TypePool(stringPool)
+    val typePool = TypePool()
 
 
     fun writeHeader() {
@@ -21,7 +21,6 @@ open class NodeSerializer : BinaryWriter(), NodeSerializationCommon {
     }
 
     fun writeStringPool() {
-
     }
 }
 

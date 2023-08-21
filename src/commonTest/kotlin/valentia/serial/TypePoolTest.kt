@@ -22,8 +22,8 @@ class TypePoolTest {
         assertEquals(2, index2)
         assertEquals(3, index3)
         assertEquals(4, index4)
-        val pool2 = TypePool.fromByteArray(pool.toByteArray(), pool.stringPool)
+        val pool2 = TypePool.fromByteArray(pool.toByteArray())
         assertEquals(pool, pool2)
-        assertEquals(13, pool2.toByteArray().size)
+        assertEquals(26, pool2.toByteArray().size)
     }
 }

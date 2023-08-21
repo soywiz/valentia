@@ -14,6 +14,8 @@ class TypePool(val stringPool: StringPool = StringPool()) : Pool<Type?>() {
     }
 
     fun toByteArray(): ByteArray = buildByteArray {
+        val stringPoolBytes = stringPool.toByteArray()
+        writeBytesWithLength(stringPoolBytes)
         writeIntVLQ(items.size)
         for (type in items) {
             writeType(type)
@@ -42,7 +44,11 @@ class TypePool(val stringPool: StringPool = StringPool()) : Pool<Type?>() {
         }
     }
 
-    private fun getTypeIndex(type: Type, currentIndex: Int): Int {
+    private fun getStringIndex(str: String?): Int {
+        return stringPool.getOrThrow(str)
+    }
+
+    private fun getTypeIndex(type: Type?, currentIndex: Int): Int {
         return typePool.getOrThrow(type).also { check(it < currentIndex) { "$it < $currentIndex" } }
     }
 
@@ -52,7 +58,7 @@ class TypePool(val stringPool: StringPool = StringPool()) : Pool<Type?>() {
             null -> writeIntVLQ(0)
             is SimpleType -> {
                 writeIntVLQ(SimpleType.ID)
-                writeIntVLQ(stringPool.getOrThrow(type.fullName))
+                writeIntVLQ(getStringIndex(type.fullName))
             }
             is NullableType -> {
                 writeIntVLQ(NullableType.ID)
@@ -64,14 +70,24 @@ class TypePool(val stringPool: StringPool = StringPool()) : Pool<Type?>() {
                 writeIntVLQ(type.generics.size)
                 for (generic in type.generics) writeIntVLQ(getTypeIndex(generic, index))
             }
+            is FuncType -> {
+                writeIntVLQ(FuncType.ID)
+                writeIntVLQ(type.flags)
+                writeIntVLQ(getTypeIndex(type.receiver, index))
+                writeIntVLQ(getTypeIndex(type.ret, index))
+                for (param in type.params) {
+                    writeIntVLQ(getStringIndex(param.name))
+                    writeIntVLQ(getTypeIndex(param.type, index))
+                }
+            }
             else -> TODO("type=$type")
         }
     }
 
     companion object {
-        fun fromByteArray(bytes: ByteArray, stringPool: StringPool): TypePool {
-            val pool = TypePool(stringPool)
+        fun fromByteArray(bytes: ByteArray): TypePool {
             val reader = bytes.binaryReader()
+            val pool = TypePool(StringPool.fromByteArray(reader.readBytesWithLength()))
             for (n in 0 until reader.readIntVLQ()) {
                 reader.readType(pool).also { pool[it] }
             }

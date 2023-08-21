@@ -31,6 +31,8 @@ data class GenericType(val base: Type, val generics: List<Type>) : Type() {
 }
 
 data class FuncType(val ret: Type?, val params: List<Item>, val receiver: Type? = null, val suspendable: Boolean = false) : Type() {
+    val flags = if (suspendable) 1 else 0
+
     data class Item(val type: Type?, val name: String? = null) {
         constructor(param: Parameter) : this(param.type, param.id)
         override fun toString(): String = if (name != null) "$name: $type" else "$type"

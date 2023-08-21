@@ -25,6 +25,11 @@ open class BinaryWriter(initialCapacity: Int = 74) {
         data.copyInto(this.buffer, ensure(len), offset, offset + len)
     }
 
+    fun writeBytesWithLength(data: ByteArray) {
+        writeIntVLQ(data.size)
+        writeBytes(data)
+    }
+
     fun writeByte(data: Byte) {
         buffer[ensure(1)] = data
     }
@@ -127,6 +132,10 @@ open class BinaryReader(val data: ByteArray, var position: Int = 0, val length: 
             out.writeByte(b.toByte())
         }
         return out.toByteArray().decodeToString()
+    }
+
+    fun readBytesWithLength(): ByteArray {
+        return readBytes(readIntVLQ())
     }
 }
 
