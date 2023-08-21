@@ -54,9 +54,18 @@ open class BinaryWriter(initialCapacity: Int = 74) {
         }
     }
 
+    fun writeStringNullable(str: String?) {
+        if (str == null) {
+            writeIntVLQ(0)
+            return
+        } else {
+            writeString(str)
+        }
+    }
+
     fun writeString(str: String) {
         val bytes = str.encodeToByteArray()
-        writeIntVLQ(bytes.size)
+        writeIntVLQ(1 + bytes.size)
         writeBytes(bytes)
     }
     fun writeStringz(str: String) {
@@ -74,7 +83,12 @@ open class BinaryReader(val data: ByteArray, var position: Int = 0, val length: 
     val eof: Boolean get() = position >= length
     val hasMore: Boolean get() = !eof
 
-    fun readString(): String = readBytes(readIntVLQ()).decodeToString()
+    fun readStringNullable(): String? {
+        val len = readIntVLQ() - 1
+        if (len < 0) return null
+        return readBytes(len).decodeToString()
+    }
+    fun readString(): String = readStringNullable()!!
 
     fun readIntVLQ(): Int {
         var out = 0

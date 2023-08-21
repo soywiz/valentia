@@ -24,10 +24,10 @@ sealed class Node : Extra by Extra.Mixin() {
         for (item in items) addNode(item)
     }
 
-    private var _cachedType: TypeNode? = null
-    protected open fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode =
+    private var _cachedType: Type? = null
+    protected open fun getTypeUncached(resolutionContext: ResolutionContext): Type =
         TODO("${this::class} $this")
-    fun getType(resolutionContext: ResolutionContext): TypeNode {
+    fun getType(resolutionContext: ResolutionContext): Type {
         if (_cachedType == null) _cachedType = getTypeUncached(resolutionContext)
         return _cachedType!!
     }
@@ -110,7 +110,7 @@ sealed class ExprOrStm : Node() {
 
 data class TypeConstraint(
     val id: String,
-    val type: TypeNode,
+    val type: Type,
     val annotations: Annotations = Annotations.EMPTY,
 ) : Node()
 
@@ -130,7 +130,7 @@ data class AnnotationNodes(
 }
 
 data class AnnotationNode(
-    val name: TypeNode,
+    val name: Type,
     val args: List<Expr>? = null,
     val useSite: String? = null,
 ) : Node()
@@ -180,7 +180,7 @@ fun <T : Node> T.enrich(reader: BaseConsumer?, spos: Int, epos: Int): T {
 
 data class SubTypeInfo(
     /** : parentType */
-    val type: TypeNode,
+    val type: Type,
     /** : parentType(...args...) */
     val args: List<Expr>? = null,
     /** : Interface by expr */
@@ -191,7 +191,7 @@ data class SubTypeInfo(
         addNode(args)
         addNode(delegate)
     }
-    constructor(type: TypeNode, vararg args: Expr, delegate: Expr? = null) : this(type, args.toList(), delegate)
+    constructor(type: Type, vararg args: Expr, delegate: Expr? = null) : this(type, args.toList(), delegate)
 }
 
 enum class AnnotationUseSite(val id: String) {
@@ -211,7 +211,7 @@ sealed class Decl(val declName: String) : Node() {
 
 data class TypeAliasDecl(
     val id: String,
-    val type: TypeNode,
+    val type: Type,
     val types: List<TypeParameter>? = null,
     val modifiers: Modifiers = Modifiers(),
 ) : Decl(id) {
@@ -230,8 +230,8 @@ data class ConstructorDelegationCall(
         addNode(exprs)
     }
     var parent: BaseConstructorDecl? = null
-    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode =
-        FuncTypeNode(parent?.parent?.getType(resolutionContext), exprs.map { FuncTypeNode.Item(it.getType(resolutionContext)) })
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type =
+        FuncType(parent?.parent?.getType(resolutionContext), exprs.map { FuncType.Item(it.getType(resolutionContext)) })
 }
 
 abstract class BaseConstructorDecl() : Decl("constructor") {
@@ -244,9 +244,9 @@ abstract class BaseConstructorDecl() : Decl("constructor") {
     override val jsName by lazy {
         if (params.isEmpty()) "\$constructor" else "\$constructor\$${jsHash.toString(16)}"
     }
-    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type {
         val retType = parent?.declName?.type ?: UnknownType
-        return FuncTypeNode(retType, params.map { it.toNamedTypeNode() })
+        return FuncType(retType, params.map { it.toNamedTypeNode() })
     }
 }
 
@@ -255,7 +255,7 @@ data class PrimaryConstructorDecl(
     override val modifiers: Modifiers = Modifiers.EMPTY,
 ) : BaseConstructorDecl() {
     constructor(vararg classParams: ClassParameter, modifiers: Modifiers = Modifiers.EMPTY) : this(classParams.toList(), modifiers)
-    constructor(vararg pairs: Pair<String, TypeNode>, modifiers: Modifiers = Modifiers.EMPTY) : this(pairs.map { ClassParameter(it.first, it.second) }, modifiers)
+    constructor(vararg pairs: Pair<String, Type>, modifiers: Modifiers = Modifiers.EMPTY) : this(pairs.map { ClassParameter(it.first, it.second) }, modifiers)
 
     init {
         addNode(classParams)
@@ -336,7 +336,7 @@ data class ClassDecl(
         addNode(body)
         addNode(primaryConstructor)
     }
-    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type {
         return SimpleType(name) // @TODO: FqNAme
     }
 }
@@ -352,10 +352,10 @@ data class ObjectDecl(
 data class FunDecl constructor(
     val name: String,
     val params: List<FuncValueParam> = emptyList(),
-    val retType: TypeNode? = null,
+    val retType: Type? = null,
     val where: List<TypeConstraint>? = null,
     val body: Stm? = null,
-    val receiver: TypeNode? = null,
+    val receiver: Type? = null,
     val modifiers: Modifiers = Modifiers(),
 ) : Decl(name) {
     init {
@@ -370,8 +370,8 @@ data class FunDecl constructor(
 
     val isSuspend: Boolean get() = FunctionModifier.SUSPEND in modifiers
 
-    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
-        return FuncTypeNode(UnknownType, params.map { FuncTypeNode.Item(it.type) })
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type {
+        return FuncType(UnknownType, params.map { FuncType.Item(it.type) })
         //TODO("${this::class} $this")
     }
 }
@@ -391,10 +391,10 @@ enum class VariableKind(val id: String) {
 
 data class VariableDecl(
     val id: String,
-    val type: TypeNode? = null,
+    val type: Type? = null,
     val expr: Expr? = null,
     val delegation: Boolean = false,
-    val receiver: TypeNode? = null,
+    val receiver: Type? = null,
     val annotations: Annotations = Annotations.EMPTY,
     override val modifiers: Modifiers = Modifiers.EMPTY,
     val getter: FunDecl? = null,
@@ -409,7 +409,7 @@ data class VariableDecl(
     }
     val isField get() = !delegation && getter == null && setter == null
 
-    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type {
         return type ?: expr?.getType(resolutionContext) ?: UnknownType
     }
 }
@@ -417,8 +417,8 @@ data class MultiVariableDecl(
     val decls: List<VariableDecl>,
     val expr: Expr? = null,
     val delegation: Boolean = false,
-    val type: TypeNode? = null,
-    val receiver: TypeNode? = null,
+    val type: Type? = null,
+    val receiver: Type? = null,
     override val modifiers: Modifiers = Modifiers.EMPTY,
     override val kind: VariableKind = VariableKind.VAL,
 ) : VariableDeclBase(decls.joinToString(",") { it.declName }) {
@@ -448,7 +448,7 @@ fun <T : VariableDeclBase> T.withGetter(
 fun <T : VariableDeclBase> T.withAssignment(
     expr: Expr,
     delegation: Boolean = false,
-    receiver: TypeNode? = null
+    receiver: Type? = null
 ): T {
     return when (this) {
         is VariableDecl -> this.copy(expr = expr, delegation = delegation, receiver = receiver) as T
@@ -481,9 +481,9 @@ data class AnonymousFunctionExpr(val decl: FunDecl) : Expr()
 
 sealed class AssignableExpr : Expr()
 
-data class TypeArgumentsAssignableSuffixExpr(val expr: Expr, val types: List<TypeNode>) : AssignableExpr()
+data class TypeArgumentsAssignableSuffixExpr(val expr: Expr, val types: List<Type>) : AssignableExpr()
 
-data class CallableReferenceExt(val type: TypeNode?, val kind: String) : Expr()
+data class CallableReferenceExt(val type: Type?, val kind: String) : Expr()
 data class ObjectLiteralExpr(
     val delegationSpecifiers: List<SubTypeInfo>? = null,
     val body: List<Decl>? = null,
@@ -498,16 +498,16 @@ data class WhenExpr(
     sealed interface ConditionBase
     data class Condition(val expr: Expr = EmptyExpr()) : ConditionBase
     data class ConditionIn(val op: String? = null, val expr: Expr = EmptyExpr()) : ConditionBase
-    data class ConditionIs(val op: String? = null, val type: TypeNode? = null) : ConditionBase
+    data class ConditionIs(val op: String? = null, val type: Type? = null) : ConditionBase
 }
 data class CollectionLiteralExpr(val items: List<Expr>) : Expr()
 data class TryCatchExpr(val body: Node, val catches: List<Catch> = emptyList(), val finally: Stm? = null) : Expr() {
-    data class Catch(val local: String, val type: TypeNode, val body: Stm)
+    data class Catch(val local: String, val type: Type, val body: Stm)
 }
-data class Temp(val type: TypeNode, val id: Int) : Expr() {
+data class Temp(val type: Type, val id: Int) : Expr() {
     override fun toString(): String = "\$temp\$$id"
 }
-data class SuperExpr(val label: String? = null, val type: TypeNode? = null) : AssignableExpr()
+data class SuperExpr(val label: String? = null, val type: Type? = null) : AssignableExpr()
 data class TernaryExpr(val cond: Expr, val trueExpr: Expr, val falseExpr: Expr) : Expr() {
     init {
         addNode(cond)
@@ -535,31 +535,31 @@ data class ThrowExpr(val expr: Expr) : Expr() {
     }
 }
 
-data class Parameter(val id: String, val type: TypeNode) : Node()
-data class ParameterOptType(val id: String, val type: TypeNode?, val modifiers: Modifiers? = null, val expr: Expr? = null) : Node() {
+data class Parameter(val id: String, val type: Type) : Node()
+data class ParameterOptType(val id: String, val type: Type?, val modifiers: Modifiers? = null, val expr: Expr? = null) : Node() {
     init {
         addNode(expr)
     }
 }
-data class FuncValueParam(val id: String, val type: TypeNode?) : Node()
-data class TypeParameter(val id: String, val type: TypeNode?) : Node()
+data class FuncValueParam(val id: String, val type: Type?) : Node()
+data class TypeParameter(val id: String, val type: Type?) : Node()
 
 fun ParameterOptType.toFuncValueParam(): FuncValueParam = FuncValueParam(id, type ?: UnknownType)
-fun FuncValueParam.toNamedTypeNode(): FuncTypeNode.Item = FuncTypeNode.Item(this.type, this.id)
+fun FuncValueParam.toNamedTypeNode(): FuncType.Item = FuncType.Item(this.type, this.id)
 
 data class ClassParameter(
     val id: String,
-    val type: TypeNode? = null,
+    val type: Type? = null,
     val expr: Expr? = null,
     val kind: VariableKind? = null,
     val modifiers: Modifiers = Modifiers.EMPTY,
 ) : Node() {
     companion object {
-        fun VAL(id: String, type: TypeNode? = null): ClassParameter = ClassParameter(id, type, kind = VariableKind.VAL)
-        fun VAR(id: String, type: TypeNode? = null): ClassParameter = ClassParameter(id, type, kind = VariableKind.VAR)
+        fun VAL(id: String, type: Type? = null): ClassParameter = ClassParameter(id, type, kind = VariableKind.VAL)
+        fun VAR(id: String, type: Type? = null): ClassParameter = ClassParameter(id, type, kind = VariableKind.VAR)
 
-        fun VAL(pair: Pair<String, TypeNode>): ClassParameter = ClassParameter(pair.first, pair.second, kind = VariableKind.VAL)
-        fun VAR(pair: Pair<String, TypeNode>): ClassParameter = ClassParameter(pair.first, pair.second, kind = VariableKind.VAR)
+        fun VAL(pair: Pair<String, Type>): ClassParameter = ClassParameter(pair.first, pair.second, kind = VariableKind.VAL)
+        fun VAR(pair: Pair<String, Type>): ClassParameter = ClassParameter(pair.first, pair.second, kind = VariableKind.VAR)
     }
 }
 
@@ -578,7 +578,7 @@ enum class UnaryPostOp(val str: String) {
     }
 }
 
-data class CastExpr(val expr: Expr, val targetType: TypeNode, val kind: String) : Expr() {
+data class CastExpr(val expr: Expr, val targetType: Type, val kind: String) : Expr() {
     init {
         addNode(expr)
     }
@@ -586,23 +586,23 @@ data class CastExpr(val expr: Expr, val targetType: TypeNode, val kind: String) 
 sealed class BaseCallExpr : Expr() {
     abstract val params: List<Expr>
     abstract val lambdaArg: Expr?
-    abstract val typeArgs: List<TypeNode>?
+    abstract val typeArgs: List<Type>?
     val paramsPlusLambda by lazy { params + listOfNotNull(lambdaArg) }
 
     var resolvedDecl: Decl? = null
     var addThis: Boolean = false
 
-    open fun getFuncType(resolutionContext: ResolutionContext): FuncTypeNode = FuncTypeNode(null, params.map { FuncTypeNode.Item(it.getType(resolutionContext)) })
+    open fun getFuncType(resolutionContext: ResolutionContext): FuncType = FuncType(null, params.map { FuncType.Item(it.getType(resolutionContext)) })
 }
-data class CallExpr(val expr: Expr, override val params: List<Expr> = emptyList(), override val lambdaArg: Expr? = null, override val typeArgs: List<TypeNode>? = null) : BaseCallExpr() {
+data class CallExpr(val expr: Expr, override val params: List<Expr> = emptyList(), override val lambdaArg: Expr? = null, override val typeArgs: List<Type>? = null) : BaseCallExpr() {
     init {
         addNode(expr)
         addNode(params)
         addNode(lambdaArg)
     }
 
-    override fun getFuncType(resolutionContext: ResolutionContext): FuncTypeNode = FuncTypeNode(expr.getType(resolutionContext), params.map { FuncTypeNode.Item(it.getType(resolutionContext)) })
-    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+    override fun getFuncType(resolutionContext: ResolutionContext): FuncType = FuncType(expr.getType(resolutionContext), params.map { FuncType.Item(it.getType(resolutionContext)) })
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type {
         return getFuncType(resolutionContext)
     }
 
@@ -621,7 +621,7 @@ data class NavigationExpr(val op: String, val expr: Expr, val key: Any) : Assign
 
     var resolvedDecl: Decl? = null
 
-    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type {
         return resolvedDecl?.getType(resolutionContext) ?: UnknownType
     }
 }
@@ -639,7 +639,7 @@ data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr() {
     init {
         addNode(expr)
     }
-    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type {
         val type = expr.getType(resolutionContext)
         if (type == IntType) return type
         TODO("UnaryPreOpExpr type=$type, expr=$expr")
@@ -652,7 +652,7 @@ data class IdentifierExpr(val id: String) : AssignableExpr() {
     var resolutionContext: ResolutionContext? = null
     var resolvedDecl: Decl? = null
 
-    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type {
         return resolvedDecl?.getType(resolutionContext) ?: resolutionContext.resolve(id).decls.firstOrNull()?.getType(resolutionContext) ?: UnknownType
     }
 }
@@ -684,18 +684,18 @@ open class LiteralExpr(val literal: Any?) : Expr()
 
 data class NullLiteralExpr(val dummy: Unit = Unit) : LiteralExpr(null)
 data class BoolLiteralExpr(val value: Boolean) : LiteralExpr(value) {
-    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = BoolType
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type = BoolType
 }
 data class CharLiteralExpr(val value: Char) : LiteralExpr(value) {
-    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = CharType
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type = CharType
 }
 data class IntLiteralExpr(val value: Long, val isLong: Boolean = false, val isUnsigned: Boolean = false) : LiteralExpr(value) {
     override fun toString(): String = "$value${if (isUnsigned) "U" else ""}${if (isLong) "L" else ""}.lit"
     //override fun toString(): String = "IntLiteralExpr($value${if (isUnsigned) "U" else ""}${if (isLong) "L" else ""})"
-    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = IntType
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type = IntType
 }
 data class StringLiteralExpr(val value: String) : LiteralExpr(value) {
-    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = StringType
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type = StringType
 }
 data class InterpolatedStringExpr(val chunks: List<Chunk>) : Expr() {
     init {
@@ -705,13 +705,13 @@ data class InterpolatedStringExpr(val chunks: List<Chunk>) : Expr() {
     sealed class Chunk : Node()
     data class StringChunk(val string: String) : Chunk()
     data class ExpressionChunk(val expr: Expr) : Chunk()
-    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = StringType
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type = StringType
 }
 
 open class IncompleteExpr(val message: String) : Expr()
 open class EmptyExpr : Expr()
 
-data class TypeTestExpr(val base: Expr, val kind: String, val type: TypeNode) : Expr() {
+data class TypeTestExpr(val base: Expr, val kind: String, val type: Type) : Expr() {
     init {
         addNode(base)
     }
@@ -724,7 +724,7 @@ data class RangeTestExpr(val base: Expr, val kind: String, val container: Expr) 
 }
 
 data class ThisExpr(val id: String?) : AssignableExpr() {
-    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type {
         return resolutionContext.getCurrentClass(id)?.getType(resolutionContext) ?: UnknownType
     }
 }
@@ -752,7 +752,7 @@ data class TryCatchStm(val body: Stm, val catches: List<Catch> = emptyList(), va
         for (catch in catches) addNode(catch.body)
         addNode(finally)
     }
-    data class Catch(val local: String, val type: TypeNode, val body: Stm) {
+    data class Catch(val local: String, val type: Type, val body: Stm) {
     }
 }
 

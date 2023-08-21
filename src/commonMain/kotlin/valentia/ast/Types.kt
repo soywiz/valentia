@@ -2,31 +2,36 @@ package valentia.ast
 
 // Type
 
-abstract class TypeNode : Node()
+abstract class Type : Node()
 
-data class SimpleType(val name: String) : TypeNode() {
+//data class PackageName(val parts: List<String>)
+//data class FqName(val parts: List<String>)
+
+data class SimpleType(val name: String) : Type() {
     var fqname: String? = null
+    //val _package: String? = null
+    //val _simpleName: String get() = name
     val fullName: String get() = fqname ?: name
     var resolvedDecl: Decl? = null
     override fun toString(): String = name
     companion object {
-        const val ID = 0
-    }
-}
-data class NullableType(val type: TypeNode) : TypeNode() {
-    companion object {
         const val ID = 1
     }
 }
-data class GenericType(val base: TypeNode, val generics: List<TypeNode>) : TypeNode() {
-    constructor(base: TypeNode, vararg generics: TypeNode) : this(base, generics.toList())
+data class NullableType(val type: Type) : Type() {
     companion object {
         const val ID = 2
     }
 }
+data class GenericType(val base: Type, val generics: List<Type>) : Type() {
+    constructor(base: Type, vararg generics: Type) : this(base, generics.toList())
+    companion object {
+        const val ID = 3
+    }
+}
 
-data class FuncTypeNode(val ret: TypeNode?, val params: List<Item>, val receiver: TypeNode? = null, val suspendable: Boolean = false) : TypeNode() {
-    data class Item(val type: TypeNode?, val name: String? = null) {
+data class FuncType(val ret: Type?, val params: List<Item>, val receiver: Type? = null, val suspendable: Boolean = false) : Type() {
+    data class Item(val type: Type?, val name: String? = null) {
         constructor(param: Parameter) : this(param.type, param.id)
         override fun toString(): String = if (name != null) "$name: $type" else "$type"
     }
@@ -34,33 +39,33 @@ data class FuncTypeNode(val ret: TypeNode?, val params: List<Item>, val receiver
     override fun toString(): String = "(${params.joinToString(", ")}) -> $ret"
 
     companion object {
-        const val ID = 3
-    }
-}
-data class MultiType(val types: List<TypeNode>) : TypeNode() {
-    constructor(vararg types: TypeNode) : this(types.toList())
-
-    companion object {
         const val ID = 4
     }
 }
+data class MultiType(val types: List<Type>) : Type() {
+    constructor(vararg types: Type) : this(types.toList())
 
-data class DefinitelyNonNullableType(
-    val type1: TypeNode,
-    val mods1: Modifiers,
-    val type2: TypeNode,
-    val mods2: Modifiers,
-) : TypeNode() {
     companion object {
         const val ID = 5
     }
 }
 
-// @TODO: This should be resolved instead of serialized
-data class UnificationExprType(val exprs: List<ExprOrStm>) : TypeNode() {
-    constructor(vararg exprs: ExprOrStm?) : this(exprs.filterNotNull())
+data class DefinitelyNonNullableType(
+    val type1: Type,
+    val mods1: Modifiers,
+    val type2: Type,
+    val mods2: Modifiers,
+) : Type() {
     companion object {
         const val ID = 6
+    }
+}
+
+// @TODO: This should be resolved instead of serialized
+data class UnificationExprType(val exprs: List<ExprOrStm>) : Type() {
+    constructor(vararg exprs: ExprOrStm?) : this(exprs.filterNotNull())
+    companion object {
+        const val ID = 255
     }
 }
 
@@ -73,11 +78,11 @@ val StringType = SimpleType("String")
 val IntType = SimpleType("Int")
 val FloatType = SimpleType("Float")
 
-fun FuncTypeNode.suspendable(): FuncTypeNode = this.copy(suspendable = true)
+fun FuncType.suspendable(): FuncType = this.copy(suspendable = true)
 
-fun TypeNode.withModifiers(modifiers: List<Any>): TypeNode {
+fun Type.withModifiers(modifiers: List<Any>): Type {
     if (modifiers.isNotEmpty()) println("TODO: TypeNode.withModifiers: $modifiers")
     return this
 }
 
-fun TypeNode.nullable(): NullableType = if (this is NullableType) this else NullableType(this)
+fun Type.nullable(): NullableType = if (this is NullableType) this else NullableType(this)

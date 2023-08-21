@@ -1,12 +1,12 @@
 package valentia.sema
 
-import valentia.ast.FuncTypeNode
-import valentia.ast.TypeNode
+import valentia.ast.FuncType
+import valentia.ast.Type
 import valentia.ast.UnknownType
 
 object TypeMatching {
-    fun canAssignTo(src: TypeNode?, dst: TypeNode?): Boolean {
-        if (src is FuncTypeNode && dst is FuncTypeNode) {
+    fun canAssignTo(src: Type?, dst: Type?): Boolean {
+        if (src is FuncType && dst is FuncType) {
             if (src.params.size != dst.params.size) return false
             for ((srcP, dstP) in src.params.zip(dst.params)) {
                 if (!canAssignTo(srcP.type, dstP.type)) return false

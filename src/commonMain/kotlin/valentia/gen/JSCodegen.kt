@@ -240,12 +240,12 @@ open class JSCodegen {
         }
     }
 
-    fun Node.getTypeSafe(): TypeNode {
+    fun Node.getTypeSafe(): Type {
         // @TODO: Get from this context
         return getTypeSafe(currentResolutionContext)
     }
 
-    fun Node.getTypeSafe(resolutionContext: ResolutionContext): TypeNode {
+    fun Node.getTypeSafe(resolutionContext: ResolutionContext): Type {
         return try {
             getType(resolutionContext)
         } catch (e: Throwable) {
@@ -255,7 +255,7 @@ open class JSCodegen {
         }
     }
 
-    fun IdWithContext.resolveSafe(funcType: TypeNode): Decl? {
+    fun IdWithContext.resolveSafe(funcType: Type): Decl? {
         //try {
             return resolve(funcType)
         //} catch (e: Throwable) {
@@ -534,7 +534,7 @@ open class JSCodegen {
         }
     }
 
-    fun TypeNode.toJsString(): String = when (this) {
+    fun Type.toJsString(): String = when (this) {
         is SimpleType -> this.name
         else -> "$this"
     }

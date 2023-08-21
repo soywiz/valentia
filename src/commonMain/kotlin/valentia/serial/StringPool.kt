@@ -3,20 +3,22 @@ package valentia.serial
 import valentia.util.BinaryReader
 import valentia.util.buildByteArray
 
-class StringPool : Pool<String>() {
-    fun toByteArray(): ByteArray = buildByteArray(7 + items.sumOf { it.length * 2 }) {
+class StringPool : Pool<String?>() {
+    init {
+        this[null]
+    }
+
+    fun toByteArray(): ByteArray = buildByteArray(7 + items.sumOf { (it ?: "").length * 2 }) {
         writeIntVLQ(items.size)
-        for (str in items) writeString(str)
+        for (str in items) writeStringNullable(str)
     }
 
     companion object {
         fun fromByteArray(bytes: ByteArray): StringPool {
             val reader = BinaryReader(bytes)
             val count = reader.readIntVLQ()
-            val strings = (0 until count).map { reader.readString() }
             val pool = StringPool()
-            pool.items.addAll(strings)
-            for ((index, str) in strings.withIndex()) pool.itemsToIndex[str] = index
+            for (n in 0 until count) { pool[reader.readStringNullable()] }
             return pool
         }
     }

@@ -31,13 +31,13 @@ operator fun SymbolProvider.plus(other: SymbolProvider): SymbolProvider =
 
 data class IdWithContext(val id: String, val context: ResolutionContext, val addThis: Boolean) {
     fun resolve(): DeclCollection = context[id]
-    fun resolve(type: TypeNode): Decl? = resolve().findMatch(type)
+    fun resolve(type: Type): Decl? = resolve().findMatch(type)
     override fun toString(): String = if (addThis) "this.$id" else id
 }
 
 inline class DeclCollection(val declsNull: List<Decl>?) {
     val decls: List<Decl> get() = declsNull ?: emptyList()
-    fun findMatch(type: TypeNode): Decl? {
+    fun findMatch(type: Type): Decl? {
         val items = declsNull ?: return null
         for (item in items) {
             // @TODO: Check constructors
@@ -48,7 +48,7 @@ inline class DeclCollection(val declsNull: List<Decl>?) {
                         return constructor
                     }
                 }
-                if (type is FuncTypeNode) {
+                if (type is FuncType) {
                     if (type.params.isEmpty()) {
                         return item
                     }
@@ -67,7 +67,7 @@ inline class DeclCollection(val declsNull: List<Decl>?) {
 interface ResolutionContext {
     val node: Node? get() = null
     operator fun get(name: String): DeclCollection = resolve(name)
-    operator fun get(type: TypeNode): DeclCollection = resolve(type.toString())
+    operator fun get(type: Type): DeclCollection = resolve(type.toString())
     fun resolve(id: String): DeclCollection
     fun getCurrentClass(id: String? = null): ClassOrObjectDecl? = null
 }

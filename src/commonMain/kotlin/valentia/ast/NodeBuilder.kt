@@ -17,8 +17,8 @@ interface DeclBuilder : NodeBuilder {
     fun addDecl(decl: Decl) {
     }
 
-    fun VAL(name: String, expr: Expr? = null, type: TypeNode? = null, delegation: Boolean = false): VariableDecl = VariableDecl(name, type, expr, delegation = delegation, kind = VariableKind.VAL).also { addDecl(it) }
-    fun VAR(name: String, expr: Expr? = null, type: TypeNode? = null, delegation: Boolean = false): VariableDecl = VariableDecl(name, type, expr, delegation = delegation, kind = VariableKind.VAR).also { addDecl(it) }
+    fun VAL(name: String, expr: Expr? = null, type: Type? = null, delegation: Boolean = false): VariableDecl = VariableDecl(name, type, expr, delegation = delegation, kind = VariableKind.VAL).also { addDecl(it) }
+    fun VAR(name: String, expr: Expr? = null, type: Type? = null, delegation: Boolean = false): VariableDecl = VariableDecl(name, type, expr, delegation = delegation, kind = VariableKind.VAR).also { addDecl(it) }
     fun CLASS(
         name: String,
         vararg subTypes: SubTypeInfo,
@@ -37,8 +37,8 @@ interface DeclBuilder : NodeBuilder {
         ClassDecl(ClassKind.INTERFACE, name, if (subTypes.isEmpty()) null else subTypes.toList(), buildDeclList { block() }, primaryConstructor = null).also { addDecl(it) }
     fun FUN(
         name: String,
-        ret: TypeNode? = null,
-        vararg params: Pair<String, TypeNode>,
+        ret: Type? = null,
+        vararg params: Pair<String, Type>,
         block: (StmBuilder.() -> Unit)? = null
     ): FunDecl =
         FunDecl(name, params.map { FuncValueParam(it.first, it.second) }, retType = ret, body = block?.let { func -> StmBuilder.buildStms { func() } }).also { addDecl(it) }
@@ -132,7 +132,7 @@ interface NodeBuilder {
             }
         })
     }
-    val IntType: TypeNode get() = "Int".type
+    val IntType: Type get() = "Int".type
     val Boolean.lit: BoolLiteralExpr get() = BoolLiteralExpr(this)
     val Int.lit: IntLiteralExpr get() = IntLiteralExpr(this.toLong())
     val Char.lit: CharLiteralExpr get() = CharLiteralExpr(this)
@@ -140,15 +140,15 @@ interface NodeBuilder {
     val String.lit: StringLiteralExpr get() = StringLiteralExpr(this)
     val String.id: IdentifierExpr get() = IdentifierExpr(this)
     val String.multiType: MultiType get() = this.type.multi
-    fun TypeNode.generic(vararg generics: TypeNode): GenericType = GenericType(this, generics.toList())
+    fun Type.generic(vararg generics: Type): GenericType = GenericType(this, generics.toList())
     val String.type: SimpleType get() = SimpleType(this)
-    val TypeNode.multi: MultiType get() = MultiType(this)
-    val List<TypeNode>.multi: MultiType get() = MultiType(this)
+    val Type.multi: MultiType get() = MultiType(this)
+    val List<Type>.multi: MultiType get() = MultiType(this)
     fun collection(vararg items: Expr): CollectionLiteralExpr = CollectionLiteralExpr(items.toList())
     fun Expr.notNull(): UnaryPostOpExpr = UnaryPostOpExpr(this, UnaryPostOp.NOT_NULL)
     operator fun Expr.get(vararg indices: Expr): IndexedExpr = IndexedExpr(this, indices.toList())
     operator fun Expr.get(dot: String): NavigationExpr = NavigationExpr(".", this, dot)
-    operator fun Expr.invoke(vararg params: Expr, lambdaArg: Expr? = null, typeArgs: List<TypeNode>? = null): BaseCallExpr =
+    operator fun Expr.invoke(vararg params: Expr, lambdaArg: Expr? = null, typeArgs: List<Type>? = null): BaseCallExpr =
         when (this) {
             //is IdentifierExpr -> CallIdExpr(null, this.id, ".", params.toList(), lambdaArg, typeArgs)
             else -> CallExpr(this, params.toList(), lambdaArg, typeArgs)
@@ -156,9 +156,9 @@ interface NodeBuilder {
     fun Expr.infix(key: String, expr: Expr): Expr = BinaryOpExpr(this, key, expr)
     operator fun Expr.unaryMinus(): UnaryPreOpExpr = UnaryPreOpExpr(UnaryPreOp.MINUS, this)
     operator fun Expr.unaryPlus(): UnaryPreOpExpr = UnaryPreOpExpr(UnaryPreOp.PLUS, this)
-    fun Expr.castTo(targetType: TypeNode, safe: Boolean = false): Expr =
+    fun Expr.castTo(targetType: Type, safe: Boolean = false): Expr =
         CastExpr(this, targetType, if (safe) "as?" else "as")
-    fun Expr.safeCastTo(targetType: TypeNode, safe: Boolean = true): Expr = castTo(targetType, safe)
+    fun Expr.safeCastTo(targetType: Type, safe: Boolean = true): Expr = castTo(targetType, safe)
     operator fun Expr.plus(that: Expr): Expr = BinaryOpExpr(this, "+", that)
     operator fun Expr.minus(that: Expr): Expr = BinaryOpExpr(this, "-", that)
     operator fun Expr.times(that: Expr): Expr = BinaryOpExpr(this, "*", that)
@@ -167,8 +167,8 @@ interface NodeBuilder {
     infix fun Expr.shr(that: Expr): Expr = BinaryOpExpr(this, "shr", that)
     infix fun Expr._in(that: Expr): Expr = RangeTestExpr(this, "in", that)
     infix fun Expr._notIn(that: Expr): Expr = RangeTestExpr(this, "!in", that)
-    infix fun Expr._is(that: TypeNode): Expr = TypeTestExpr(this, "is", that)
-    infix fun Expr._notIs(that: TypeNode): Expr = TypeTestExpr(this, "!is", that)
+    infix fun Expr._is(that: Type): Expr = TypeTestExpr(this, "is", that)
+    infix fun Expr._notIs(that: Type): Expr = TypeTestExpr(this, "!is", that)
     val THIS: ThisExpr get() = ThisExpr(null)
     fun OBJECT_LIT(vararg subtypes: SubTypeInfo, isData: Boolean = false, block: DeclBuilder.() -> Unit): ObjectLiteralExpr =
         ObjectLiteralExpr(subtypes.toList(), body = DeclBuilder.buildDeclList { block() }, isData = isData)

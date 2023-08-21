@@ -1,6 +1,6 @@
 package valentia.parser
 
-import valentia.ast.FuncTypeNode
+import valentia.ast.FuncType
 import valentia.ast.GenericType
 import valentia.ast.NodeBuilder.Companion.generic
 import valentia.ast.NodeBuilder.Companion.type
@@ -28,7 +28,7 @@ open class ValentiaParserTypeTest {
     @Test
     fun testTypeFunc() {
         assertEquals(
-            FuncTypeNode(ret = SimpleType(name = "T"), params = listOf(FuncTypeNode.Item("Int".type))),
+            FuncType(ret = SimpleType(name = "T"), params = listOf(FuncType.Item("Int".type))),
             ValentiaParser.type("(Int) -> T") as Any?
         )
     }
@@ -47,7 +47,7 @@ open class ValentiaParserTypeTest {
     @Test
     fun testFun1() {
         assertEquals(
-            FuncTypeNode("T".type, listOf(), receiver = "ValentiaParser".type),
+            FuncType("T".type, listOf(), receiver = "ValentiaParser".type),
             ValentiaParser.type("ValentiaParser.() -> T") as? Any?
         )
     }

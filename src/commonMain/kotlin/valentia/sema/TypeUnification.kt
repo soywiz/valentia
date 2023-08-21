@@ -1,10 +1,10 @@
 package valentia.sema
 
 import valentia.ast.DynamicType
-import valentia.ast.TypeNode
+import valentia.ast.Type
 
 object TypeUnification {
-    fun unify(vararg types: TypeNode): TypeNode {
+    fun unify(vararg types: Type): Type {
         return DynamicType
     }
 }

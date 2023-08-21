@@ -10,7 +10,7 @@ class TransformUnsupportedNodes(val supported: (Node) -> Boolean) {
     class TransformContext {
         var id = 0
         val temps = arrayListOf<Temp>()
-        fun createTemp(type: TypeNode): Temp {
+        fun createTemp(type: Type): Temp {
             return Temp(type, id++).also { temps += it }
         }
     }
