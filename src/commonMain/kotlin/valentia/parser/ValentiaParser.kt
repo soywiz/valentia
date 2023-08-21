@@ -1168,19 +1168,19 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //functionTypeParameters
     //    : LPAREN NL* (parameter | type)? (NL* COMMA NL* (parameter | type))* (NL* COMMA)? NL* RPAREN
     //    ;
-    fun functionTypeParameters(): List<NamedTypeNode>? {
+    fun functionTypeParameters(): List<FuncTypeNode.Item>? {
         return expectAndRecover("(", ")", nullIfNotMatching = true) {
             NLs()
             val first = ORNullable(
-                { parameter()?.let { NamedTypeNode(it) } },
-                { type()?.let { NamedTypeNode(it) } }
+                { parameter()?.let { FuncTypeNode.Item(it) } },
+                { type()?.let { FuncTypeNode.Item(it) } }
             )
             val rest = zeroOrMore {
                 if (!expectOptNLs(",")) return@zeroOrMore null
                 NLs()
                 ORNullable(
-                    { parameter()?.let { NamedTypeNode(it) } },
-                    { type()?.let { NamedTypeNode(it) } }
+                    { parameter()?.let { FuncTypeNode.Item(it) } },
+                    { type()?.let { FuncTypeNode.Item(it) } }
                 )
             }
             expectOptNLs(",")

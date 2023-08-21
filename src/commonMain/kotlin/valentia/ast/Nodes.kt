@@ -231,7 +231,7 @@ data class ConstructorDelegationCall(
     }
     var parent: BaseConstructorDecl? = null
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode =
-        FuncTypeNode(parent?.parent?.getType(resolutionContext), exprs.map { NamedTypeNode(it.getType(resolutionContext)) })
+        FuncTypeNode(parent?.parent?.getType(resolutionContext), exprs.map { FuncTypeNode.Item(it.getType(resolutionContext)) })
 }
 
 abstract class BaseConstructorDecl() : Decl("constructor") {
@@ -371,7 +371,7 @@ data class FunDecl constructor(
     val isSuspend: Boolean get() = FunctionModifier.SUSPEND in modifiers
 
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
-        return FuncTypeNode(UnknownType, params.map { NamedTypeNode(it.type) })
+        return FuncTypeNode(UnknownType, params.map { FuncTypeNode.Item(it.type) })
         //TODO("${this::class} $this")
     }
 }
@@ -545,7 +545,7 @@ data class FuncValueParam(val id: String, val type: TypeNode?) : Node()
 data class TypeParameter(val id: String, val type: TypeNode?) : Node()
 
 fun ParameterOptType.toFuncValueParam(): FuncValueParam = FuncValueParam(id, type ?: UnknownType)
-fun FuncValueParam.toNamedTypeNode(): NamedTypeNode = NamedTypeNode(this.type, this.id)
+fun FuncValueParam.toNamedTypeNode(): FuncTypeNode.Item = FuncTypeNode.Item(this.type, this.id)
 
 data class ClassParameter(
     val id: String,
@@ -592,7 +592,7 @@ sealed class BaseCallExpr : Expr() {
     var resolvedDecl: Decl? = null
     var addThis: Boolean = false
 
-    open fun getFuncType(resolutionContext: ResolutionContext): FuncTypeNode = FuncTypeNode(null, params.map { NamedTypeNode(it.getType(resolutionContext)) })
+    open fun getFuncType(resolutionContext: ResolutionContext): FuncTypeNode = FuncTypeNode(null, params.map { FuncTypeNode.Item(it.getType(resolutionContext)) })
 }
 data class CallExpr(val expr: Expr, override val params: List<Expr> = emptyList(), override val lambdaArg: Expr? = null, override val typeArgs: List<TypeNode>? = null) : BaseCallExpr() {
     init {
@@ -601,7 +601,7 @@ data class CallExpr(val expr: Expr, override val params: List<Expr> = emptyList(
         addNode(lambdaArg)
     }
 
-    override fun getFuncType(resolutionContext: ResolutionContext): FuncTypeNode = FuncTypeNode(expr.getType(resolutionContext), params.map { NamedTypeNode(it.getType(resolutionContext)) })
+    override fun getFuncType(resolutionContext: ResolutionContext): FuncTypeNode = FuncTypeNode(expr.getType(resolutionContext), params.map { FuncTypeNode.Item(it.getType(resolutionContext)) })
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
         return getFuncType(resolutionContext)
     }
