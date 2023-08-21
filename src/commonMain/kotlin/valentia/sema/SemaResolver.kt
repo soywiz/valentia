@@ -59,25 +59,39 @@ class SemaResolver : NodeVisitor() {
     }
 
     override fun visit(expr: CallExpr) {
-        val key = expr.expr
-        when (key) {
+        val cexpr = expr.expr
+        val funcType = expr.getFuncType(currentResolutionContext)
+        super.visit(expr)
+        when (cexpr) {
             is IdentifierExpr -> {
-                val decls = currentResolutionContext.resolve(key.id)
-                val funcType = expr.getFuncType(currentResolutionContext)
+                val decls = currentResolutionContext.resolve(cexpr.id)
                 val resolved = decls.findMatch(funcType)
-                key.resolvedDecl = resolved
+                cexpr.resolvedDecl = resolved
                 if (resolved?.parentNode == currentClassDecl && currentClassDecl != null) {
-                    key.addThis = true
+                    cexpr.addThis = true
                 }
             }
             is NavigationExpr -> {
-                //TODO("NavigationExpr")
+                val key = cexpr.key
+                if (key is String) {
+                    val exprType = cexpr.expr.getType(currentResolutionContext)
+                    val exprResolvedDecl = cexpr.resolve(exprType.toString()).firstOrNull()
+                    val decls = DeclCollection(exprResolvedDecl?.resolve(key)?.toList())
+                    //val decls = currentResolutionContext.resolve(cexpr.key.toString())
+                    val resolved = decls.findMatch(funcType)
+                    if (exprResolvedDecl is ClassOrObjectDecl) {
+                        val resolvedSubTypes = exprResolvedDecl.directResolvedSubTypes
+                        println("resolvedSubTypes=$resolvedSubTypes")
+                    }
+                    cexpr.resolvedDecl = resolved
+                } else {
+                    TODO("NavigationExpr key=${cexpr.key}")
+                }
             }
             else -> {
-                TODO("key=$key")
+                TODO("key=$cexpr")
             }
         }
-        super.visit(expr)
         /*
         val decls = currentResolutionContext.resolve(expr.id)
         val funcType = expr.getFuncType(currentResolutionContext)

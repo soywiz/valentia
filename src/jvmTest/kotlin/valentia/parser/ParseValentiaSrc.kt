@@ -27,7 +27,7 @@ class ParseValentiaSrc {
 
     @Test
     fun testParser() {
-        doTest("./src/commonMain/kotlin/valentia/parser/KotlinParser.kt")
+        doTest("./src/commonMain/kotlin/valentia/parser/ValentiaParser.kt")
     }
 
     fun doTestFolder(folder: String) {

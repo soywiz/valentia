@@ -280,6 +280,14 @@ open class JSCodegen {
                 }
 
             }
+            is NavigationExpr -> {
+                if (expr.op != ".") error("Unsupported ${expr.op}")
+                val keyStr = when (expr.key) {
+                    is Expr -> generateExpr(expr.key)
+                    else -> expr.resolvedDecl?.jsName ?: expr.key.toString()
+                }
+                "${generateExpr(expr.expr)}.$keyStr"
+            }
             is BoolLiteralExpr -> "${expr.value}"
             is IntLiteralExpr -> "${expr.value}"
             is CharLiteralExpr -> "${expr.value.code}"
@@ -346,14 +354,6 @@ open class JSCodegen {
                 val resStr = generateExpr(exprExpr)
                 val paramsStr = "(" + expr.paramsPlusLambda.joinToString(", ") { generateExpr(it).toString() } + ")"
                 "$resStr$paramsStr"
-            }
-            is NavigationExpr -> {
-                if (expr.op != ".") error("Unsupported ${expr.op}")
-                val keyStr = when (expr.key) {
-                    is Expr -> generateExpr(expr.key)
-                    else -> expr.resolvedDecl?.jsName ?: expr.key.toString()
-                }
-                "${generateExpr(expr.expr)}.$keyStr"
             }
             is LambdaFunctionExpr -> {
                 val str = initLambdaBlock {

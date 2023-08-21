@@ -12,6 +12,17 @@ sealed class Node : Extra by Extra.Mixin() {
     val rangeStr: String? get() = reader?.readAbsoluteRange(spos, epos)
     var nodeAnnotations: Annotations? = null
     var parentNode: Node? = null
+    val parentDecl: Decl? by lazy { if (parentNode is Decl) parentNode as Decl else parentNode?.parentDecl }
+    val currentDecl: Decl? get() = if (this is Decl) this else parentDecl
+
+    fun addNode(item: Node?) {
+        item?.parentNode = this
+    }
+
+    fun addNode(items: List<Node?>?) {
+        if (items == null) return
+        for (item in items) addNode(item)
+    }
 
     private var _cachedType: TypeNode? = null
     protected open fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode =
@@ -22,27 +33,36 @@ sealed class Node : Extra by Extra.Mixin() {
     }
 }
 
-class Program : Node() {
+class Program : Decl("\$program") {
     var semaResolved = false
     val modulesById = LinkedHashMap<String?, Module>()
 
     fun getModule(id: String?): Module {
-        return modulesById.getOrPut(id) { Module(id) }
+        return modulesById.getOrPut(id) { Module(this, id) }
     }
 }
 
-class Module(val id: String? = null) : Node() {
+class Module(val program: Program, val id: String? = null) : Decl("\$module\$$id") {
+    init {
+        program.addNode(this)
+    }
     val packagesById = LinkedHashMap<Identifier?, Package>()
 
     fun getPackage(identifier: Identifier?): Package {
-        return packagesById.getOrPut(identifier) { Package(identifier) }
+        return packagesById.getOrPut(identifier) {
+            Package(this, identifier)
+        }
     }
 
     fun addFile(file: FileNode) {
         getPackage(file._package).addFile(file)
     }
 }
-open class Package(val identifier: Identifier?) : Node() {
+open class Package(val module: Module, val identifier: Identifier?) : Decl("$identifier") {
+    init {
+        module.addNode(this)
+    }
+    val program: Program get() = module.program
     val symbols = LinkedHashMap<String, ArrayList<Decl>>()
     val files = arrayListOf<FileNode>()
 
@@ -50,6 +70,8 @@ open class Package(val identifier: Identifier?) : Node() {
 
     fun addFile(file: FileNode) {
         files += file
+        file.parentNode = this
+        file.pack = this
         file.symbolsByName.map { (name, decls) ->
             getSymbolsByName(name).addAll(decls)
         }
@@ -122,12 +144,20 @@ data class ImportNode(
 }
 
 data class FileNode(
+    val filePath: String = "Unknown.kt",
     val shebang: String? = null,
     val _package: Identifier? = null,
     val fileAnnotations: List<AnnotationNodes> = emptyList(),
     val imports: List<ImportNode> = emptyList(),
     val topLevelDecls: List<Decl> = emptyList(),
-) : Node(), Extra by Extra.Mixin() {
+) : Decl("\$file\$$filePath"), Extra by Extra.Mixin() {
+    var pack: Package? = null
+
+    init {
+        addNode(imports)
+        addNode(topLevelDecls)
+    }
+
     val symbolsByName by lazy {
         topLevelDecls.groupBy { it.declName }
     }
@@ -156,149 +186,12 @@ data class SubTypeInfo(
     /** : Interface by expr */
     val delegate: Expr? = null
 ) : Node() {
+    init {
+        addNode(type)
+        addNode(args)
+        addNode(delegate)
+    }
     constructor(type: TypeNode, vararg args: Expr, delegate: Expr? = null) : this(type, args.toList(), delegate)
-}
-
-// Type
-
-abstract class TypeNode : Node()
-
-data class DefinitelyNonNullableType(
-    val type1: TypeNode,
-    val mods1: Modifiers,
-    val type2: TypeNode,
-    val mods2: Modifiers,
-) : TypeNode()
-
-data class NamedTypeNode(val type: TypeNode?, val name: String? = null) {
-    constructor(param: Parameter) : this(param.type, param.id)
-    override fun toString(): String = if (name != null) "$name: $type" else "$type"
-}
-
-data class UnificationExprType(val exprs: List<ExprOrStm>) : TypeNode() {
-    constructor(vararg exprs: ExprOrStm?) : this(exprs.filterNotNull())
-}
-data class FuncTypeNode(val ret: TypeNode?, val params: List<NamedTypeNode>, val receiver: TypeNode? = null, val suspendable: Boolean = false) : TypeNode() {
-    override fun toString(): String = "(${params.joinToString(", ")}) -> $ret"
-}
-data class MultiType(val types: List<TypeNode>) : TypeNode() {
-    constructor(vararg types: TypeNode) : this(types.toList())
-}
-data class SimpleType(val name: String) : TypeNode() {
-    override fun toString(): String = name
-}
-data class GenericType(val type: TypeNode, val generics: List<TypeNode>) : TypeNode()
-data class NullableType(val type: TypeNode) : TypeNode()
-
-val DynamicType = SimpleType("dynamic")
-val NothingType = SimpleType("Nothing")
-val UnknownType = SimpleType("Unknown")
-val BoolType = SimpleType("Boolean")
-val CharType = SimpleType("Char")
-val StringType = SimpleType("String")
-val IntType = SimpleType("Int")
-val FloatType = SimpleType("Float")
-
-fun FuncTypeNode.suspendable(): FuncTypeNode = this.copy(suspendable = true)
-
-fun TypeNode.withModifiers(modifiers: List<Any>): TypeNode {
-    if (modifiers.isNotEmpty()) {
-        println("TODO: TypeNode.withModifiers: $modifiers")
-    }
-    return this
-}
-
-fun TypeNode.nullable(): NullableType {
-    return if (this is NullableType) this else NullableType(this)
-}
-
-// Modifiers
-
-inline class ModifiersSet(val values: Int) {
-    operator fun plus(other: ModifiersSet): ModifiersSet = ModifiersSet(this.values or other.values)
-    operator fun contains(item: Modifier): Boolean = (values and (1 shl item.index)) != 0
-    companion object {
-        operator fun invoke(vararg modifiers: Modifier): ModifiersSet {
-            var out = 0
-            for (mod in modifiers) out = out or (1 shl mod.index)
-            return ModifiersSet(out)
-        }
-    }
-}
-
-interface Modifier : ModifierOrAnnotation {
-    val id: String
-    val index: Int
-}
-enum class ClassModifier(override val id: String, override val index: Int) : Modifier {
-    ENUM("enum", 0), SEALED("sealed", 1), ANNOTATION("annotation", 2), DATA("data", 3), INNER("inner", 4), VALUE("value", 5);
-    override fun toString(): String = id
-    companion object {
-        val BY_ID = entries.associateBy { it.id }
-    }
-}
-enum class MemberModifier(override val id: String, override val index: Int) : Modifier {
-    OVERRIDE("override", 6), LATE_INIT("lateinit", 7);
-    override fun toString(): String = id
-    companion object {
-        val BY_ID = entries.associateBy { it.id }
-    }
-}
-enum class VisibilityModifier(override val id: String, override val index: Int) : Modifier {
-    PUBLIC("public", 8), PRIVATE("private", 9), INTERNAL("internal", 10), PROTECTED("protected", 11);
-    override fun toString(): String = id
-    companion object {
-        val BY_ID = entries.associateBy { it.id }
-    }
-}
-enum class VarianceModifier(override val id: String, override val index: Int) : Modifier {
-    IN("in", 12), OUT("out", 13);
-    override fun toString(): String = id
-    companion object {
-        val BY_ID = entries.associateBy { it.id }
-    }
-}
-enum class FunctionModifier(override val id: String, override val index: Int) : Modifier {
-    TAILREC("tailrec", 14), OPERATOR("operator", 15), INFIX("infix", 16), INLINE("inline", 17), EXTERNAL("external", 18), SUSPEND("suspend", 19);
-    override fun toString(): String = id
-    companion object {
-        val BY_ID = entries.associateBy { it.id }
-    }
-}
-enum class PropertyModifier(override val id: String, override val index: Int) : Modifier {
-    CONST("const", 20);
-    override fun toString(): String = id
-    companion object {
-        val BY_ID = entries.associateBy { it.id }
-    }
-}
-enum class InheritanceModifier(override val id: String, override val index: Int) : Modifier {
-    ABSTRACT("abstract", 21), FINAL("final", 22), OPEN("open", 23);
-    override fun toString(): String = id
-    companion object {
-        val BY_ID = entries.associateBy { it.id }
-    }
-}
-enum class ParameterModifier(override val id: String, override val index: Int) : Modifier {
-    VARARG("vararg", 24), NOINLINE("noinline", 25), CROSSINLINE("crossinline", 26);
-    override fun toString(): String = id
-    companion object {
-        val BY_ID = entries.associateBy { it.id }
-    }
-}
-enum class ReificationModifier(override val id: String, override val index: Int) : Modifier {
-    REIFIED("reified", 27);
-    override fun toString(): String = id
-    companion object {
-        val BY_ID = entries.associateBy { it.id }
-    }
-}
-enum class PlatformModifier(override val id: String, override val index: Int) : Modifier {
-    EXPECT("expect", 28), ACTUAL("actual", 29);
-    override fun toString(): String = id
-    companion object {
-        val BY_ID = entries.associateBy { it.id }
-    }
 }
 
 enum class AnnotationUseSite(val id: String) {
@@ -321,7 +214,8 @@ data class TypeAliasDecl(
     val type: TypeNode,
     val types: List<TypeParameter>? = null,
     val modifiers: Modifiers = Modifiers(),
-) : Decl(id)
+) : Decl(id) {
+}
 enum class DelegationCallKind(val id: String) {
     THIS("this"), SUPER("super");
     companion object {
@@ -332,6 +226,9 @@ data class ConstructorDelegationCall(
     val kind: DelegationCallKind?,
     val exprs: List<Expr>,
 ) : Node() {
+    init {
+        addNode(exprs)
+    }
     var parent: BaseConstructorDecl? = null
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode =
         FuncTypeNode(parent?.parent?.getType(resolutionContext), exprs.map { NamedTypeNode(it.getType(resolutionContext)) })
@@ -360,6 +257,10 @@ data class PrimaryConstructorDecl(
     constructor(vararg classParams: ClassParameter, modifiers: Modifiers = Modifiers.EMPTY) : this(classParams.toList(), modifiers)
     constructor(vararg pairs: Pair<String, TypeNode>, modifiers: Modifiers = Modifiers.EMPTY) : this(pairs.map { ClassParameter(it.first, it.second) }, modifiers)
 
+    init {
+        addNode(classParams)
+    }
+
     override val params: List<FuncValueParam> = classParams.map {
         FuncValueParam(it.id, it.type)
     }
@@ -372,9 +273,15 @@ data class ConstructorDecl(
 ) : BaseConstructorDecl() {
     init {
         constructorDelegationCall?.parent = this
+        addNode(params)
+        addNode(body)
     }
 }
-data class InitDecl(val stm: Stm) : Decl("init")
+data class InitDecl(val stm: Stm) : Decl("init") {
+    init {
+        addNode(stm)
+    }
+}
 data class CompanionObjectDecl(val name: String?) : Decl(name ?: "companion object")
 
 enum class ClassKind(
@@ -388,6 +295,9 @@ enum class ClassKind(
 }
 
 abstract class ClassOrObjectDecl(open val name: String, open val kind: ClassKind) : Decl(name) {
+
+    var fqname: String? = null
+
     // @TODO: Extract primary constructor val/var to Variable declarations
     open val primaryConstructor: PrimaryConstructorDecl? = null
     open val body: List<Decl>? = null
@@ -421,6 +331,11 @@ data class ClassDecl(
     override val body: List<Decl>? = null,
     override val primaryConstructor: PrimaryConstructorDecl? = null,
 ) : ClassOrObjectDecl(name, kind) {
+    init {
+        addNode(subTypes)
+        addNode(body)
+        addNode(primaryConstructor)
+    }
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
         return SimpleType(name) // @TODO: FqNAme
     }
@@ -430,6 +345,9 @@ data class ObjectDecl(
     override val body: List<Decl>? = null,
     override val subTypes: List<SubTypeInfo>? = null,
 ) : ClassOrObjectDecl(name, ClassKind.OBJECT) {
+    init {
+        addNode(body)
+    }
 }
 data class FunDecl constructor(
     val name: String,
@@ -440,6 +358,10 @@ data class FunDecl constructor(
     val receiver: TypeNode? = null,
     val modifiers: Modifiers = Modifiers(),
 ) : Decl(name) {
+    init {
+        addNode(body)
+    }
+
     val jsHash by lazy { params.map { it.type }.hashCode() and 0x7FFFFFFF }
     override val jsName by lazy {
         //if (params.isEmpty()) name else "$name\$${jsHash.toString(16)}"
@@ -480,7 +402,16 @@ data class VariableDecl(
     override val kind: VariableKind = VariableKind.VAL,
     val synth: Boolean = false,
 ) : VariableDeclBase(id) {
+    init {
+        addNode(expr)
+        addNode(getter)
+        addNode(setter)
+    }
     val isField get() = !delegation && getter == null && setter == null
+
+    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+        return type ?: expr?.getType(resolutionContext) ?: UnknownType
+    }
 }
 data class MultiVariableDecl(
     val decls: List<VariableDecl>,
@@ -491,6 +422,10 @@ data class MultiVariableDecl(
     override val modifiers: Modifiers = Modifiers.EMPTY,
     override val kind: VariableKind = VariableKind.VAL,
 ) : VariableDeclBase(decls.joinToString(",") { it.declName }) {
+    init {
+        addNode(decls)
+        addNode(expr)
+    }
     constructor(vararg decls: VariableDecl, expr: Expr? = null, modifiers: Modifiers = Modifiers.EMPTY, kind: VariableKind = VariableKind.VAL) : this(decls.toList(), expr, modifiers = modifiers, kind = kind)
 }
 
@@ -536,6 +471,10 @@ data class Identifier(val parts: List<String>) : Expr() {
 sealed class Expr : ExprOrStm()
 
 data class LambdaFunctionExpr(val stms: List<Stm> = emptyList(), val params: List<VariableDeclBase>? = null) : Expr() {
+    init {
+        addNode(stms)
+        addNode(params)
+    }
 }
 
 data class AnonymousFunctionExpr(val decl: FunDecl) : Expr()
@@ -569,17 +508,41 @@ data class Temp(val type: TypeNode, val id: Int) : Expr() {
     override fun toString(): String = "\$temp\$$id"
 }
 data class SuperExpr(val label: String? = null, val type: TypeNode? = null) : AssignableExpr()
-data class TernaryExpr(val cond: Expr, val trueExpr: Expr, val falseExpr: Expr) : Expr()
-data class IfExpr(val cond: Expr, val trueBody: ExprOrStm, val falseBody: ExprOrStm? = null) : Expr()
+data class TernaryExpr(val cond: Expr, val trueExpr: Expr, val falseExpr: Expr) : Expr() {
+    init {
+        addNode(cond)
+        addNode(trueExpr)
+        addNode(falseExpr)
+    }
+}
+data class IfExpr(val cond: Expr, val trueBody: ExprOrStm, val falseBody: ExprOrStm? = null) : Expr() {
+    init {
+        addNode(cond)
+        addNode(trueBody)
+        addNode(falseBody)
+    }
+}
 data class BreakExpr(val label: String? = null) : Expr()
 data class ContinueExpr(val label: String? = null) : Expr()
-data class ReturnExpr(val expr: Expr?, val label: String? = null) : Expr()
-data class ThrowExpr(val expr: Expr) : Expr()
+data class ReturnExpr(val expr: Expr?, val label: String? = null) : Expr() {
+    init {
+        addNode(expr)
+    }
+}
+data class ThrowExpr(val expr: Expr) : Expr() {
+    init {
+        addNode(expr)
+    }
+}
 
-data class Parameter(val id: String, val type: TypeNode)
-data class ParameterOptType(val id: String, val type: TypeNode?, val modifiers: Modifiers? = null, val expr: Expr? = null)
-data class FuncValueParam(val id: String, val type: TypeNode?)
-data class TypeParameter(val id: String, val type: TypeNode?)
+data class Parameter(val id: String, val type: TypeNode) : Node()
+data class ParameterOptType(val id: String, val type: TypeNode?, val modifiers: Modifiers? = null, val expr: Expr? = null) : Node() {
+    init {
+        addNode(expr)
+    }
+}
+data class FuncValueParam(val id: String, val type: TypeNode?) : Node()
+data class TypeParameter(val id: String, val type: TypeNode?) : Node()
 
 fun ParameterOptType.toFuncValueParam(): FuncValueParam = FuncValueParam(id, type ?: UnknownType)
 fun FuncValueParam.toNamedTypeNode(): NamedTypeNode = NamedTypeNode(this.type, this.id)
@@ -590,7 +553,7 @@ data class ClassParameter(
     val expr: Expr? = null,
     val kind: VariableKind? = null,
     val modifiers: Modifiers = Modifiers.EMPTY,
-) {
+) : Node() {
     companion object {
         fun VAL(id: String, type: TypeNode? = null): ClassParameter = ClassParameter(id, type, kind = VariableKind.VAL)
         fun VAR(id: String, type: TypeNode? = null): ClassParameter = ClassParameter(id, type, kind = VariableKind.VAR)
@@ -615,7 +578,11 @@ enum class UnaryPostOp(val str: String) {
     }
 }
 
-data class CastExpr(val expr: Expr, val targetType: TypeNode, val kind: String) : Expr()
+data class CastExpr(val expr: Expr, val targetType: TypeNode, val kind: String) : Expr() {
+    init {
+        addNode(expr)
+    }
+}
 sealed class BaseCallExpr : Expr() {
     abstract val params: List<Expr>
     abstract val lambdaArg: Expr?
@@ -628,7 +595,17 @@ sealed class BaseCallExpr : Expr() {
     open fun getFuncType(resolutionContext: ResolutionContext): FuncTypeNode = FuncTypeNode(null, params.map { NamedTypeNode(it.getType(resolutionContext)) })
 }
 data class CallExpr(val expr: Expr, override val params: List<Expr> = emptyList(), override val lambdaArg: Expr? = null, override val typeArgs: List<TypeNode>? = null) : BaseCallExpr() {
+    init {
+        addNode(expr)
+        addNode(params)
+        addNode(lambdaArg)
+    }
+
     override fun getFuncType(resolutionContext: ResolutionContext): FuncTypeNode = FuncTypeNode(expr.getType(resolutionContext), params.map { NamedTypeNode(it.getType(resolutionContext)) })
+    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+        return getFuncType(resolutionContext)
+    }
+
     //var resolvedDecl: Decl? = null
     //var addThis: Boolean = false
 }
@@ -637,11 +614,31 @@ data class CallExpr(val expr: Expr, override val params: List<Expr> = emptyList(
 //    var addThis: Boolean = false
 //}
 data class NavigationExpr(val op: String, val expr: Expr, val key: Any) : AssignableExpr() {
+    init {
+        addNode(expr)
+        if (key is Node) addNode(key)
+    }
+
     var resolvedDecl: Decl? = null
+
+    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+        return resolvedDecl?.getType(resolutionContext) ?: UnknownType
+    }
 }
-data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : AssignableExpr()
-data class UnaryPostOpExpr(val expr: Expr, val op: UnaryPostOp) : AssignableExpr()
+data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : AssignableExpr() {
+    init {
+        addNode(expr)
+    }
+}
+data class UnaryPostOpExpr(val expr: Expr, val op: UnaryPostOp) : AssignableExpr() {
+    init {
+        addNode(expr)
+    }
+}
 data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr() {
+    init {
+        addNode(expr)
+    }
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
         val type = expr.getType(resolutionContext)
         if (type == IntType) return type
@@ -656,13 +653,16 @@ data class IdentifierExpr(val id: String) : AssignableExpr() {
     var resolvedDecl: Decl? = null
 
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
-
         return resolvedDecl?.getType(resolutionContext) ?: resolutionContext.resolve(id).decls.firstOrNull()?.getType(resolutionContext) ?: UnknownType
     }
 }
 data class TempExpr(val temp: Temp) : AssignableExpr()
 
 data class OpSeparatedBinaryExprs(val ops: List<String>, val exprs: List<Expr>) : Expr() {
+    init {
+        addNode(exprs)
+    }
+
     fun toSimpleOps(): Expr {
         check(ops.size == exprs.size - 1)
         var out = exprs.first()
@@ -673,7 +673,12 @@ data class OpSeparatedBinaryExprs(val ops: List<String>, val exprs: List<Expr>) 
     }
 }
 
-data class BinaryOpExpr(val left: Expr, val op: String, val right: Expr) : Expr()
+data class BinaryOpExpr(val left: Expr, val op: String, val right: Expr) : Expr() {
+    init {
+        addNode(left)
+        addNode(right)
+    }
+}
 
 open class LiteralExpr(val literal: Any?) : Expr()
 
@@ -693,19 +698,35 @@ data class StringLiteralExpr(val value: String) : LiteralExpr(value) {
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = StringType
 }
 data class InterpolatedStringExpr(val chunks: List<Chunk>) : Expr() {
-    sealed interface Chunk
-    data class StringChunk(val string: String) : Chunk
-    data class ExpressionChunk(val expr: Expr) : Chunk
+    init {
+        addNode(chunks)
+    }
+
+    sealed class Chunk : Node()
+    data class StringChunk(val string: String) : Chunk()
+    data class ExpressionChunk(val expr: Expr) : Chunk()
     override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode = StringType
 }
 
 open class IncompleteExpr(val message: String) : Expr()
 open class EmptyExpr : Expr()
 
-data class TypeTestExpr(val base: Expr, val kind: String, val type: TypeNode) : Expr()
-data class RangeTestExpr(val base: Expr, val kind: String, val container: Expr) : Expr()
+data class TypeTestExpr(val base: Expr, val kind: String, val type: TypeNode) : Expr() {
+    init {
+        addNode(base)
+    }
+}
+data class RangeTestExpr(val base: Expr, val kind: String, val container: Expr) : Expr() {
+    init {
+        addNode(base)
+        addNode(container)
+    }
+}
 
 data class ThisExpr(val id: String?) : AssignableExpr() {
+    override fun getTypeUncached(resolutionContext: ResolutionContext): TypeNode {
+        return resolutionContext.getCurrentClass(id)?.getType(resolutionContext) ?: UnknownType
+    }
 }
 
 // Statements
@@ -726,13 +747,39 @@ fun Stm.withModifiers(mods: Modifiers): Stm {
 
 /** JavaScript for example only supports try catch statements, not expressions */
 data class TryCatchStm(val body: Stm, val catches: List<Catch> = emptyList(), val finally: Stm = EmptyStm()) : Stm() {
-    data class Catch(val local: String, val type: TypeNode, val body: Stm)
+    init {
+        addNode(body)
+        for (catch in catches) addNode(catch.body)
+        addNode(finally)
+    }
+    data class Catch(val local: String, val type: TypeNode, val body: Stm) {
+    }
 }
 
-data class ReturnStm(val expr: Expr?) : Stm()
-data class IfStm(val cond: Expr, val btrue: Stm, val bfalse: Stm? = null) : Stm()
-data class ThrowStm(val expr: Expr) : Stm()
-data class AssignStm(val lvalue: Expr, val op: String, val expr: Expr) : Stm()
+data class ReturnStm(val expr: Expr?) : Stm() {
+    init {
+        addNode(expr)
+    }
+}
+data class IfStm(val cond: Expr, val btrue: Stm, val bfalse: Stm? = null) : Stm() {
+    init {
+        addNode(cond)
+        addNode(btrue)
+        addNode(bfalse)
+    }
+}
+data class ThrowStm(val expr: Expr) : Stm() {
+    init {
+
+        addNode(expr)
+    }
+}
+data class AssignStm(val lvalue: Expr, val op: String, val expr: Expr) : Stm() {
+    init {
+        addNode(lvalue)
+        addNode(expr)
+    }
+}
 data class BreakStm(val label: String? = null) : Stm()
 data class ContinueStm(val label: String? = null) : Stm()
 
@@ -744,12 +791,23 @@ fun List<Stm>.compact(): Stm = when {
 
 data class Stms(val stms: List<Stm>) : Stm() {
     constructor(vararg stms: Stm) : this(stms.toList())
+    init {
+        addNode(stms)
+    }
 }
 
 data class EmptyStm(val dummy: Unit = Unit) : Stm()
 
-data class ExprStm(val expr: Expr) : Stm()
-data class DeclStm(val decl: Decl) : Stm()
+data class ExprStm(val expr: Expr) : Stm() {
+    init {
+        addNode(expr)
+    }
+}
+data class DeclStm(val decl: Decl) : Stm() {
+    init {
+        addNode(decl)
+    }
+}
 
 sealed class LoopStm(
 ) : Stm() {
@@ -758,12 +816,25 @@ sealed class LoopStm(
 
 /** Iterates over a collection */
 data class ForLoopStm(val expr: Expr, val vardecl: VariableDeclBase?, val body: Stm? = null, val annotations: Annotations = Annotations.EMPTY, override val modifiers: Modifiers = Modifiers.EMPTY) : LoopStm() {
+    init {
+        addNode(expr)
+        addNode(vardecl)
+        addNode(body)
+    }
 }
 
 /** Executes 0 or more times */
 data class WhileLoopStm(val cond: Expr, val body: Stm, override val modifiers: Modifiers = Modifiers.EMPTY) : LoopStm() {
+    init {
+        addNode(cond)
+        addNode(body)
+    }
 }
 
 /** Executes 1 or more times */
 data class DoWhileLoopStm(val body: Stm?, val cond: Expr?, override val modifiers: Modifiers = Modifiers.EMPTY) : LoopStm() {
+    init {
+        addNode(body)
+        addNode(cond)
+    }
 }

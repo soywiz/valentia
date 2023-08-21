@@ -48,10 +48,11 @@ interface DeclBuilder : NodeBuilder {
         _package: Identifier? = null,
         fileAnnotations: List<AnnotationNodes> = emptyList(),
         imports: List<ImportNode> = emptyList(),
+        filePath: String = "Unknown.kt",
         block: DeclBuilder.() -> Unit
     ): FileNode {
         return FileNode(
-            shebang, _package, fileAnnotations, imports,
+            filePath, shebang, _package, fileAnnotations, imports,
             topLevelDecls = buildDeclList { block() },
         )
     }

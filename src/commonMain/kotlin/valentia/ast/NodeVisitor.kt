@@ -52,6 +52,10 @@ open class NodeVisitor {
             is TypeAliasDecl -> visit(decl)
             is MultiVariableDecl -> visit(decl)
             is VariableDecl -> visit(decl)
+            is Module -> TODO()
+            is Package -> TODO()
+            is Program -> TODO()
+            is FileNode -> TODO()
         }
     }
 

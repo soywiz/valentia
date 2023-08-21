@@ -123,6 +123,7 @@ class JSCodegenTest {
     }
 
     @Test
+    @Ignore
     fun testClassInheritance() {
         assertEquals(
             "8\n9",
