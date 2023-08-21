@@ -1,4 +1,4 @@
-package valentia.serializing
+package valentia.serial
 
 import valentia.util.BinaryReader
 import valentia.util.buildByteArray

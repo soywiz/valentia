@@ -1,0 +1,26 @@
+package valentia.serial
+
+import valentia.ast.GenericType
+import valentia.ast.SimpleType
+import valentia.ast.nullable
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+class TypePoolTest {
+    @Test
+    fun test() {
+        val pool = TypePool()
+        val index0 = pool[SimpleType("Hello")]
+        val index0b = pool[SimpleType("Hello")]
+        val index3 = pool[GenericType(SimpleType("Hello"), SimpleType("Hello").nullable(), SimpleType("Int"))]
+        val index1 = pool[SimpleType("Hello").nullable()]
+        val index2 = pool[SimpleType("Int")]
+        assertEquals(0, index0)
+        assertEquals(0, index0b)
+        assertEquals(1, index1)
+        assertEquals(2, index2)
+        assertEquals(3, index3)
+        val pool2 = TypePool.fromByteArray(pool.toByteArray(), pool.stringPool)
+        assertEquals(pool, pool2)
+    }
+}

@@ -3,10 +3,7 @@ package valentia.parser
 import valentia.ast.FuncTypeNode
 import valentia.ast.GenericType
 import valentia.ast.NodeBuilder.Companion.generic
-import valentia.ast.NodeBuilder.Companion.id
 import valentia.ast.NodeBuilder.Companion.type
-import valentia.ast.NodeBuilder.Companion.multi
-import valentia.ast.NodeBuilder.Companion.multiType
 import valentia.ast.SimpleType
 import kotlin.test.Test
 import kotlin.test.assertEquals

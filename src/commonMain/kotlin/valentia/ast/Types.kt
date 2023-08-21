@@ -6,6 +6,7 @@ abstract class TypeNode : Node()
 
 data class SimpleType(val name: String) : TypeNode() {
     var fqname: String? = null
+    val fullName: String get() = fqname ?: name
     var resolvedDecl: Decl? = null
     override fun toString(): String = name
     companion object {
@@ -18,6 +19,7 @@ data class NullableType(val type: TypeNode) : TypeNode() {
     }
 }
 data class GenericType(val base: TypeNode, val generics: List<TypeNode>) : TypeNode() {
+    constructor(base: TypeNode, vararg generics: TypeNode) : this(base, generics.toList())
     companion object {
         const val ID = 2
     }
