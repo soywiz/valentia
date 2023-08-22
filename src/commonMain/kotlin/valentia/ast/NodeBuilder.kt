@@ -96,6 +96,7 @@ interface StmBuilder : DeclBuilder {
     fun FOR(id: String, expr: Expr, block: (StmBuilder.() -> Unit)? = null): ForLoopStm =
         ForLoopStm(expr, VariableDecl(id), body = block?.let { buildStmCompact { block() } })
     fun RETURN(expr: Expr? = null, label: String? = null): ReturnExpr = ReturnExpr(expr, label).addStm()
+    fun THROW(expr: Expr): ThrowExpr = ThrowExpr(expr).addStm()
     fun WHEN(expr: Expr? = null, block: WhenBuilder.() -> Unit): WhenExpr {
         val builder = WhenBuilder().also(block)
         return WhenExpr(WhenExpr.Subject(expr), builder.entries)
@@ -157,7 +158,7 @@ interface NodeBuilder {
     operator fun Expr.unaryMinus(): UnaryPreOpExpr = UnaryPreOpExpr(UnaryPreOp.MINUS, this)
     operator fun Expr.unaryPlus(): UnaryPreOpExpr = UnaryPreOpExpr(UnaryPreOp.PLUS, this)
     fun Expr.castTo(targetType: Type, safe: Boolean = false): Expr =
-        CastExpr(this, targetType, if (safe) "as?" else "as")
+        CastExpr(this, targetType, safe)
     fun Expr.safeCastTo(targetType: Type, safe: Boolean = true): Expr = castTo(targetType, safe)
     operator fun Expr.plus(that: Expr): Expr = BinaryOpExpr(this, "+", that)
     operator fun Expr.minus(that: Expr): Expr = BinaryOpExpr(this, "-", that)

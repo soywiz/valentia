@@ -2,7 +2,7 @@ package valentia.ast
 
 // Modifiers
 
-interface Modifier : ModifierOrAnnotation {
+interface Modifier : ModifierOrAnnotation, ModifierLike {
     val id: String
     val index: Int
 }
@@ -75,6 +75,14 @@ enum class PlatformModifier(override val id: String, override val index: Int) : 
     companion object {
         val BY_ID = entries.associateBy { it.id }
     }
+}
+
+val ALL_MODIFIERS_LIST: List<Modifier> = ClassModifier.entries + MemberModifier.entries + VisibilityModifier.entries + VarianceModifier.entries + FunctionModifier.entries + PropertyModifier.entries + InheritanceModifier.entries + ParameterModifier.entries + ReificationModifier.entries + PlatformModifier.entries
+
+val ALL_MODIFIERS_BY_INDEX = ALL_MODIFIERS_LIST.associateBy { it.index }
+
+val ALL_MODIFIERS_BY_ID: Array<Modifier?> = Array(32) {
+    ALL_MODIFIERS_BY_INDEX[it]
 }
 
 inline class ModifiersSet(val values: Int) {

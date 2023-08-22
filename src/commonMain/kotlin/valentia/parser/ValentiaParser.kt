@@ -1611,7 +1611,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         }
         if (asTypes.isNotEmpty()) {
             for (type in asTypes) {
-                res = CastExpr(res, type.second, type.first)
+                res = CastExpr(res, type.second, type.first == "as?")
             }
         }
         return res
@@ -2720,7 +2720,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : (annotation | modifier)+
     //    ;
     fun modifiers(): Modifiers {
-        val mods = arrayListOf<Any>()
+        val mods = arrayListOf<ModifierLike>()
         loop@ while (hasMore) {
             mods += if (matchesNLs("@")) {
                 annotation()
@@ -2767,7 +2767,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : annotation
     //    | SUSPEND NL*
     //    ;
-    fun typeModifier(): Any? {
+    fun typeModifier(): ModifierLike? {
         return when {
             expectOptNLs("suspend") -> FunctionModifier.SUSPEND
             expectOptNLs("@") -> {
@@ -2888,7 +2888,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             unescapedAnnotation(allowAnnotationSpaceBetweenArgs)?.let { AnnotationNodes(listOf(it)) }
         } ?: return null.also { pos = spos }
         NLs()
-        return AnnotationNodes(nodes.annotations.map { it.copy(useSite = useSite) })
+        return AnnotationNodes(nodes.annotations.map { it.copy(useSite = AnnotationUseSite.BY_ID[useSite] ?: AnnotationUseSite.NULL) })
     }
 
     fun annotations(atLeastOne: Boolean = false): Annotations {

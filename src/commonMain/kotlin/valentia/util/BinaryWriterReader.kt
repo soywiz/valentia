@@ -1,5 +1,6 @@
 package valentia.util
 
+import kotlin.math.absoluteValue
 import kotlin.math.max
 import kotlin.math.min
 
@@ -48,6 +49,16 @@ open class BinaryWriter(initialCapacity: Int = 74) {
         buffer[p + 3] = d4
     }
 
+    fun writeIntSVLQ(v: Int) {
+        val abs = v.absoluteValue.toLong() shl 1
+        writeLongVLQ(abs or (if (v < 0) 1 else 0))
+    }
+
+    fun writeLongSVLQ(v: Long) {
+        val abs = v.absoluteValue shl 1
+        writeLongVLQ(abs or (if (v < 0) 1 else 0))
+    }
+
     fun writeIntVLQ(v: Int) {
         var v = v
         while (true) {
@@ -56,6 +67,17 @@ open class BinaryWriter(initialCapacity: Int = 74) {
             if (v != 0) payload = payload or 0x80
             writeByte(payload.toByte())
             if (v == 0) break
+        }
+    }
+
+    fun writeLongVLQ(v: Long) {
+        var v = v
+        while (true) {
+            var payload = v and 0x7F
+            v = v ushr 7
+            if (v != 0L) payload = payload or 0x80
+            writeByte(payload.toByte())
+            if (v == 0L) break
         }
     }
 
@@ -95,6 +117,20 @@ open class BinaryReader(val data: ByteArray, var position: Int = 0, val length: 
     }
     fun readString(): String = readStringNullable()!!
 
+    fun readIntSVLQ(): Int {
+        val value = readLongVLQ()
+        val sign = value and 1
+        val abs = (value ushr 1)
+        return (if (sign != 0L) -abs else abs).toInt()
+    }
+
+    fun readLongSVLQ(): Long {
+        val value = readLongVLQ()
+        val sign = value and 1
+        val abs = (value ushr 1)
+        return if (sign != 0L) -abs else abs
+    }
+
     fun readIntVLQ(): Int {
         var out = 0
         var offset = 0
@@ -106,6 +142,18 @@ open class BinaryReader(val data: ByteArray, var position: Int = 0, val length: 
         }
         return out
     }
+    fun readLongVLQ(): Long {
+        var out = 0L
+        var offset = 0
+        while (true) {
+            val v = readByte()
+            out = out or ((v.toLong() and 0x7FL) shl offset)
+            offset += 7
+            if ((v and 0x80) == 0) break
+        }
+        return out
+    }
+
     fun readByte(): Int = data[position++].toInt() and 0xFF
     fun readBytes(size: Int): ByteArray {
         val bytes = ByteArray(size)

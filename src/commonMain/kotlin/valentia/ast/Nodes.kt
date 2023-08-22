@@ -84,11 +84,13 @@ data class Annotations(val items: List<AnnotationNodes> = emptyList()) {
     }
 }
 
-data class Modifiers(val items: List<Any> = emptyList()) {
+sealed interface ModifierLike
+
+data class Modifiers(val items: List<ModifierLike> = emptyList()) {
     companion object {
         val EMPTY = Modifiers()
     }
-    constructor(vararg items: Any) : this(items.toList())
+    constructor(vararg items: ModifierLike) : this(items.toList())
     val modifiers by lazy { items.filterIsInstance<Modifier>().toSet() }
     val modifiersSet by lazy { ModifiersSet(*modifiers.toTypedArray()) }
     val annotations by lazy { Annotations(items.filterIsInstance<AnnotationNodes>()) }
@@ -114,14 +116,14 @@ data class TypeConstraint(
     val annotations: Annotations = Annotations.EMPTY,
 ) : Node()
 
-data class LabelNode(val id: String) : Node()
+data class LabelNode(val id: String) : Node(), ModifierLike
 
 fun <T : Node> T.annotated(annotations: Annotations): T {
     this.nodeAnnotations = annotations
     return this
 }
 
-interface ModifierOrAnnotation
+sealed interface ModifierOrAnnotation : ModifierLike
 
 data class AnnotationNodes(
     val annotations: List<AnnotationNode>,
@@ -129,10 +131,12 @@ data class AnnotationNodes(
     constructor(vararg annotations: AnnotationNode) : this(annotations.toList())
 }
 
+fun List<AnnotationNodes>.merge(): AnnotationNodes = AnnotationNodes(this.flatMap { it.annotations })
+
 data class AnnotationNode(
-    val name: Type,
+    val type: Type,
     val args: List<Expr>? = null,
-    val useSite: String? = null,
+    val useSite: AnnotationUseSite = AnnotationUseSite.NULL,
 ) : Node()
 
 data class ImportNode(
@@ -151,6 +155,9 @@ data class FileNode(
     val imports: List<ImportNode> = emptyList(),
     val topLevelDecls: List<Decl> = emptyList(),
 ) : Decl("\$file\$$filePath"), Extra by Extra.Mixin() {
+    companion object {
+        const val ID = 4
+    }
     var pack: Package? = null
 
     init {
@@ -195,7 +202,7 @@ data class SubTypeInfo(
 }
 
 enum class AnnotationUseSite(val id: String) {
-    FIELD("field"), PROPERTY("property"), GET("get"), SET("set"), RECEIVER("receiver"),
+    NULL("null"), FIELD("field"), PROPERTY("property"), GET("get"), SET("set"), RECEIVER("receiver"),
     PARAM("param"), SETPARAM("setparam"), DELEGATE("delegate"), FILE("file");
     override fun toString(): String = id
     companion object {
@@ -507,7 +514,12 @@ data class TryCatchExpr(val body: Node, val catches: List<Catch> = emptyList(), 
 data class Temp(val type: Type, val id: Int) : Expr() {
     override fun toString(): String = "\$temp\$$id"
 }
-data class SuperExpr(val label: String? = null, val type: Type? = null) : AssignableExpr()
+data class SuperExpr(val label: String? = null, val type: Type? = null) : AssignableExpr() {
+    companion object {
+        const val ID_UNLABELLED = 31
+        const val ID_LABELLED = 32
+    }
+}
 data class TernaryExpr(val cond: Expr, val trueExpr: Expr, val falseExpr: Expr) : Expr() {
     init {
         addNode(cond)
@@ -516,6 +528,9 @@ data class TernaryExpr(val cond: Expr, val trueExpr: Expr, val falseExpr: Expr) 
     }
 }
 data class IfExpr(val cond: Expr, val trueBody: ExprOrStm, val falseBody: ExprOrStm? = null) : Expr() {
+    companion object {
+        const val ID = 30
+    }
     init {
         addNode(cond)
         addNode(trueBody)
@@ -578,7 +593,7 @@ enum class UnaryPostOp(val str: String) {
     }
 }
 
-data class CastExpr(val expr: Expr, val targetType: Type, val kind: String) : Expr() {
+data class CastExpr(val expr: Expr, val targetType: Type, val safe: Boolean) : Expr() {
     init {
         addNode(expr)
     }
@@ -680,14 +695,22 @@ data class BinaryOpExpr(val left: Expr, val op: String, val right: Expr) : Expr(
     }
 }
 
-open class LiteralExpr(val literal: Any?) : Expr()
+sealed class LiteralExpr(val literal: Any?) : Expr()
 
-data class NullLiteralExpr(val dummy: Unit = Unit) : LiteralExpr(null)
+data class NullLiteralExpr(val dummy: Unit = Unit) : LiteralExpr(null) {
+}
 data class BoolLiteralExpr(val value: Boolean) : LiteralExpr(value) {
     override fun getTypeUncached(resolutionContext: ResolutionContext): Type = BoolType
+    override fun toString(): String = "$value"
 }
 data class CharLiteralExpr(val value: Char) : LiteralExpr(value) {
     override fun getTypeUncached(resolutionContext: ResolutionContext): Type = CharType
+    override fun toString(): String = when (value) {
+        '\r' -> "'\\r'"
+        '\n' -> "'\\n'"
+        '\t' -> "'\\t'"
+        else -> "'$value'"
+    }
 }
 data class IntLiteralExpr(val value: Long, val isLong: Boolean = false, val isUnsigned: Boolean = false) : LiteralExpr(value) {
     override fun toString(): String = "$value${if (isUnsigned) "U" else ""}${if (isLong) "L" else ""}.lit"
@@ -724,6 +747,10 @@ data class RangeTestExpr(val base: Expr, val kind: String, val container: Expr) 
 }
 
 data class ThisExpr(val id: String?) : AssignableExpr() {
+    companion object {
+        const val ID_UNLABELLED = 29
+        const val ID_LABELLED = 30
+    }
     override fun getTypeUncached(resolutionContext: ResolutionContext): Type {
         return resolutionContext.getCurrentClass(id)?.getType(resolutionContext) ?: UnknownType
     }
@@ -796,7 +823,9 @@ data class Stms(val stms: List<Stm>) : Stm() {
     }
 }
 
-data class EmptyStm(val dummy: Unit = Unit) : Stm()
+data class EmptyStm(val dummy: Unit = Unit) : Stm() {
+    override fun toString(): String = "EmptyStm"
+}
 
 data class ExprStm(val expr: Expr) : Stm() {
     init {
