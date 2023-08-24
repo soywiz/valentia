@@ -119,6 +119,9 @@ class SemaResolver : NodeTransformer() {
             // Check if not a type callable reference but an expression callable reference. We couldn't know while parsing.
             // @TODO: Transform into [NavigationExpr]
             expr._variableDecl = expr.resolve(expr.type.name).filterIsInstance<VariableDeclBase>().firstOrNull()
+            if (expr._variableDecl != null) {
+                return NavigationExpr("::", IdentifierExpr(expr.type.toString()), "class")
+            }
         }
         return res
     }

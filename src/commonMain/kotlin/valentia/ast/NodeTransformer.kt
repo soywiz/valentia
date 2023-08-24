@@ -34,11 +34,10 @@ open class NodeTransformer {
     open fun transform(file: FileNode): FileNode {
         val imports = file.imports.map { transform(it) }
         val topLevelDecls = file.topLevelDecls.map { transform(it) }
-        //return if (imports == file.imports && topLevelDecls == file.topLevelDecls) file else file.copy(
-        return file.copy(
-            imports = imports,
-            topLevelDecls = topLevelDecls,
-        ).copyFrom(file)
+        return when {
+            imports == file.imports && topLevelDecls == file.topLevelDecls -> file
+            else -> file.copy(imports = imports, topLevelDecls = topLevelDecls).copyFrom(file)
+        }
     }
 
     open fun transformNode(node: Node): Node {
@@ -173,7 +172,7 @@ open class NodeTransformer {
 
     open fun transform(stm: ExprStm): Stm {
         val expr = transform(stm.expr)
-        return if (expr === stm.expr) stm else ExprStm(transform(stm.expr) ?: EmptyExpr()).copyFrom(stm)
+        return if (expr === stm.expr) stm else ExprStm(transform(stm.expr)).copyFrom(stm)
         //return ExprStm(transform(stm.expr) ?: EmptyExpr())
     }
     open fun transform(stm: IfStm): Stm {
@@ -207,7 +206,7 @@ open class NodeTransformer {
         val stms = stm.stms.map {
             val node = transform(it)
             if (node !== it) mod = true
-            node
+            node.copyFrom(it)
         }
         return if (!mod) stm else Stms(stms)
     }
@@ -286,7 +285,7 @@ open class NodeTransformer {
         val cexpr = transform(expr.expr)
         val params = transform(expr.params)
         val lambdaArg = transformNull(expr.lambdaArg)
-        return if (cexpr === expr.expr && params === expr.params && lambdaArg === expr.lambdaArg) expr else CallExpr(cexpr, params, lambdaArg, expr.typeArgs)
+        return if (cexpr === expr.expr && params == expr.params && lambdaArg === expr.lambdaArg) expr else CallExpr(cexpr, params, lambdaArg, expr.typeArgs)
     }
     //open fun transform(expr: CallIdExpr) {
     //}
