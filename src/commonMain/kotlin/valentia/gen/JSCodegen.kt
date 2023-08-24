@@ -295,17 +295,22 @@ open class JSCodegen {
                 val rightType = expr.right.getNodeType()
                 val leftStr = generateExpr(expr.left)
                 val rightStr = generateExpr(expr.right)
-                val op = when (expr.op) {
-                    "xor" -> "^"
-                    "or" -> "|"
-                    "and" -> "&"
-                    "shl" -> "<<"
-                    "shr" -> ">>"
-                    else -> expr.op
-                }
-                when {
-                    leftType == IntType && rightType == IntType -> "((($leftStr) $op ($rightStr))|0)"
-                    else -> "(($leftStr) $op ($rightStr))"
+                if (expr.resolvedFunc != null) {
+                    //"${expr.resolvedFunc!!.jsName}($leftStr, $rightStr)"
+                    "$leftStr.${expr.resolvedFunc!!.jsName}($rightStr)"
+                } else {
+                    val op = when (expr.op) {
+                        "xor" -> "^"
+                        "or" -> "|"
+                        "and" -> "&"
+                        "shl" -> "<<"
+                        "shr" -> ">>"
+                        else -> expr.op
+                    }
+                    when {
+                        leftType == IntType && rightType == IntType -> "((($leftStr) $op ($rightStr))|0)"
+                        else -> "(($leftStr) $op ($rightStr))"
+                    }
                 }
             }
             is CallExpr -> {

@@ -28,6 +28,22 @@ class JSCodegenTest {
     }
 
     @Test
+    fun testOperatorOverloading() {
+        assertEquals(
+            "ab",
+            genAndRunJs("""
+                class Demo(val a: String) {
+                    operator fun plus(other: Demo): String = a + other.a
+                }                
+
+                fun main() {
+                    console.log(Demo("a") + Demo("b"))
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
     fun testIterator() {
         assertEquals(
             "0\n2\n4\n6\n8\n10",

@@ -1,5 +1,7 @@
 package valentia.ast
 
+import valentia.sema.TypeUnification
+
 // Type
 
 sealed class Type : Node()
@@ -57,17 +59,13 @@ data class DefinitelyNonNullableType(
     val mods1: Modifiers,
     val type2: Type,
     val mods2: Modifiers,
-) : Type() {
-    companion object {
-        const val ID = 6
-    }
-}
+) : Type()
 
-// @TODO: This should be resolved instead of serialized
 data class UnificationExprType(val exprs: List<ExprOrStm>) : Type() {
     constructor(vararg exprs: ExprOrStm?) : this(exprs.filterNotNull())
-    companion object {
-        const val ID = 255
+
+    override fun getTypeUncached(): Type {
+        return TypeUnification.unify(*exprs.map { it.getNodeType() }.toTypedArray())
     }
 }
 

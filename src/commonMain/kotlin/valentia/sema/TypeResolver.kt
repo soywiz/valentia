@@ -12,10 +12,8 @@ fun SimpleType.resolveSimpleType(): TypeDecl = resolvedDecl ?: this.resolveSimpl
 
 fun Type.getSimpleType(): SimpleType {
     return when (this) {
-        //is DefinitelyNonNullableType -> this.type1.getSimpleType()
-        is DefinitelyNonNullableType -> TODO()
-        //is FuncType -> SimpleType("Function1")
-        is FuncType -> TODO()
+        is DefinitelyNonNullableType -> this.type1.getSimpleType()
+        is FuncType -> SimpleType("Function${this.params.size}")
         is GenericType -> this.base.getSimpleType()
         is MultiType -> this.types.first().getSimpleType()
         is NullableType -> this.type.getSimpleType()

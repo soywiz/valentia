@@ -41,6 +41,15 @@ class SemaResolver : NodeVisitor() {
         //println("expr.addThis=${expr.addThis}, expr=$expr, firstDecl=$firstDecl, currentClassDecl=$currentClassDecl, firstDecl.parentNode=${firstDecl?.parentNode}")
     }
 
+    //override fun visit(expr: BinaryOpExpr) {
+    //    if (expr.op == "+") {
+    //        val leftTypeDecl = expr.resolveType(leftType)
+    //        for (resolve in leftTypeDecl.resolve("plus") + this.resolve("plus")) {
+    //            println("resolve")
+    //        }
+    //    }
+    //}
+
     override fun visit(expr: CallExpr) {
         val cexpr = expr.expr
         val funcType = expr.getFuncType()

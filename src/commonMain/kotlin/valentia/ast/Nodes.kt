@@ -2,8 +2,10 @@ package valentia.ast
 
 import valentia.ast.NodeBuilder.Companion.type
 import valentia.parser.BaseConsumer
+import valentia.sema.TypeMatching
 import valentia.sema.getAscendantClassByName
 import valentia.sema.resolve
+import valentia.sema.resolveType
 import valentia.util.Extra
 
 sealed class Node : Extra by Extra.Mixin() {
@@ -728,23 +730,69 @@ data class OpSeparatedBinaryExprs(val ops: List<String>, val exprs: List<Expr>) 
     }
 }
 
+enum class BinaryOp(val symbol: String, val operatorName: String) {
+    PLUS("+", "plus"),
+    MINUS("-", "minus"),
+    TIMES("*", "times"),
+    DIV("/", "div"),
+    REM("%", "rem"),
+    ;
+}
+
 data class BinaryOpExpr(val left: Expr, val op: String, val right: Expr) : Expr() {
     init {
         addNode(left)
         addNode(right)
     }
 
+    var resolvedFunc: FunDecl? = null
+
+    val opName by lazy {
+        when (op) {
+            "+" -> "plus"
+            "-" -> "minus"
+            "*" -> "times"
+            "/" -> "div"
+            "%" -> "rem"
+            else -> op
+        }
+    }
+
     override fun getTypeUncached(): Type {
         // @TODO: Operator overloading
         val leftType = left.getNodeType()
         val rightType = right.getNodeType()
-        if (leftType != rightType) {
-            println("ERROR: Unsupported BinaryOp type resolution $leftType, $rightType")
-            //error("")
-            //return UnknownType
+        if (leftType == IntType && rightType == IntType) {
+            return leftType
+        }
+
+        if (resolvedFunc == null) {
+            val leftTypeDecl = this.resolveType(leftType)
+            // @TODO: Try to find best match
+            for (resolve in leftTypeDecl.resolve(opName).filterIsInstance<FunDecl>()) {
+                if (TypeMatching.canAssignTo(rightType, resolve.params.first().type)) {
+                    //println("!!!! FOUND[a] $resolve")
+                    resolvedFunc = resolve
+                }
+            }
+            for (resolve in this.resolve(opName).filterIsInstance<FunDecl>()) {
+                if (TypeMatching.canAssignTo(leftType, resolve.receiver)) {
+                    if (TypeMatching.canAssignTo(rightType, resolve.params.first().type)) {
+                        //println("!!!! FOUND[b] $resolve")
+                        resolvedFunc = resolve
+                    }
+                }
+                //println("resolve: $clazz, $resolve")
+            }
+        }
+
+        if (resolvedFunc == null) {
+            println("ERROR: Unsupported BinaryOp type resolution $leftType, $rightType --> ${resolvedFunc?.retType}")
+        } else {
+            //println("!!!! FOUND[c]: $leftType, $rightType --> ${resolvedFunc?.retType}")
         }
         //return leftType
-        return rightType
+        return resolvedFunc?.retType ?: rightType
     }
 }
 

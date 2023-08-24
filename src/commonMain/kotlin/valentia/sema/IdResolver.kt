@@ -48,4 +48,3 @@ fun Decl.resolve(id: String): Sequence<Decl> = sequence<Decl> {
         }
     }
 }
-
