@@ -85,7 +85,7 @@ open class ValentiaParserVarStmTest : StmBuilder {
             FILE {
                  CLASS("NumberToken", SubTypeInfo("Token".type, "number".id), data = true, primaryConstructorDecl = PrimaryConstructorDecl(
                      ClassParameter.VAL("number" to StringType),
-                 )
+                 ), modifiers = Modifiers(Modifier.DATA),
                  ) {
                      VAL("numberCleanedUp", type = StringType, expr = "lazy".id(lambdaArg = LAMBDA { STM("".lit) }), delegation = true)
                  }

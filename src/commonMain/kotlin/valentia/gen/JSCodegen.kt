@@ -151,6 +151,9 @@ open class JSCodegen {
     }
 
     open fun generateClass(clazz: ClassLikeDecl) {
+        // Do not output external declarations
+        if (Modifier.EXTERNAL in clazz) return
+
         val subTypes = clazz.subTypes ?: emptyList()
         var extends: ClassLikeDecl? = null
         for (subType in subTypes) {
@@ -190,9 +193,7 @@ open class JSCodegen {
     open fun generateFunction(func: FunDecl, parent: Decl?) {
         if (Modifier.EXTERNAL in func) return
 
-        val isTopLevel = parent is FileNode
-
-        val params = func.params.toJsString()
+        val params = func.allParams.toJsString()
 
         //indenter.line("${decl.name}($params)") {
         //    decl.body?.let {
@@ -234,6 +235,14 @@ open class JSCodegen {
         }
     }
 
+    fun generateThis(node: Node): String {
+        val decl = node.currentDecl
+        return when {
+            decl is FunDecl && decl.receiver != null -> "\$this"
+            else -> "this"
+        }
+    }
+
     open fun generateExpr(expr: Expr?): Any {
         return when (expr) {
             null -> "null"
@@ -241,7 +250,7 @@ open class JSCodegen {
             //        is BaseConstructorDecl -> "(new ${resolved.parent?.jsName}).${resolved.jsName}$paramsStr"
             //        is FunDecl -> "$thisStr$name$paramsStr"
             is IdentifierExpr -> {
-                val thisStr = if (expr.addThis) "this." else ""
+                val thisStr = if (expr.addThis) "${generateThis(expr)}." else ""
                 val resolved = expr.resolvedDecl
                 val name = resolved?.jsName ?: expr.id
                 when (resolved) {
@@ -331,15 +340,47 @@ open class JSCodegen {
                 //println("expr.id=${expr.id} : $symbols")
 
                 val exprExpr = expr.expr
-                val resStr = generateExpr(exprExpr)
-                val paramsStr = "(" + expr.paramsPlusLambda.joinToString(", ") { generateExpr(it).toString() } + ")"
-                "$resStr$paramsStr"
+
+                val resolvedDecl = when (exprExpr) {
+                    //is NavigationExpr -> exprExpr.resolvedDecl
+                    else -> expr.resolvedDecl
+                }
+                val args = expr.paramsPlusLambda.map { generateExpr(it).toString() }
+                if (resolvedDecl is FunDecl && resolvedDecl.receiver != null && exprExpr is NavigationExpr) {
+                    val args2 = listOf(generateExpr(exprExpr.expr), *args.toTypedArray())
+                    val paramsStr = "(" + args2.joinToString(", ") + ")"
+                    "${resolvedDecl.jsName}$paramsStr"
+                } else {
+                    //println("resolvedDecl=$resolvedDecl")
+                    val resStr = generateExpr(exprExpr)
+                    val paramsStr = "(" + args.joinToString(", ") + ")"
+                    "$resStr$paramsStr"
+                }
             }
             is LambdaFunctionExpr -> {
+                // When creating the lambda, the locals from other scopes are passed at the time of creation so:
+                //   let captured = 10
+                //   const func = ((captured) => () => 1 + captured)(captured)
+                //   captured++ // This doesn't affect, since the lambda was already created with the older captured value
+                // if locals from parent scope are not used, we can simply:
+                //   () => 1 + captured
+
                 val str = initLambdaBlock {
-                    for (stm in expr.stms) generateStm(stm, null)
+                    val stms = expr.stms.stms
+                    for ((index, stm) in stms.withIndex()) {
+                        val isLast = (index == stms.size - 1)
+                        if (isLast && stm is ExprStm) {
+                            generateStmCompact(ReturnStm(stm.expr).copyFrom(stm), null)
+                        } else {
+                            generateStmCompact(stm, null)
+                        }
+                    }
                 }
-                "() => { $str }"
+                val params = expr.allParams.map { it.jsName }
+                val paramsStr = params.joinToString(", ")
+                // TODO: determine locals from upper scopes
+                //if (capturedArgs != "") "(($capturedArgs) => () => { $str })($capturedArgs)" else
+                "($paramsStr) => { $str }"
             }
             is BreakExpr -> throw UnsupportedOperationException("break expression not supported")
             is ContinueExpr -> throw UnsupportedOperationException("continue expression not supported")
@@ -360,7 +401,7 @@ open class JSCodegen {
                 out += "`"
                 out.joinToString("")
             }
-            is ThisExpr -> "this"
+            is ThisExpr -> generateThis(expr)
             //is BreakExpr -> if (expr.label != null) "break ${expr.label};" else "break;"
             //is ContinueExpr -> if (expr.label != null) "continue ${expr.label};" else "continue;"
             is TempExpr -> "${expr.temp}"

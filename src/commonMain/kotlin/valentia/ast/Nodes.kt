@@ -33,6 +33,11 @@ sealed class Node : Extra by Extra.Mixin() {
     }
 }
 
+fun <T : Node> T.copyFrom(other: Node): T {
+    this.parentNode = other.parentNode
+    return this
+}
+
 class Program : Decl("\$program") {
     var semaResolved = false
     val modules = arrayListOf<Module>()
@@ -124,24 +129,6 @@ data class Annotations(val items: List<AnnotationNodes> = emptyList()) {
     companion object {
         val EMPTY = Annotations()
     }
-}
-
-sealed interface ModifierLike
-
-data class Modifiers(val items: List<ModifierLike> = emptyList()) {
-    companion object {
-        val EMPTY = Modifiers()
-    }
-    constructor(vararg items: ModifierLike) : this(items.toList())
-    val modifiers by lazy { items.filterIsInstance<Modifier>().toSet() }
-    val modifiersSet by lazy { ModifiersSet(*modifiers.toTypedArray()) }
-    val annotations by lazy { Annotations(items.filterIsInstance<AnnotationNodes>()) }
-    val labels by lazy { items.filterIsInstance<LabelNode>() }
-    val label by lazy { labels.firstOrNull() }
-    fun isEmpty(): Boolean = items.isEmpty()
-    //operator fun contains(item: Modifier): Boolean = item in modifiers
-    operator fun contains(item: Modifier): Boolean = item in modifiersSet
-    val isEnum: Boolean get() = ClassModifier.ENUM in this
 }
 
 sealed class ExprOrStm : Node() {
@@ -351,7 +338,8 @@ sealed class TypeDecl(name: String) : Decl(name) {}
 
 data class UnknownTypeDecl(val name: String) : TypeDecl(name)
 
-abstract class ClassLikeDecl(open val name: String, open val kind: ClassKind) : TypeDecl(name) {
+abstract class ClassLikeDecl(open val name: String, open val kind: ClassKind) : TypeDecl(name), ModifiersContainer {
+    override abstract val modifiers: Modifiers
     var fqname: String? = null
 
     override val jsName: String get() = (fqname ?: name).replace('.', '$')
@@ -396,6 +384,7 @@ data class ClassDecl(
     override val subTypes: List<SubTypeInfo>? = null,
     override val body: List<Decl>? = null,
     override val primaryConstructor: PrimaryConstructorDecl? = null,
+    override val modifiers: Modifiers = Modifiers.EMPTY,
 ) : ClassLikeDecl(name, kind) {
     init {
         addNode(subTypes)
@@ -410,6 +399,7 @@ data class ObjectDecl(
     override val name: String,
     override val body: List<Decl>? = null,
     override val subTypes: List<SubTypeInfo>? = null,
+    override val modifiers: Modifiers = Modifiers.EMPTY,
 ) : ClassLikeDecl(name, ClassKind.OBJECT) {
     init {
         addNode(body)
@@ -425,33 +415,39 @@ data class FunDecl constructor(
     val where: List<TypeConstraint>? = null,
     val body: Stm? = null,
     val receiver: Type? = null,
-    val modifiers: Modifiers = Modifiers(),
-) : CallableDecl(name) {
+    override val modifiers: Modifiers = Modifiers.EMPTY,
+) : CallableDecl(name), ModifiersContainer {
     init {
         addNode(body)
     }
 
+    val isSuspend: Boolean get() = FunctionModifier.SUSPEND in modifiers
+
+    /** Including receiver and coroutine context */
+    val allParams: List<FuncValueParam> by lazy {
+        listOfNotNull(receiver?.let { FuncValueParam("\$this", receiver) }, *params.toTypedArray(), if (isSuspend) FuncValueParam("\$coroutineContext", CoroutineContextType) else null)
+    }
     val isTopLevel get() = parentDecl is FileNode
     val jsHash by lazy { params.map { it.type }.hashCode() and 0x7FFFFFFF }
     override val jsName by lazy {
         val parentDecl = parentDecl
+
+        val nameWithRecever = if (receiver != null) "${receiver.toString()}.$name" else name
+
         val fqname = if (parentDecl is FileNode) {
-            ((parentDecl._package ?: Identifier(listOf())) + Identifier(name)).fqname.replace('.', '\$')
+            ((parentDecl._package ?: Identifier(listOf())) + Identifier(nameWithRecever)).fqname
         } else {
-            name
-        }
+            nameWithRecever
+        }.replace('.', '\$')
         //if (params.isEmpty()) name else "$name\$${jsHash.toString(16)}"
         "$fqname\$${jsHash.toString(16)}"
     }
 
-    val isSuspend: Boolean get() = FunctionModifier.SUSPEND in modifiers
 
     override fun getTypeUncached(): Type {
         return FuncType(UnknownType, params.map { FuncType.Item(it.type) })
         //TODO("${this::class} $this")
     }
-
-    operator fun contains(item: Modifier): Boolean = item in modifiers.modifiersSet
 }
 sealed abstract class VariableDeclBase(
     declName: String,
@@ -551,10 +547,15 @@ data class Identifier(val parts: List<String>) : Expr() {
 
 sealed class Expr : ExprOrStm()
 
-data class LambdaFunctionExpr(val stms: List<Stm> = emptyList(), val params: List<VariableDeclBase>? = null) : Expr() {
+data class LambdaFunctionExpr(val stms: Stms = Stms(), val params: List<VariableDeclBase>? = null) : Expr() {
+    val allParams = if (params == null) listOf(VariableDecl("it", UnknownType)) else params
     init {
         addNode(stms)
-        addNode(params)
+        addNode(allParams)
+    }
+
+    override fun getTypeUncached(): Type {
+        return FuncType(stms.getNodeType(), allParams.map { FuncType.Item(it.getNodeType()) })
     }
 }
 
@@ -598,7 +599,7 @@ data class TryCatchExpr(val body: Node, val catches: List<Catch> = emptyList(), 
     data class Catch(val local: String, val type: Type, val body: Stm) : Node()
 }
 data class Temp(val type: Type, val id: Int) : Expr() {
-    override fun toString(): String = "\$temp\$$id"
+    override fun toString(): String = "\$$id"
 }
 data class SuperExpr(val label: String? = null, val type: Type? = null) : AssignableExpr() {
 }
@@ -703,7 +704,11 @@ data class CallExpr(val expr: Expr, override val params: List<Expr> = emptyList(
         addNode(lambdaArg)
     }
 
-    override fun getFuncType(): FuncType = FuncType(expr.getNodeType(), params.map { FuncType.Item(it.getNodeType()) })
+    val paramsWithLambda: List<Expr> by lazy { listOfNotNull(*params.toTypedArray(), lambdaArg) }
+
+    override fun getFuncType(): FuncType {
+        return FuncType(expr.getNodeType(), paramsWithLambda.map { FuncType.Item(it.getNodeType()) })
+    }
     //override fun getFuncType(): FuncType = expr.getType() as FuncType
     override fun getTypeUncached(): Type {
         return getFuncType().ret ?: UnknownType
@@ -992,6 +997,8 @@ data class ExprStm(val expr: Expr) : Stm() {
     init {
         addNode(expr)
     }
+
+    override fun getTypeUncached(): Type = expr.getNodeType()
 }
 data class DeclStm(val decl: Decl) : Stm() {
     init {

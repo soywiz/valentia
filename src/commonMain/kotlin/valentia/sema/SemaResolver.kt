@@ -80,9 +80,10 @@ class SemaResolver : NodeTransformer() {
                     val resolved = decls.findMatch(funcType)
                     if (exprResolvedDecl is ClassLikeDecl) {
                         val resolvedSubTypes = exprResolvedDecl.directResolvedSubTypes
-                        println("resolvedSubTypes=$resolvedSubTypes")
+                        //println("resolvedSubTypes=$resolvedSubTypes")
                     }
                     cexpr.resolvedDecl = resolved
+                    expr.resolvedDecl = resolved
                 } else {
                     TODO("NavigationExpr key=${cexpr.key}")
                 }

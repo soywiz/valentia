@@ -7,8 +7,13 @@ import valentia.ast.UnknownType
 object TypeMatching {
     fun canAssignTo(src: Type?, dst: Type?): Boolean {
         if (src is FuncType && dst is FuncType) {
-            if (src.params.size != dst.params.size) return false
-            for ((srcP, dstP) in src.params.zip(dst.params)) {
+            val srcParams2 = src.params
+            val dstParams = dst.params
+            // @TODO: This is for lambdas
+            val srcParams = if (srcParams2.isEmpty() && dstParams.size == 1) listOf(dstParams[0]) else srcParams2
+
+            if (srcParams.size != dstParams.size) return false
+            for ((srcP, dstP) in srcParams.zip(dstParams)) {
                 if (!canAssignTo(srcP.type, dstP.type)) return false
             }
             //src.params.zip()

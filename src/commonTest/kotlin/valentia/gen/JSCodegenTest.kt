@@ -26,6 +26,21 @@ class JSCodegenTest {
     }
 
     @Test
+    fun testSimpleReceiver() {
+        assertEquals(
+            "9",
+            genAndRunJs("""
+                external class Int
+                fun Int.squared(): Int = this * this                 
+
+                fun main() {
+                    console.log(3.squared())
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
     fun testOperatorOverloading() {
         assertEquals(
             "ab",
@@ -184,11 +199,35 @@ class JSCodegenTest {
     }
 
     @Test
-    fun testSimpleLoop() {
+    fun testSimpleForLoop() {
         assertEquals("0\n1\n2\n3", genAndRunJs("fun main() { for (n in 0 .. 3) console.log(n) }", printJs = true))
         assertEquals("0\n1\n2", genAndRunJs("fun main() { for (n in 0 ..< 3) console.log(n) }", printJs = true))
         assertEquals("0\n1\n2", genAndRunJs("fun main() { for (n in 0 until 3) console.log(n) }", printJs = true))
         assertEquals("3\n2\n1\n0", genAndRunJs("fun main() { for (n in 3 downTo 0) console.log(n) }", printJs = true))
+    }
+
+    @Test
+    fun testForLoopEvaluatesOnce() {
+        assertEquals(
+            "0\n1\n2\n3\n1 1",
+            genAndRunJs("""
+                var count1 = 0
+                var count2 = 0
+                fun func1(): Int {
+                    count1++
+                    return 0
+                }
+                fun func2(): Int {
+                    count2++
+                    return 3
+                }
+    
+                fun main() { 
+                    for (n in func1() .. func2()) console.log(n)
+                    console.log(count1, count2)
+                }
+            """, printJs = true)
+        )
     }
 
     @Test
@@ -360,7 +399,22 @@ class JSCodegenTest {
                 fun main() {
                     console.log(sum(1, 3) * 3)
                 }
-            """.trimIndent())
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
+    fun testFuncArgument() {
+        assertEquals(
+            "22",
+            genAndRunJs("""
+                external class Int
+                fun Int.intApply2(func: (Int) -> Int): Int = func(this) * 2
+                fun main() {
+                    //console.log(10.intApply2 { if (it > 10) it * 4 else it * 3 })
+                    console.log(10.intApply2 { it + 1 })
+                }
+            """.trimIndent(), printJs = true)
         )
     }
 

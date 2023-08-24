@@ -48,10 +48,11 @@ data class FuncType(val ret: Type?, val params: List<Item>, val receiver: Type? 
 }
 data class MultiType(val types: List<Type>) : Type() {
     constructor(vararg types: Type) : this(types.toList())
+}
 
-    companion object {
-        const val ID = 5
-    }
+fun MultiType.withoutLast(n: Int = 1): Type {
+    val res = copy(types.dropLast(n))
+    return if (res.types.size == 1) res.types[0] else res
 }
 
 data class DefinitelyNonNullableType(
@@ -73,6 +74,7 @@ val DynamicType = SimpleType("dynamic")
 val NothingType = SimpleType("Nothing")
 val UnknownType = SimpleType("Unknown")
 val UnitType = SimpleType("Unit")
+val CoroutineContextType = SimpleType("CoroutineContext")
 val BoolType = SimpleType("Boolean")
 val CharType = SimpleType("Char")
 val StringType = SimpleType("String")

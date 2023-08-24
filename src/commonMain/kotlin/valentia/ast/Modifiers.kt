@@ -160,3 +160,26 @@ inline class ModifiersSet(val values: Int) {
         }
     }
 }
+
+sealed interface ModifierLike
+
+data class Modifiers(val items: List<ModifierLike> = emptyList()) {
+    companion object {
+        val EMPTY = Modifiers()
+    }
+    constructor(vararg items: ModifierLike) : this(items.toList())
+    val modifiers by lazy { items.filterIsInstance<Modifier>().toSet() }
+    val modifiersSet by lazy { ModifiersSet(*modifiers.toTypedArray()) }
+    val annotations by lazy { Annotations(items.filterIsInstance<AnnotationNodes>()) }
+    val labels by lazy { items.filterIsInstance<LabelNode>() }
+    val label by lazy { labels.firstOrNull() }
+    fun isEmpty(): Boolean = items.isEmpty()
+    //operator fun contains(item: Modifier): Boolean = item in modifiers
+    operator fun contains(item: Modifier): Boolean = item in modifiersSet
+    val isEnum: Boolean get() = ClassModifier.ENUM in this
+}
+
+interface ModifiersContainer {
+    val modifiers: Modifiers
+    operator fun contains(item: Modifier): Boolean = item in modifiers.modifiersSet
+}

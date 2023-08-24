@@ -444,9 +444,4 @@ open class NodeTransformer {
         val cexpr = transform(expr.expr)
         return if (cexpr === expr.expr) expr else UnaryPostOpExpr(cexpr, expr.op)
     }
-
-    protected fun <T : Node> T.copyFrom(other: Node): T {
-        this.parentNode = other.parentNode
-        return this
-    }
 }

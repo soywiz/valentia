@@ -24,6 +24,7 @@ interface DeclBuilder : NodeBuilder {
         vararg subTypes: SubTypeInfo,
         data: Boolean = false,
         primaryConstructorDecl: PrimaryConstructorDecl? = null,
+        modifiers: Modifiers = Modifiers.EMPTY,
         block: DeclBuilder.() -> Unit = {},
     ): ClassDecl =
         ClassDecl(
@@ -31,7 +32,8 @@ interface DeclBuilder : NodeBuilder {
             name,
             if (subTypes.isNotEmpty()) subTypes.toList() else emptyList(),
             buildDeclList { block() },
-            primaryConstructor = primaryConstructorDecl
+            primaryConstructor = primaryConstructorDecl,
+            modifiers = modifiers
         ).also { addDecl(it) }
     fun INTERFACE(name: String, vararg subTypes: SubTypeInfo, block: DeclBuilder.() -> Unit = {}): ClassDecl =
         ClassDecl(ClassKind.INTERFACE, name, if (subTypes.isEmpty()) null else subTypes.toList(), buildDeclList { block() }, primaryConstructor = null).also { addDecl(it) }
@@ -102,7 +104,7 @@ interface StmBuilder : DeclBuilder {
         return WhenExpr(WhenExpr.Subject(expr), builder.entries)
     }
     fun LAMBDA(vararg params: VariableDeclBase, block: StmBuilder.() -> Unit = {}): LambdaFunctionExpr {
-        return LambdaFunctionExpr(buildStmList { block() }, if (params.isNotEmpty()) params.toList() else null)
+        return LambdaFunctionExpr(Stms(buildStmList { block() }), if (params.isNotEmpty()) params.toList() else null)
     }
 
 }

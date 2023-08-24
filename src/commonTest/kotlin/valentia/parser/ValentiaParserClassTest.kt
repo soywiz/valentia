@@ -10,7 +10,7 @@ class ValentiaParserClassTest : DeclBuilder, StmBuilder {
     @Test
     fun testAnnotatedClass() {
         assertEquals(
-            ClassDecl(kind = ClassKind.CLASS, name = "Demo"),
+            ClassDecl(kind = ClassKind.CLASS, name = "Demo", modifiers = Modifiers(AnnotationNodes(AnnotationNode("Test".type)))),
             ValentiaParser.topLevelDecl("@Test class Demo")
         )
     }
@@ -22,7 +22,8 @@ class ValentiaParserClassTest : DeclBuilder, StmBuilder {
                 primaryConstructor = PrimaryConstructorDecl(
                     ClassParameter("a", IntType, kind = VariableKind.VAL),
                     ClassParameter("b", StringType, kind = VariableKind.VAL),
-                )
+                ),
+                modifiers = Modifiers(Modifier.ANNOTATION),
             ),
             ValentiaParser.topLevelDecl("annotation class Demo(val a: Int, val b: String)")
         )

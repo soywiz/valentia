@@ -252,7 +252,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             null
         }
         NLs()
-        return ClassDecl(kind = kind, name = className, subTypes = subTypes, body = decls, primaryConstructor = primaryConstructor)
+        return ClassDecl(kind = kind, name = className, subTypes = subTypes, body = decls, primaryConstructor = primaryConstructor, modifiers = modifiers)
     }
 
     // primaryConstructor
@@ -608,7 +608,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             var it = receiverType()
             if (!matchesNLs(".")) {
                 if (it is MultiType && it.types.size >= 2) {
-                    it = it.copy(it.types.dropLast(1))
+                    it = it.withoutLast()
                     while (peek().str != "." && pos > 0) pos--
                 }
             }
@@ -628,7 +628,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val typeConstraints = typeConstraints()
         NLs()
         val body = if (matches("=") || matches("{")) functionBody() else null
-        return FunDecl(funcName, params, retType = retType, where = typeConstraints, body = body, modifiers = modifiers)
+        return FunDecl(funcName, params, retType = retType, where = typeConstraints, body = body, modifiers = modifiers, receiver = receiver)
         //} catch (e: Throwable) {
         //    Throwable("Function was not able to be parsed '$funcNameOpt' :: ${readAbsoluteRange(spos, pos)}", e).printStackTrace()
         //    TODO("Function was not able to be parsed '$funcNameOpt': ${readAbsoluteRange(spos, pos)} :: $e")
@@ -909,7 +909,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             NLs()
             classBody()
         }
-        return ObjectDecl(name, body, delegations)
+        return ObjectDecl(name = name, body = body, subTypes = delegations, modifiers = modifiers)
     }
 
     //secondaryConstructor
@@ -1093,7 +1093,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             }
             more += stype
         }
-        return if (more.isNotEmpty()) MultiType(listOf(base, *more.toTypedArray())) else base
+        return when {
+            more.isNotEmpty() -> MultiType(listOf(base, *more.toTypedArray()))
+            else -> base
+        }
         //val types = parseList(oneOrMore = true, separator = { expectOpt(".") }) {
         //    simpleUserType()
         //}
@@ -2228,7 +2231,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             NLs()
             params to stms
         }
-        return LambdaFunctionExpr(stms, params)
+        return LambdaFunctionExpr(Stms(stms), params)
     }
 
     //lambdaParameters
