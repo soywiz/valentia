@@ -115,7 +115,7 @@ object TOML {
                 }
                 return items
             }
-            '"' -> parseStringLiteral()
+            '"', '\'' -> parseStringLiteral()
             else -> {
                 if (!c.isValidLiteralChar()) error("Expected literal but found = '$c'")
                 val value = readWhile { it.isValidLiteralChar() }
@@ -144,7 +144,7 @@ object TOML {
     private fun StrReader.parseKey(): String {
         skipSpacesOrNLs()
         val c = peek()
-        return if (c == '"') {
+        return if (c == '"' || c == '\'') {
             parseStringLiteral()
         } else if (c.isLetterOrDigitOrUndescore()) {
             val key = readWhile { it.isLetterOrDigitOrUndescore() }

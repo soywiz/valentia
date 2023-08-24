@@ -15,8 +15,8 @@ class TOMLTest {
                 ),
                 "database" to mapOf(
                     "enabled" to true,
-                    "ports" to listOf( +8000, -8001, 8002 ),
-                    "data" to listOf( listOf("delta", "phi"), listOf(3.14) ),
+                    "ports" to listOf(+8000, -8001, 8002),
+                    "data" to listOf(listOf("delta", "phi"), listOf(3.14)),
                     "temp_targets" to mapOf("cpu" to 79.5, "case" to 72.0)
                 ),
                 "servers" to mapOf(
@@ -27,9 +27,11 @@ class TOMLTest {
                     mapOf("name" to "Hammer", "sku" to 738594937),
                     mapOf(),
                     mapOf("name" to "Nail", "sku" to 284758393, "color" to "gray"),
-                )
+                ),
+                "demo" to mapOf("hello" to mapOf("test" to 10, "demo" to 11, "world" to 12)),
             ),
-            TOML.parseToml("""
+            TOML.parseToml(
+                """
                 # This is a TOML document
     
                 title = "TOML Example"
@@ -65,7 +67,13 @@ class TOMLTest {
                 sku = 284758393
                 
                 color = "gray"
-            """.trimIndent())
+                
+                [demo]
+                hello.test = 10
+                hello."demo" = 11
+                hello.'world' = 12
+            """.trimIndent()
+            )
         )
     }
 }
