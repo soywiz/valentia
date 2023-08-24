@@ -72,6 +72,7 @@ data class UnificationExprType(val exprs: List<ExprOrStm>) : Type() {
 val DynamicType = SimpleType("dynamic")
 val NothingType = SimpleType("Nothing")
 val UnknownType = SimpleType("Unknown")
+val UnitType = SimpleType("Unit")
 val BoolType = SimpleType("Boolean")
 val CharType = SimpleType("Char")
 val StringType = SimpleType("String")

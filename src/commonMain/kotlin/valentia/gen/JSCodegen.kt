@@ -159,11 +159,7 @@ open class JSCodegen {
             if (clazz.primaryConstructor != null) {
                 for (decl in clazz.bodyAll.filterIsInstance<VariableDecl>().filter { !it.delegation }) {
                     val type = decl.getNodeType()
-                    val nullValue = when (type) {
-                        IntType, CharType -> "0"
-                        BoolType -> "false"
-                        else -> "null"
-                    }
+                    val nullValue = type.defaultValueStr
                     indenter.line("${decl.jsName} = $nullValue;")
                     //generateDecl(decl, clazz)
                 }
@@ -532,4 +528,9 @@ open class JSCodegen {
         return this.joinToString(", ") { "${it.id} /*: ${it.type?.toJsString()}*/" }
     }
 
+    val Type.defaultValueStr: String get() = when (this) {
+        IntType, CharType -> "0"
+        BoolType -> "false"
+        else -> "null"
+    }
 }
