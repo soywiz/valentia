@@ -3,6 +3,9 @@ package valentia.util
 import org.intellij.lang.annotations.Language
 import kotlin.math.min
 
+// @TODO: Dates
+// @TODO: Special cases for ' & ''' & """
+// @TODO: Check for bugs and for invalid scenarios that shouldn't be accepted
 object TOML {
     fun parseToml(@Language("toml") str: String, out: MutableMap<String, Any?> = LinkedHashMap()): Map<String, Any?> {
         return StrReader(str).parseToml(out)
@@ -153,7 +156,7 @@ object TOML {
     }
 
     private fun StrReader.parseStringLiteral(): String {
-        val str = StringBuilder()
+        val sb = StringBuilder()
         val parseStart = peek(0)
         if (parseStart != '\'' && parseStart != '"') error("Invalid string $parseStart")
 
@@ -172,7 +175,7 @@ object TOML {
             }
             if (c == '\\') {
                 skip()
-                str.append(when (val cc = read()) {
+                sb.append(when (val cc = read()) {
                     'b' -> '\u0008'
                     't' -> '\u0009'
                     'n' -> '\u000a'
@@ -186,11 +189,12 @@ object TOML {
                 })
             } else {
                 skip()
-                str.append(c)
+                sb.append(c)
             }
         }
-
-        return str.toString()
+        var str = sb.toString()
+        if (triplet && str.isNotEmpty() && str[0] == '\n') str = str.substring(1)
+        return str
     }
 
     private class StrReader(val str: String, var pos: Int = 0) {
