@@ -418,6 +418,8 @@ data class FunDecl constructor(
         return FuncType(UnknownType, params.map { FuncType.Item(it.type) })
         //TODO("${this::class} $this")
     }
+
+    operator fun contains(item: Modifier): Boolean = item in modifiers.modifiersSet
 }
 sealed abstract class VariableDeclBase(
     declName: String,

@@ -181,6 +181,8 @@ open class JSCodegen {
     var transformContext = TransformUnsupportedNodes.TransformContext()
 
     open fun generateFunction(func: FunDecl, parent: Decl?) {
+        if (Modifier.EXTERNAL in func) return
+
         val params = func.params.toJsString()
 
         //indenter.line("${decl.name}($params)") {
