@@ -111,6 +111,10 @@ open class JSCodegen {
                             generateDecl(field, decl, GenerateContext(settingFieldConstructor = true))
                             //indenter.line("this.${field.jsName} = null;")
                         }
+                        val parentClass = decl.parentDecl as ClassLikeDecl
+                        for (init in parentClass.bodyAll.filterIsInstance<InitDecl>()) {
+                            generateStmCompact(init.stm, decl)
+                        }
                     }
                     val delegatedCall = decl.constructorDelegationCall
                     if (delegatedCall != null) {
@@ -135,6 +139,10 @@ open class JSCodegen {
                     generateStm(decl.body, parent)
                     indenter.line("return this;")
                 }
+            }
+            // Already included in the main constructor
+            is InitDecl -> {
+                Unit
             }
             else -> TODO("decl=$decl")
         }
@@ -403,6 +411,13 @@ open class JSCodegen {
             block()
         }
         indenter.line("}")
+    }
+    open fun generateStmCompact(stm: Stm?, parent: Decl?) {
+        if (stm is Stms) {
+            for (stm in stm.stms) generateStm(stm, parent)
+        } else {
+            generateStm(stm, parent)
+        }
     }
     open fun generateStm(stm: Stm?, parent: Decl?) {
         _generateStm(transformer.ensure(stm, transformContext), parent)

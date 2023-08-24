@@ -280,6 +280,43 @@ class JSCodegenTest {
     }
 
     @Test
+    fun testMultipleInitBlock() {
+        assertEquals(
+            "27",
+            genAndRunJs("""
+                class Demo() {
+                    var a = 1
+                    init { this.a += 3 }
+                    init { this.a *= 7 }
+                    init { this.a -= 1 }
+                }
+                fun main() {
+                    console.log(Demo().a)
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
+    @Ignore
+    fun testMultipleInitBlock2() {
+        assertEquals(
+            "27",
+            genAndRunJs("""
+                class Demo {
+                    var a = 1
+                    init { a += 3 }
+                    init { a *= 7 }
+                    init { a -= 1 }
+                }
+                fun main() {
+                    console.log(Demo().a)
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
     fun testIntegerOps() {
         assertEquals(
             "-1073741824\n2\n949312677\n1018518717\n69206040\n2\n44\n-1\n1073741823",
