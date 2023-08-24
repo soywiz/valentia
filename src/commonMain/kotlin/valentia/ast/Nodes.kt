@@ -736,6 +736,15 @@ enum class BinaryOp(val symbol: String, val operatorName: String) {
     TIMES("*", "times"),
     DIV("/", "div"),
     REM("%", "rem"),
+
+    // STANDARD INFIX FUNCTIONS
+    //"xor" -> "^"
+    //"or" -> "|"
+    //"and" -> "&"
+    //"shl" -> "<<"
+    //"shr" -> ">>"
+    //"ushr" -> ">>>"
+
     ;
 }
 

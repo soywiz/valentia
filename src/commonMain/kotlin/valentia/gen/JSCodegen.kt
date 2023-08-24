@@ -305,9 +305,11 @@ open class JSCodegen {
                         "and" -> "&"
                         "shl" -> "<<"
                         "shr" -> ">>"
+                        "ushr" -> ">>>"
                         else -> expr.op
                     }
                     when {
+                        leftType == BoolType && rightType == BoolType -> "((($leftStr) $op ($rightStr))!=0)"
                         leftType == IntType && rightType == IntType -> "((($leftStr) $op ($rightStr))|0)"
                         else -> "(($leftStr) $op ($rightStr))"
                     }

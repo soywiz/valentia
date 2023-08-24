@@ -2,10 +2,8 @@ package valentia.gen
 
 import org.intellij.lang.annotations.Language
 import valentia.ExternalInterface
-import valentia.ast.Program
 import valentia.compiler.FileWithContents
 import valentia.compiler.ValentiaCompiler
-import valentia.parser.ValentiaParser
 import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -221,10 +219,9 @@ class JSCodegenTest {
     }
 
     @Test
-    fun testIntegerAddition() {
-        0 until 10
+    fun testIntegerOps() {
         assertEquals(
-            "-1073741824\n2\n949312677\n1018518717\n69206040",
+            "-1073741824\n2\n949312677\n1018518717\n69206040\n2\n44\n-1\n1073741823",
             genAndRunJs("""
                 fun main() {
                     console.log(2147483648 + 1073741824)
@@ -232,6 +229,24 @@ class JSCodegenTest {
                     console.log(213212312 xor 874512445)
                     console.log(213212312 or 874512445)
                     console.log(213212312 and 874512445)
+                    console.log(1 shl 1)
+                    console.log(179 shr 2)
+                    console.log((-1) shr 2)
+                    console.log((-1) ushr 2)
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
+    fun testBoolOps() {
+        assertEquals(
+            "false\ntrue\ntrue",
+            genAndRunJs("""
+                fun main() {
+                    console.log(true && false)
+                    console.log(true || false)
+                    console.log(true xor false)
                 }
             """.trimIndent(), printJs = true)
         )
