@@ -32,6 +32,10 @@ interface Indenter {
     data class Line(val indentLevel: Int, var str: String) {
         var opt: Boolean = false
         override fun toString(): String = "${INDENT_LEVELS[indentLevel]}$str"
+        infix fun APPEND(str: String): Line {
+            this.str += str
+            return this
+        }
     }
 
     fun line(str: String): Line

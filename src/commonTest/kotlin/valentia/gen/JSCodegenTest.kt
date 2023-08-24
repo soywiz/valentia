@@ -163,6 +163,18 @@ class JSCodegenTest {
         assertEquals("3\n2\n1\n0", genAndRunJs("fun main() { for (n in 3 downTo 0) console.log(n) }", printJs = true))
     }
 
+    @Test
+    fun testWhileLoop() {
+        assertEquals("1\n2\n3\n4", genAndRunJs("fun main() { var n = 0; while (n++ < 4) console.log(n) }", printJs = true))
+        assertEquals("1\n2\n3", genAndRunJs("fun main() { var n = 0; while (++n < 4) console.log(n) }", printJs = true))
+    }
+
+    @Test
+    fun testDoWhileLoop() {
+        assertEquals("0\n1\n2\n3\n4", genAndRunJs("fun main() { var n = 0; do console.log(n) while (n++ < 4) }", printJs = true))
+        assertEquals("0\n1\n2\n3", genAndRunJs("fun main() { var n = 0; do console.log(n) while (++n < 4) }", printJs = true))
+    }
+
     val RESOURCES_PREFIX = "src/commonTest/resources"
 
     @Test

@@ -692,6 +692,10 @@ data class UnaryPostOpExpr(val expr: Expr, val op: UnaryPostOp) : AssignableExpr
     init {
         addNode(expr)
     }
+
+    override fun getTypeUncached(): Type {
+        return expr.getNodeType()
+    }
 }
 data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr() {
     init {
@@ -700,8 +704,9 @@ data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr() {
     override fun getTypeUncached(): Type {
         val type = expr.getNodeType()
         if (type == IntType) return type
-        TODO("UnaryPreOpExpr type=$type, expr=$expr")
-        return super.getTypeUncached()
+        //TODO("UnaryPreOpExpr type=$type, expr=$expr")
+        //return super.getTypeUncached()
+        return type
     }
 }
 
@@ -792,6 +797,9 @@ data class BinaryOpExpr(val left: Expr, val op: String, val right: Expr) : Expr(
                     }
                 }
                 //println("resolve: $clazz, $resolve")
+            }
+            if (resolvedFunc != null && Modifier.OPERATOR !in resolvedFunc!!) {
+                println("!!! Function $resolvedFunc not marked as operator")
             }
         }
 
@@ -967,7 +975,7 @@ data class WhileLoopStm(val cond: Expr, val body: Stm, override val modifiers: M
 }
 
 /** Executes 1 or more times */
-data class DoWhileLoopStm(val body: Stm?, val cond: Expr?, override val modifiers: Modifiers = Modifiers.EMPTY) : LoopStm() {
+data class DoWhileLoopStm(val body: Stm?, val cond: Expr, override val modifiers: Modifiers = Modifiers.EMPTY) : LoopStm() {
     init {
         addNode(body)
         addNode(cond)

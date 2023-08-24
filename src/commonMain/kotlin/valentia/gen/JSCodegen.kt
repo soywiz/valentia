@@ -281,6 +281,8 @@ open class JSCodegen {
                     UnaryPreOp.MINUS -> "-($exprStr)"
                     UnaryPreOp.PLUS -> "+($exprStr)"
                     UnaryPreOp.EXCL -> "!($exprStr)"
+                    UnaryPreOp.INCR -> "++($exprStr)"
+                    UnaryPreOp.DECR -> "--($exprStr)"
                     else -> TODO("Unsupported $expr")
                 }
             }
@@ -463,7 +465,15 @@ open class JSCodegen {
                             }
                         }
                     }
-                    is DoWhileLoopStm -> TODO()
+                    is DoWhileLoopStm -> {
+                        val (pre, expr) = transformer.ensure(stm.cond, transformContext)
+                        pre?.let { generateStm(pre, parent) }
+                        if (expr != null) {
+                            indenter.line("${labelStr}do") {
+                                generateStmsCompact(stm.body, parent)
+                            } APPEND " while (${generateExpr(expr)})"
+                        }
+                    }
                 }
             }
             is Stms -> {

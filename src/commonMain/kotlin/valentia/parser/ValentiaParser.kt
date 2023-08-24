@@ -1396,7 +1396,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             NLs()
             expression().also { NLs() }
         }
-        DoWhileLoopStm(body, cond, modifiers)
+        DoWhileLoopStm(body, cond ?: EmptyExpr(), modifiers)
     }
 
     //assignment
