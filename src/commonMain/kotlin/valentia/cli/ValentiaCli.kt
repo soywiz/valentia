@@ -79,6 +79,7 @@ object ValentiaCli {
                     folder["valentia.toml"].writeString("""
                         name = "${folder.cannonical.baseName}"
                         authors = ["dummy"]
+
                         [dependencies]
                     """.trimIndent())
                     folder["src"].mkdirs()
