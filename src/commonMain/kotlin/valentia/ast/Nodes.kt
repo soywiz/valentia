@@ -2,10 +2,7 @@ package valentia.ast
 
 import valentia.ast.NodeBuilder.Companion.type
 import valentia.parser.BaseConsumer
-import valentia.sema.TypeMatching
-import valentia.sema.getAscendantClassByName
-import valentia.sema.resolve
-import valentia.sema.resolveType
+import valentia.sema.*
 import valentia.util.Extra
 
 sealed class Node : Extra by Extra.Mixin() {
@@ -558,6 +555,8 @@ data class WhenExpr(
     data class Condition(val expr: Expr = EmptyExpr()) : ConditionBase
     data class ConditionIn(val op: String? = null, val expr: Expr = EmptyExpr()) : ConditionBase
     data class ConditionIs(val op: String? = null, val type: Type? = null) : ConditionBase
+
+    override fun getTypeUncached(): Type = UnificationExprType(entries.map { it.body })
 }
 data class CollectionLiteralExpr(val items: List<Expr>) : Expr()
 data class TryCatchExpr(val body: Node, val catches: List<Catch> = emptyList(), val finally: Stm? = null) : Expr() {
@@ -581,6 +580,10 @@ data class IfExpr(val cond: Expr, val trueBody: ExprOrStm, val falseBody: ExprOr
         addNode(trueBody)
         addNode(falseBody)
     }
+
+    override fun getTypeUncached(): Type {
+        return UnificationExprType(trueBody, falseBody)
+    }
 }
 data class BreakExpr(val label: String? = null) : Expr()
 data class ContinueExpr(val label: String? = null) : Expr()
@@ -588,11 +591,15 @@ data class ReturnExpr(val expr: Expr?, val label: String? = null) : Expr() {
     init {
         addNode(expr)
     }
+
+    override fun getTypeUncached(): Type = NothingType
 }
 data class ThrowExpr(val expr: Expr) : Expr() {
     init {
         addNode(expr)
     }
+
+    override fun getTypeUncached(): Type = NothingType
 }
 
 data class Parameter(val id: String, val type: Type) : Node()
@@ -938,6 +945,8 @@ data class Stms(val stms: List<Stm>) : Stm() {
     init {
         addNode(stms)
     }
+
+    override fun getTypeUncached(): Type = stms.lastOrNull()?.getNodeType() ?: UnitType
 }
 
 data class EmptyStm(val dummy: Unit = Unit) : Stm() {
