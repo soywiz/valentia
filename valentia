@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+export BASEDIR="`dirname $0`"
+
+if [ "$*" == "" ]; then
+    "$BASEDIR/gradlew" -q -p "$BASEDIR" run
+else
+    "$BASEDIR/gradlew" -q -p "$BASEDIR" run --args="$*"
+fi

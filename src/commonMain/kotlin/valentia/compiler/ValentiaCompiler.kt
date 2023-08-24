@@ -32,8 +32,8 @@ object ValentiaCompiler {
         val parsingTime = measureTime {
             for (file in files) {
                 val fileContent = file.content
-                val fileNode = ValentiaParser.file(fileContent)
-                module.addFile(fileNode)
+                val fileNodes = ValentiaParser.files(fileContent)
+                module.addFiles(fileNodes)
             }
         }
         var resolvedProgram: Program = program

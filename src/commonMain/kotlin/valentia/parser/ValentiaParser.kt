@@ -13,6 +13,11 @@ open class ValentiaParser(
     constructor(str: String) : this(ValentiaTokenizer(str).tokenize())
 
     fun valentiaFile(filePath: String = "Unknown.kt"): FileNode = kotlinFile(filePath)
+    fun valentiaFiles(filePath: String = "Unknown.kt"): List<FileNode> {
+        return multiple(atLeastOne = false) {
+            if (eof) null else kotlinFile(filePath)
+        }
+    }
 
     companion object {
         private inline fun <T> parserEOF(str: String, checkEOF: Boolean = true, block: ValentiaParser.() -> T): T {
@@ -25,6 +30,8 @@ open class ValentiaParser(
             parserEOF(str) { topLevelObject() ?: error("Not a topLevelObject") }
         fun file(@Language("kotlin") str: String, filePath: String = "Unknown.kt"): FileNode =
             parserEOF(str) { valentiaFile(filePath) }
+        fun files(str: String, filePath: String = "Unknown.kt"): List<FileNode> =
+            parserEOF(str) { valentiaFiles(filePath) }
         fun expression(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String, checkEOF: Boolean = true): Expr =
             parserEOF(str, checkEOF) { expressionSure() }
         fun assignment(@Language("kotlin", prefix = "fun test() {", suffix = "}") str: String): Stm =
@@ -62,7 +69,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     // kotlinFile
     //    : shebangLine? NL* fileAnnotation* packageHeader importList topLevelObject* EOF
     //    ;
-    fun kotlinFile(filePath: String = "Unknown.kt"): FileNode {
+    fun kotlinFile(filePath: String = "Unknown.kt", checkEOF: Boolean = false): FileNode {
         val shebang = shebangLineOpt()
         NLs()
         val fileAnnotations = zeroOrMore { fileAnnotation() }
@@ -72,12 +79,13 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         while (true) {
             NLs()
             if (eof) break
+            if (peek().str == "package") break
             val topLevelObject = topLevelObject()
                 ?: error("Expected topLevelObject but found ${peek()} $this")
             topLevelDecls += topLevelObject
         }
         NLs()
-        EOF()
+        if (checkEOF) EOF()
         return FileNode(
             filePath = filePath,
             shebang = shebang,

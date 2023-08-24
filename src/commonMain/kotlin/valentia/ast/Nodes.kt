@@ -84,6 +84,9 @@ class Module(val program: Program, val id: String? = null) : Decl("\$module\$$id
     fun addFile(file: FileNode) {
         getPackage(file._package).addFile(file)
     }
+    fun addFiles(files: List<FileNode>) {
+        for (file in files) addFile(file)
+    }
 
     fun addPackages(packages: List<Package>): Module {
         for (pack in packages) {

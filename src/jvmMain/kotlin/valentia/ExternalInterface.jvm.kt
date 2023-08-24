@@ -21,6 +21,11 @@ actual object ExternalInterface : ExternalInterfaceBase() {
     override fun fileRead(path: String): ByteArray = File(path).readBytes()
     override fun fileList(path: String): List<String> = (File(path).listFiles() ?: emptyArray()).map { it.name }
 
+    override fun fileStat(path: String): StatResult? {
+        val file = File(path).takeIf { it.exists() } ?: return null
+        return StatResult(file.name, file.length(), file.isDirectory)
+    }
+
     override fun makeExecutable(path: String) {
         File(path).setExecutable(true)
     }

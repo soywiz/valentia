@@ -1,7 +1,11 @@
 package valentia
 
-@JsName("require")
-external fun jsRequire(str: String): dynamic
+@JsName("eval")
+external fun eval(str: String): dynamic
+
+//@JsName("require")
+//external fun jsRequire(str: String): dynamic
+fun jsRequire(str: String): dynamic = eval("require('$str')")
 
 @JsName("Object")
 external object JsObject {
@@ -54,4 +58,6 @@ actual object ExternalInterface : ExternalInterfaceBase() {
     override fun fileRead(path: String): ByteArray {
         return jsRequire("fs").readFileSync(path)
     }
+
+
 }

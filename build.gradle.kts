@@ -1,5 +1,5 @@
 plugins {
-    kotlin("multiplatform") version "1.9.0"
+    kotlin("multiplatform") version "1.9.10"
     application
 }
 
@@ -27,18 +27,18 @@ kotlin {
     }
     js(IR) {
         binaries.executable()
-        nodejs {
-            testTask {
-                //environment("key", "value")
-            }
-        }
-        //browser {
+        //nodejs {
+        //    testTask {
+        //        //environment("key", "value")
+        //    }
+        //}
+        browser {
         //    commonWebpackConfig {
         //        cssSupport {
         //            enabled.set(true)
         //        }
         //    }
-        //}
+        }
     }
     sourceSets {
         val commonMain by getting
@@ -66,7 +66,14 @@ kotlin {
 
 application {
     mainClass.set("valentia.MainKt")
+    //println(System.getProperty("user.dir"))
 }
+
+val run = tasks.getByName<JavaExec>("run")
+run.workingDir = File(System.getProperty("user.dir"))
+//println(tasks.getByName("run")!!::class)
+
+//println(System.getProperty("user.dir"))
 
 //tasks.named<Copy>("jvmProcessResources") {
 //    val jsBrowserDistribution = tasks.named("jsBrowserDistribution")
