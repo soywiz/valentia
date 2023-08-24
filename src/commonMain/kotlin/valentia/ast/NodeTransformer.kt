@@ -2,25 +2,43 @@ package valentia.ast
 
 open class NodeTransformer {
     open fun transform(program: Program): Program {
-        val modules = program.modulesById.values.map { transform(it) }
-        return if (program.modulesById.values.toList() == modules) program else TODO()
+        var mod = false
+        val modules = program.modulesById.values.map {
+            val node = transform(it)
+            if (node !== it) mod = true
+            if (node !== it) node.copyFrom(it) else node
+        }
+        return if (!mod) program else Program().addModules(modules)
     }
 
     open fun transform(module: Module): Module {
-        val packages = module.packagesById.values.map { transform(it) }
-        return if (module.packagesById.values.toList() == packages) module else TODO()
+        var mod = false
+        val packages: List<Package> = module.packagesById.values.map {
+            val node = transform(it)
+            if (node !== it) mod = true
+            if (node !== it) node.copyFrom(it) else node
+        }
+        return if (!mod) module else Module(module.program, module.id).addPackages(packages)
     }
 
     open fun transform(pack: Package): Package {
-        val files = pack.files.map { transform(it) }
-        return if (files == pack.files) pack else TODO()
+        var mod = false
+        val files = pack.files.map {
+            val node = transform(it)
+            if (node !== it) mod = true
+            if (node !== it) node.copyFrom(it) else node
+        }
+        return if (!mod) pack else Package(pack.module, pack.identifier).addFiles(files)
     }
 
     open fun transform(file: FileNode): FileNode {
+        val imports = file.imports.map { transform(it) }
+        val topLevelDecls = file.topLevelDecls.map { transform(it) }
+        //return if (imports == file.imports && topLevelDecls == file.topLevelDecls) file else file.copy(
         return file.copy(
-            imports = file.imports.map { transform(it) },
-            topLevelDecls = file.topLevelDecls.mapNotNull { transform(it) },
-        )
+            imports = imports,
+            topLevelDecls = topLevelDecls,
+        ).copyFrom(file)
     }
 
     open fun transformNode(node: Node): Node {
@@ -33,11 +51,13 @@ open class NodeTransformer {
     }
 
     open fun <T : Node> transform(list: List<T>): List<T> {
+        var mod = false
         val nodes = list.map {
             val node = transformNode(it)
+            if (node !== it) mod = true
             node.also { if (node !== it) node.copyFrom(it) }
         }
-        return if (nodes == list) nodes as List<T> else list
+        return if (mod) nodes as List<T> else list
     }
 
     open fun transform(import: ImportNode): ImportNode {
@@ -78,8 +98,8 @@ open class NodeTransformer {
         return decl
     }
     open fun transform(decl: FunDecl): Decl {
-        transformNull(decl.body)
-        return decl
+        val body = transformNull(decl.body)
+        return if (body !== decl.body) decl else decl.copy(body = body).copyFrom(decl)
     }
     open fun transform(decl: InitDecl): Decl {
         return decl
@@ -88,14 +108,20 @@ open class NodeTransformer {
         return decl
     }
     open fun transform(decl: MultiVariableDecl): Decl {
+        var mod = false
+        val decls = decl.decls.map {
+            val node = transform(it)
+            if (node !== it) mod = true
+            node as VariableDecl
+        }
         for (decl in decl.decls) transform(decl)
-        return decl
+        return if (!mod) decl else decl.copy(decls = decls).copyFrom(decl)
     }
     open fun transform(decl: VariableDecl): Decl {
-        transformNull(decl.expr)
-        transformNull(decl.getter)
-        transformNull(decl.setter)
-        return decl
+        val cexpr = transformNull(decl.expr)
+        val getter = transformNull(decl.getter) as? FunDecl?
+        val setter = transformNull(decl.setter) as? FunDecl?
+        return if (cexpr === decl.expr && getter === decl.getter && setter === decl.setter) decl else decl.copy(expr = cexpr, getter = getter, setter = setter).copyFrom(decl)
     }
     open fun transformExprOrStm(exprOrStm: ExprOrStm?): ExprOrStm? {
         return when (exprOrStm) {
@@ -162,23 +188,28 @@ open class NodeTransformer {
         return if (cond === stm.cond && body === stm.body) stm else DoWhileLoopStm(body, cond!!, stm.modifiers).copyFrom(stm)
     }
     open fun transform(stm: ForLoopStm): Stm {
-        transformNull(stm.vardecl)
-        transform(stm.expr)
-        transformNull(stm.body)
-        return stm
+        val vardecl = transformNull(stm.vardecl) as? VariableDeclBase?
+        val cexpr = transform(stm.expr)
+        val body = transformNull(stm.body)
+        return if (vardecl === stm.vardecl && cexpr === stm.expr && body === stm.body) stm else ForLoopStm(cexpr, vardecl, body, stm.annotations, stm.modifiers).copyFrom(stm)
     }
     open fun transform(stm: WhileLoopStm): Stm {
-        transform(stm.cond)
-        transform(stm.body)
-        return stm
+        val cond = transform(stm.cond)
+        val body = transform(stm.body)
+        return if (cond === stm.cond && body === stm.body) stm else WhileLoopStm(cond, body, stm.modifiers).copyFrom(stm)
     }
     open fun transform(stm: ReturnStm): Stm {
-        transformNull(stm.expr)
-        return stm
+        val cexpr = transformNull(stm.expr)
+        return if (cexpr === stm.expr) stm else ReturnStm(cexpr).copyFrom(stm)
     }
     open fun transform(stm: Stms): Stm {
-        for (stm in stm.stms) transform(stm)
-        return stm
+        var mod = false
+        val stms = stm.stms.map {
+            val node = transform(it)
+            if (node !== it) mod = true
+            node
+        }
+        return if (!mod) stm else Stms(stms)
     }
     open fun transform(stm: TryCatchStm): Stm {
         transform(stm.body)
@@ -236,9 +267,9 @@ open class NodeTransformer {
     }
 
     open fun transform(expr: BinaryOpExpr): Expr {
-        transform(expr.left)
-        transform(expr.right)
-        return expr
+        val left = transform(expr.left)
+        val right = transform(expr.right)
+        return if (left === expr.left && right === expr.right) expr else BinaryOpExpr(left, expr.op, right).copyFrom(expr)
     }
     open fun transform(expr: BreakExpr): Expr {
         return expr
@@ -252,8 +283,10 @@ open class NodeTransformer {
         return expr
     }
     open fun transform(expr: CallExpr): Expr {
-        transform(expr.expr)
-        return expr
+        val cexpr = transform(expr.expr)
+        val params = transform(expr.params)
+        val lambdaArg = transformNull(expr.lambdaArg)
+        return if (cexpr === expr.expr && params === expr.params && lambdaArg === expr.lambdaArg) expr else CallExpr(cexpr, params, lambdaArg, expr.typeArgs)
     }
     //open fun transform(expr: CallIdExpr) {
     //}
@@ -261,12 +294,12 @@ open class NodeTransformer {
         return expr
     }
     open fun transform(expr: CastExpr): Expr {
-        transform(expr.expr)
-        return expr
+        val cexpr = transform(expr.expr)
+        return if (cexpr === expr.expr) expr else CastExpr(cexpr, expr.targetType, expr.safe).copyFrom(expr)
     }
     open fun transform(expr: CollectionLiteralExpr): Expr {
-        transform(expr.items)
-        return expr
+        val items = transform(expr.items)
+        return if (items === expr.items) expr else expr.copy(items).copyFrom(expr)
     }
     open fun transform(expr: ContinueExpr): Expr {
         return expr
@@ -278,29 +311,34 @@ open class NodeTransformer {
         return expr
     }
     open fun transform(expr: IfExpr): Expr {
-        transform(expr.cond)
-        transformExprOrStm(expr.trueBody)
-        transformExprOrStm(expr.falseBody)
-        return expr
+        val cond = transform(expr.cond)
+        val trueBody = transformExprOrStm(expr.trueBody)
+        val falseBody = transformExprOrStm(expr.falseBody)
+        return if (cond === expr.cond && trueBody === expr.trueBody && falseBody === expr.falseBody) expr else IfExpr(cond, trueBody!!, falseBody).copyFrom(expr)
     }
     open fun transform(expr: TernaryExpr): Expr {
-        transform(expr.cond)
-        transformExprOrStm(expr.trueExpr)
-        transformExprOrStm(expr.falseExpr)
-        return expr
+        val cond = transform(expr.cond)
+        val trueBody = transform(expr.trueExpr)
+        val falseBody = transform(expr.falseExpr)
+        return if (cond === expr.cond && trueBody === expr.trueExpr && falseBody === expr.falseExpr) expr else TernaryExpr(cond, trueBody, falseBody).copyFrom(expr)
     }
     open fun transform(expr: IncompleteExpr): Expr {
         return expr
     }
     open fun transform(expr: InterpolatedStringExpr): Expr {
-        for (chunk in expr.chunks) {
-            when (chunk) {
-                is InterpolatedStringExpr.ExpressionChunk -> transform(chunk.expr)
-                is InterpolatedStringExpr.StringChunk -> Unit
-            }
+        var mod = false
+        val chunks = expr.chunks.map {
+            val node = transform(it)
+            if (node !== it) mod = true
+            node
         }
-        return expr
+        return if (!mod) expr else InterpolatedStringExpr(chunks).copyFrom(expr)
     }
+
+    open fun transform(chunk: InterpolatedStringExpr.Chunk): InterpolatedStringExpr.Chunk {
+        return chunk
+    }
+
     open fun transform(expr: LambdaFunctionExpr): Expr {
         return expr
     }
@@ -311,49 +349,57 @@ open class NodeTransformer {
         return expr
     }
     open fun transform(expr: OpSeparatedBinaryExprs): Expr {
-        transform(expr.exprs)
-        return expr
+        val exprs = transform(expr.exprs)
+        return if (exprs === expr.exprs) expr else OpSeparatedBinaryExprs(expr.ops, exprs)
     }
     open fun transform(expr: RangeTestExpr): Expr {
-        transform(expr.base)
-        transform(expr.container)
-        return expr
+        val base = transform(expr.base)
+        val container = transform(expr.container)
+        return if (base === expr.base && container === expr.container) expr else RangeTestExpr(base, expr.kind, container).copyFrom(expr)
     }
     open fun transform(expr: ReturnExpr): Expr {
-        transformNull(expr.expr)
-        return expr
+        val cexpr = transformNull(expr.expr)
+        return if (cexpr === expr.expr) expr else ReturnExpr(cexpr).copyFrom(expr)
     }
     open fun transform(expr: Temp): Expr {
         return expr
     }
     open fun transform(expr: ThrowExpr): Expr {
-        transform(expr.expr)
-        return expr
+        val cexpr = transform(expr.expr)
+        return if (cexpr === expr.expr) expr else ThrowExpr(cexpr).copyFrom(expr)
     }
     open fun transform(expr: TryCatchExpr): Expr {
-        transformNode(expr.body)
-        for (catch in expr.catches) {
-            transform(catch.body)
-        }
-        transformNull(expr.finally)
-        return expr
+        val body = transformNode(expr.body)
+        val catches = expr.catches.map { transform(it) }
+        val finally = transformNull(expr.finally)
+        return if (body === expr.body && finally === expr.finally && catches == expr.catches) expr else TryCatchExpr(body, catches, finally).copyFrom(expr)
+    }
+    open fun transform(catch: TryCatchExpr.Catch): TryCatchExpr.Catch {
+        val body = transform(catch.body)
+        return if (body === catch.body) catch else TryCatchExpr.Catch(catch.local, catch.type, body).copyFrom(catch)
     }
     open fun transform(expr: TypeTestExpr): Expr {
-        transform(expr.base)
-        return expr
+        val base = transform(expr.base)
+        return if (base === expr.base) expr else TypeTestExpr(base, expr.kind, expr.type)
     }
     open fun transform(expr: UnaryPreOpExpr): Expr {
-        transform(expr.expr)
-        return expr
+        val cexpr = transform(expr.expr)
+        return if (cexpr === expr) expr else UnaryPreOpExpr(expr.op, cexpr).copyFrom(expr)
     }
     open fun transform(expr: WhenExpr): Expr {
-        transformNull(expr.subject?.decl)
-        transformNull(expr.subject?.expr)
-        for (entry in expr.entries) {
-            //transform(entry.conditions) // @TODO
-            transform(entry.body)
-        }
-        return expr
+        val subject = transformNull(expr.subject)
+        val entries = expr.entries.map { transform(it) }
+        return if (subject === expr.subject && entries == expr.entries) expr else WhenExpr(expr.subject)
+    }
+
+    open fun transformNull(entry: WhenExpr.Subject?): WhenExpr.Subject? {
+        println("TODO: NodeTransformer.WhenExpr.Subject")
+        return entry
+    }
+
+    open fun transform(entry: WhenExpr.Entry): WhenExpr.Entry {
+        println("TODO: NodeTransformer.WhenExpr.Entry")
+        return entry
     }
 
     //////////////

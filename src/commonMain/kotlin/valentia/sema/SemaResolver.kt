@@ -2,37 +2,33 @@ package valentia.sema
 
 import valentia.ast.*
 
-class SemaResolver : NodeVisitor() {
+class SemaResolver : NodeTransformer() {
     companion object {
         fun resolve(program: Program): Program {
-            SemaResolver().visit(program)
-            return program
+            return SemaResolver().transform(program)
         }
     }
 
-    override fun visit(program: Program) {
-        super.visit(program)
-        program.semaResolved = true
+    override fun transform(program: Program): Program {
+        return super.transform(program).also {
+            it.semaResolved = true
+        }
     }
 
+    // @TODO: Is this required?
     var currentClassDecl: ClassLikeDecl? = null
 
-    override fun visit(decl: ClassLikeDecl) {
+    override fun transform(decl: ClassLikeDecl): Decl {
         val old = currentClassDecl
         try {
             currentClassDecl = decl
-            super.visit(decl)
+            return super.transform(decl)
         } finally {
             currentClassDecl = old
         }
     }
 
-    override fun visit(decl: FunDecl) {
-        super.visit(decl)
-    }
-
-    override fun visit(expr: IdentifierExpr) {
-        super.visit(expr)
+    override fun transform(expr: IdentifierExpr): AssignableExpr {
         // Might be already resolved by the CallExpr
         if (expr.resolvedDecl == null) {
             //val resolved = currentResolutionContext.resolve(expr.id)
@@ -44,6 +40,7 @@ class SemaResolver : NodeVisitor() {
             }
         }
         //println("expr.addThis=${expr.addThis}, expr=$expr, firstDecl=$firstDecl, currentClassDecl=$currentClassDecl, firstDecl.parentNode=${firstDecl?.parentNode}")
+        return super.transform(expr)
     }
 
     //override fun visit(expr: BinaryOpExpr) {
@@ -55,10 +52,10 @@ class SemaResolver : NodeVisitor() {
     //    }
     //}
 
-    override fun visit(expr: CallExpr) {
+    override fun transform(expr: CallExpr): Expr {
         val cexpr = expr.expr
         val funcType = expr.getFuncType()
-        super.visit(expr)
+        val res = super.transform(expr)
         when (cexpr) {
             is IdentifierExpr -> {
                 val decls = expr.resolve(cexpr.id).distinct()
@@ -102,6 +99,7 @@ class SemaResolver : NodeVisitor() {
             expr.addThis = true
         }
          */
+        return res
     }
 
     //override fun visit(expr: CallIdExpr) {
@@ -115,12 +113,13 @@ class SemaResolver : NodeVisitor() {
     //    }
     //}
 
-    override fun visit(expr: CallableReferenceExt) {
-        super.visit(expr)
+    override fun transform(expr: CallableReferenceExt): Expr {
+        val res = super.transform(expr)
         if (expr.type is SimpleType) {
             // Check if not a type callable reference but an expression callable reference. We couldn't know while parsing.
             // @TODO: Transform into [NavigationExpr]
             expr._variableDecl = expr.resolve(expr.type.name).filterIsInstance<VariableDeclBase>().firstOrNull()
         }
+        return res
     }
 }

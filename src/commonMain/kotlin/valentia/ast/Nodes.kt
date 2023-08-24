@@ -51,6 +51,10 @@ class Program : Decl("\$program") {
     }
 
     override fun toString(): String = "Program($modulesById)"
+    fun addModules(modules: List<Module>): Program {
+        for (mod in modules) getModule(mod.id).copyModuleFrom(mod)
+        return this
+    }
 }
 
 class Module(val program: Program, val id: String? = null) : Decl("\$module\$$id") {
@@ -75,8 +79,19 @@ class Module(val program: Program, val id: String? = null) : Decl("\$module\$$id
     fun addFile(file: FileNode) {
         getPackage(file._package).addFile(file)
     }
+
+    fun addPackages(packages: List<Package>): Module {
+        for (pack in packages) {
+            getPackage(pack.identifier).copyFromPackage(pack)
+        }
+        return this
+    }
+
+    fun copyModuleFrom(mod: Module) {
+        for (pack in mod.packagesById.values) getPackage(pack.identifier).copyFromPackage(pack)
+    }
 }
-open class Package(val module: Module, val identifier: Identifier?) : Decl("$identifier") {
+data class Package(var module: Module, val identifier: Identifier?) : Decl("$identifier") {
     init {
         module.addNode(this)
     }
@@ -86,13 +101,22 @@ open class Package(val module: Module, val identifier: Identifier?) : Decl("$ide
 
     private fun getSymbolsByName(name: String): ArrayList<Decl> = symbols.getOrPut(name) { arrayListOf() }
 
-    fun addFile(file: FileNode) {
+    fun addFile(file: FileNode): Package {
         files += file
         file.parentNode = this
         file.pack = this
         file.symbolsByName.map { (name, decls) ->
             getSymbolsByName(name).addAll(decls)
         }
+        return this
+    }
+    fun addFiles(files: List<FileNode>): Package {
+        for (file in files) addFile(file)
+        return this
+    }
+
+    fun copyFromPackage(pack: Package) {
+        addFiles(pack.files)
     }
 }
 
@@ -560,7 +584,7 @@ data class WhenExpr(
 }
 data class CollectionLiteralExpr(val items: List<Expr>) : Expr()
 data class TryCatchExpr(val body: Node, val catches: List<Catch> = emptyList(), val finally: Stm? = null) : Expr() {
-    data class Catch(val local: String, val type: Type, val body: Stm)
+    data class Catch(val local: String, val type: Type, val body: Stm) : Node()
 }
 data class Temp(val type: Type, val id: Int) : Expr() {
     override fun toString(): String = "\$temp\$$id"

@@ -16,9 +16,11 @@ open class JSCodegen {
     }
 
     open fun generateProgram(program: Program) {
-        if (!program.semaResolved) {
+        val program = if (!program.semaResolved) {
             TODO("Not performed semantic analysis")
             SemaResolver.resolve(program)
+        } else {
+            program
         }
 
         indenter.line("#!/usr/bin/env -S deno run -A --unstable")

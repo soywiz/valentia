@@ -36,15 +36,16 @@ object ValentiaCompiler {
                 module.addFile(fileNode)
             }
         }
-        val semanticAnalysisTime = measureTime { SemaResolver.resolve(program) }
+        var resolvedProgram: Program = program
+        val semanticAnalysisTime = measureTime { resolvedProgram = SemaResolver.resolve(program) }
 
         val codegen = JSCodegen()
         val generateCodeTime = measureTime {
-            codegen.generateProgram(program)
+            codegen.generateProgram(resolvedProgram)
         }
 
         println("parsingTime=$parsingTime, semanticAnalysisTime=$semanticAnalysisTime, generateCodeTime=$generateCodeTime")
-        return CompileResult(codegen, program)
+        return CompileResult(codegen, resolvedProgram)
     }
 
     fun compileAndRun(files: List<String>) {
