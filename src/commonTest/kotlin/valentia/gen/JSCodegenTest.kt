@@ -253,6 +253,32 @@ class JSCodegenTest {
     }
 
     @Test
+    fun testIntArray() {
+        // @TODO: This doesn't parse
+        //assertEquals("0\n1\n2\n3", genAndRunJs("fun main() { level2@for (m in 0 .. 4) for (n in 0 .. m) { if (n == 3) break@level2; console.log(m, n) } }", printJs = true))
+        assertEquals("""
+            1
+            12
+            123
+        """.trimIndent(), genAndRunJs("""
+            @JsName("Int32Array")
+            @JsBody("Int32Array.prototype.hashCode = () => 0;")
+            external class IntArray {
+                constructor(size: Int)
+            }
+            fun main() {
+                val array = IntArray(10)
+                array[0] = 1
+                array[1] = 12
+                array[2] = 123
+                console.log(array[0])
+                console.log(array[1])
+                console.log(array[2])
+            }
+        """, printJs = true))
+    }
+
+    @Test
     fun testWhileLoop() {
         assertEquals("1\n2\n3\n4", genAndRunJs("fun main() { var n = 0; while (n++ < 4) console.log(n) }", printJs = true))
         assertEquals("1\n2\n3", genAndRunJs("fun main() { var n = 0; while (++n < 4) console.log(n) }", printJs = true))

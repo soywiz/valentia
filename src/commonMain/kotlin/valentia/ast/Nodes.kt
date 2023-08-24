@@ -281,8 +281,15 @@ abstract class BaseConstructorDecl() : CallableDecl("constructor") {
     open val constructorDelegationCall: ConstructorDelegationCall? = null
     open val body: Stm? = null
     val jsHash by lazy { params.map { it.type }.hashCode() and 0x7FFFFFFF }
-    override val jsName by lazy {
-        if (params.isEmpty()) "\$constructor" else "\$constructor\$${jsHash.toString(16)}"
+    val clazzDecl get() = parentDecl as ClassLikeDecl
+    val external get() = Modifier.EXTERNAL in modifiers || Modifier.EXTERNAL in clazzDecl
+    override val jsName: String by lazy {
+        if (external) {
+            println("externalJsNameAnnotation=${clazzDecl.externalJsName}")
+            clazzDecl.externalJsName ?: "\$external"
+        } else {
+            if (params.isEmpty()) "\$constructor" else "\$constructor\$${jsHash.toString(16)}"
+        }
     }
     override fun getTypeUncached(): Type {
         val retType = parent?.declName?.type ?: UnknownType
@@ -342,6 +349,14 @@ abstract class ClassLikeDecl(open val name: String, open val kind: ClassKind) : 
     override abstract val modifiers: Modifiers
     var fqname: String? = null
 
+    val externalJsName: String? by lazy {
+        (modifiers.getFirstAnnotationByType(JsNameAnnotationType)?.args?.first() as? StringLiteralExpr?)?.value
+    }
+
+    val externalJsBody: String? by lazy {
+        (modifiers.getFirstAnnotationByType(JsBodyAnnotationType)?.args?.first() as? StringLiteralExpr?)?.value
+    }
+
     override val jsName: String get() = (fqname ?: name).replace('.', '$')
 
     // @TODO: Extract primary constructor val/var to Variable declarations
@@ -378,7 +393,7 @@ abstract class ClassLikeDecl(open val name: String, open val kind: ClassKind) : 
     }
 }
 
-data class ClassDecl(
+data class ClassDecl constructor(
     override val kind: ClassKind,
     override val name: String,
     override val subTypes: List<SubTypeInfo>? = null,
@@ -736,6 +751,15 @@ data class NavigationExpr(val op: String, val expr: Expr, val key: Any) : Assign
 data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : AssignableExpr() {
     init {
         addNode(expr)
+    }
+
+    override fun getTypeUncached(): Type {
+        val arrayType = expr.getNodeType()
+        return when (arrayType) {
+            is GenericType -> arrayType.generics.first()
+            UnknownType -> UnknownType
+            else -> TODO("arrayType=$arrayType")
+        }
     }
 }
 data class UnaryPostOpExpr(val expr: Expr, val op: UnaryPostOp) : AssignableExpr() {

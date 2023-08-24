@@ -151,6 +151,8 @@ open class JSCodegen {
     }
 
     open fun generateClass(clazz: ClassLikeDecl) {
+        clazz.externalJsBody?.let { indenter.line(it) }
+
         // Do not output external declarations
         if (Modifier.EXTERNAL in clazz) return
 
@@ -254,7 +256,15 @@ open class JSCodegen {
                 val resolved = expr.resolvedDecl
                 val name = resolved?.jsName ?: expr.id
                 when (resolved) {
-                    is BaseConstructorDecl -> "(new ${resolved.parent?.jsName}).$name"
+                    is BaseConstructorDecl -> {
+                        val clazzParent = resolved.parent
+                        val externalJsName = clazzParent?.externalJsName
+                        if (externalJsName != null) {
+                            "new $externalJsName"
+                        } else {
+                            "(new ${clazzParent?.jsName}).$name"
+                        }
+                    }
                     is ClassDecl -> "new ${resolved.jsName}"
                     else -> "$thisStr$name"
                 }
@@ -419,6 +429,9 @@ open class JSCodegen {
                 } else {
                     "${expr.resolveType(expr.type ?: UnknownType)?.jsName}"
                 }
+            }
+            is IndexedExpr -> {
+                "${generateExpr(expr.expr)}[${expr.indices.joinToString(", ") { generateExpr(it).toString() }}]"
             }
             else -> TODO("generateExpr: $expr")
         }

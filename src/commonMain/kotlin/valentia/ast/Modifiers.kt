@@ -176,6 +176,9 @@ data class Modifiers(val items: List<ModifierLike> = emptyList()) {
     fun isEmpty(): Boolean = items.isEmpty()
     //operator fun contains(item: Modifier): Boolean = item in modifiers
     operator fun contains(item: Modifier): Boolean = item in modifiersSet
+    val annotationsByType: Map<Type, List<AnnotationNode>> by lazy { annotations.items.flatMap { it.annotations }.groupBy { it.type } }
+    fun getAnnotationsByType(type: SimpleType): List<AnnotationNode> = annotationsByType[type] ?: emptyList()
+    fun getFirstAnnotationByType(type: SimpleType): AnnotationNode? = getAnnotationsByType(type).firstOrNull()
     val isEnum: Boolean get() = ClassModifier.ENUM in this
 }
 

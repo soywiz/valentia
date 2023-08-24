@@ -73,6 +73,8 @@ data class UnificationExprType(val exprs: List<ExprOrStm>) : Type() {
 val DynamicType = SimpleType("dynamic")
 val NothingType = SimpleType("Nothing")
 val UnknownType = SimpleType("Unknown")
+val JsNameAnnotationType = SimpleType("JsName") // Annotation
+val JsBodyAnnotationType = SimpleType("JsBody") // Annotation for polyfills and custom implementations
 val UnitType = SimpleType("Unit")
 val CoroutineContextType = SimpleType("CoroutineContext")
 val BoolType = SimpleType("Boolean")

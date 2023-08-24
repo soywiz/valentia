@@ -115,7 +115,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : (AT_NO_WS | AT_PRE_WS) FILE NL* COLON NL* (LSQUARE unescapedAnnotation+ RSQUARE | unescapedAnnotation) NL*
     //    ;
     fun fileAnnotation(): AnnotationNodes? {
-        return annotation()
+        return opt {
+            val annotation = annotation() ?: return@opt null
+            annotation.takeIf { annotation.annotations.all { it.useSite == AnnotationUseSite.FILE } }
+        }
     }
 
     // packageHeader
