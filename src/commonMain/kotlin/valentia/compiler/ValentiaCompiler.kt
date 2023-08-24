@@ -44,7 +44,7 @@ object ValentiaCompiler {
             codegen.generateProgram(resolvedProgram)
         }
 
-        println("parsingTime=$parsingTime, semanticAnalysisTime=$semanticAnalysisTime, generateCodeTime=$generateCodeTime")
+        //println("parsingTime=$parsingTime, semanticAnalysisTime=$semanticAnalysisTime, generateCodeTime=$generateCodeTime")
         return CompileResult(codegen, resolvedProgram)
     }
 

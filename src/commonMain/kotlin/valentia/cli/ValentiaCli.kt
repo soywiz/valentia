@@ -1,5 +1,6 @@
 package valentia.cli
 
+import valentia.ExternalInterface
 import valentia.Valentia
 import valentia.compiler.ValentiaCompiler
 import valentia.util.LocalFile
@@ -40,10 +41,20 @@ object ValentiaCli {
                     return
                 }
                 "run", "-r", "-run", "--run" -> {
-                    val files = items.toList()
+                    // valentia.toml
+                    // .kt files
+                    // .vlm VaLentia Module
+                    val files = items.toList().takeIf { it.isNotEmpty() } ?: listOf(".")
                     items.clear()
-                    if (files.isEmpty()) error("Missing file/s to execute")
-                    ValentiaCompiler.compileAndRun(files)
+                    val finalFiles = files.flatMap {
+                        val file = LocalFile(it)
+                        if (file.isDirectory) {
+                            file.listRecursively().filter { it.baseName.endsWith(".kt") }.toList()
+                        } else {
+                            listOf(file)
+                        }
+                    }
+                    ValentiaCompiler.compileAndRun(finalFiles.map { it.fullPath })
                 }
                 "compile", "-c", "-compile", "--compile" -> {
                     val files = items.toList()
@@ -51,17 +62,20 @@ object ValentiaCli {
                     if (files.isEmpty()) error("Missing file/s to compile")
                     println(ValentiaCompiler.compile(files))
                 }
-                "edit", "-e", "-edit", "--edit" -> {
-                    val files = items.toList()
-                    items.clear()
-                    println("TODO")
-                }
                 "new" -> {
                     val folder = LocalFile(items.removeFirstOrNull() ?: error("Folder not specified"))
                     val stat = folder.statOpt()
                     if (stat != null && !stat.isDir) error("Exists and not a directory '$folder'")
                     if (stat != null && folder.list().isNotEmpty()) error("Folder is not empty '$folder'")
                     folder.mkdirs()
+                    folder[".gitignore"].writeString("""
+                        .idea/
+                        build/
+                        .gradle/
+                        gradle/
+                        build.gradle.kts
+                        settings.gradle.kts
+                    """.trimIndent())
                     folder["valentia.toml"].writeString("""
                         name = ${folder.baseName}
                         authors = ["dummy"]
@@ -75,10 +89,85 @@ object ValentiaCli {
                         }
                     """.trimIndent())
                 }
+                "gradle" -> {
+                    val folder = LocalFile(items.removeFirstOrNull() ?: ".")
+                    createGradleProject(folder)
+
+                }
+                "edit", "-e", "-edit", "--edit" -> {
+                    val folder = LocalFile(items.removeFirstOrNull() ?: ".")
+                    createGradleProject(folder)
+                    ExternalInterface.exec("idea", folder.fullPath)
+                }
                 else -> {
                     error("Unknown command $item")
                 }
             }
         }
+    }
+
+    private fun createGradleProject(folder: LocalFile) {
+        folder["settings.gradle.kts"].writeString("""
+            //rootProject.name = "${folder.baseName}"
+        """.trimIndent())
+        folder["build.gradle.kts"].writeString("""
+            plugins {
+                kotlin("multiplatform") version "1.9.10"
+                application
+            }
+                                    
+            repositories {
+                mavenCentral()
+            }
+            
+            java {
+                targetCompatibility = JavaVersion.VERSION_1_8
+                sourceCompatibility = JavaVersion.VERSION_1_8
+            }
+            
+            kotlin {
+                jvm {
+                    compilations.all {
+                        kotlinOptions.jvmTarget = "1.8"
+                    }
+                    withJava()
+                    testRuns["test"].executionTask.configure {
+                        useJUnitPlatform()
+                    }
+                }
+                js(IR) {
+                    binaries.executable()
+                    browser { }
+                }
+                sourceSets {
+                    val commonMain by getting
+                    val commonTest by getting {
+                        dependencies {
+                            implementation(kotlin("test"))
+                        }
+                    }
+                    val jvmMain by getting {
+                        dependencies {
+                        }
+                    }
+                    val jvmTest by getting {
+                        dependencies {
+                        }
+                    }
+                    val jsMain by getting {
+                        dependencies {
+                        }
+                    }
+                    val jsTest by getting
+                    
+                    sourceSets {
+                        this.maybeCreate("commonMain").kotlin.setSrcDirs(listOf("src"))
+                        this.maybeCreate("commonMain").resources.setSrcDirs(listOf("resources"))
+                        this.maybeCreate("commonTest").kotlin.setSrcDirs(listOf("test"))
+                        this.maybeCreate("commonTest").resources.setSrcDirs(listOf("testresources"))
+                    }
+                }
+            }
+        """.trimIndent())
     }
 }
