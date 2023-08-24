@@ -361,6 +361,15 @@ open class JSCodegen {
                 val falseStr = generateExpr(expr.falseExpr).toString()
                 "(($cond) ? ($trueStr) : ($falseStr))"
             }
+            is CallableReferenceExt -> {
+                check(expr.kind == "class") { "Other callable is unsupported" }
+                if (expr._variableDecl != null) {
+                    //"Object.getPrototypeOf(${expr.type})"
+                    "${expr.type}.constructor"
+                } else {
+                    "${expr.type}"
+                }
+            }
             else -> TODO("generateExpr: $expr")
         }
     }

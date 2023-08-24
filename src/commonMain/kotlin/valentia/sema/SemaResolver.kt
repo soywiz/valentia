@@ -109,4 +109,13 @@ class SemaResolver : NodeVisitor() {
     //        expr.addThis = true
     //    }
     //}
+
+    override fun visit(expr: CallableReferenceExt) {
+        super.visit(expr)
+        if (expr.type is SimpleType) {
+            // Check if not a type callable reference but an expression callable reference. We couldn't know while parsing.
+            // @TODO: Transform into [NavigationExpr]
+            expr._variableDecl = expr.resolve(expr.type.name).filterIsInstance<VariableDeclBase>().firstOrNull()
+        }
+    }
 }

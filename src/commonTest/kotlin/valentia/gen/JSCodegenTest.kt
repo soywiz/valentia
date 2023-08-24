@@ -42,6 +42,33 @@ class JSCodegenTest {
     }
 
     @Test
+    fun testGetClassInstanceFromType() {
+        assertEquals(
+            "[class Demo]",
+            genAndRunJs("""
+                class Demo
+                fun main() {
+                    console.log(Demo::class)
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
+    fun testGetClassInstanceFromExpression() {
+        assertEquals(
+            "true",
+            genAndRunJs("""
+                class Demo
+                val demo = Demo()
+                fun main() {
+                    console.log(demo::class == Demo::class)
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
     fun testIterator() {
         assertEquals(
             "0\n2\n4\n6\n8\n10",

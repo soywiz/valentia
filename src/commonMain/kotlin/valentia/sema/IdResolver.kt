@@ -4,10 +4,22 @@ import valentia.ast.*
 
 fun Node.resolve(id: String): Sequence<Decl> = currentDecl?.resolve(id) ?: emptySequence()
 
+fun Stm.getDecls(): List<Decl> {
+    return when (this) {
+        is Stms -> this.stms.flatMap { it.getDecls() }
+        is DeclStm -> listOf(this.decl)
+        else -> emptyList()
+    }
+}
+
 fun Decl.resolve(id: String): Sequence<Decl> = sequence<Decl> {
     val decl = this@resolve
     //println("type=$type -> decl=$decl")
     when (decl) {
+        //is FunDecl -> {
+        //    decl.body?.getDecls()?.let { yieldAll(it) }
+        //    parentDecl?.resolve(id)?.let { yieldAll(it) }
+        //}
         is ClassDecl -> {
             // Check subtypes
             val potential = decl.bodyAllByName[id]

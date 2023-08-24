@@ -532,7 +532,17 @@ sealed class AssignableExpr : Expr()
 
 data class TypeArgumentsAssignableSuffixExpr(val expr: Expr, val types: List<Type>) : AssignableExpr()
 
-data class CallableReferenceExt(val type: Type?, val kind: String) : Expr()
+data class CallableReferenceExt(val type: Type?, val kind: String) : Expr() {
+    var _variableDecl: VariableDeclBase? = null
+
+    override fun getTypeUncached(): Type {
+        return when (kind) {
+            "class" -> GenericType(ClassType, type ?: UnknownType)
+            else -> TODO()
+        }
+    }
+}
+
 data class ObjectLiteralExpr(
     val delegationSpecifiers: List<SubTypeInfo>? = null,
     val body: List<Decl>? = null,

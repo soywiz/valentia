@@ -2704,7 +2704,6 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
                 if (!expectOpt(".")) return null.also { pos = spos }
                 "?."
             }
-
             else -> null.also { pos = spos }
         }
     }

@@ -77,6 +77,7 @@ val CharType = SimpleType("Char")
 val StringType = SimpleType("String")
 val IntType = SimpleType("Int")
 val FloatType = SimpleType("Float")
+val ClassType = SimpleType("KClass")
 
 fun FuncType.suspendable(): FuncType = this.copy(suspendable = true)
 
