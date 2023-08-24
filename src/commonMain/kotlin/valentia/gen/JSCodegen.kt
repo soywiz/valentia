@@ -7,7 +7,7 @@ import valentia.util.Indenter
 import valentia.util.indent
 
 open class JSCodegen {
-    var hasMainFunction = false
+    var mainFunction: FunDecl? = null
 
     var indenter = Indenter()
 
@@ -27,8 +27,8 @@ open class JSCodegen {
         for (module in program.modulesById.values) {
             generateModule(module)
         }
-        if (hasMainFunction) {
-            indenter.line("main\$1([])")
+        if (mainFunction != null) {
+            indenter.line("${mainFunction!!.jsName}([])")
         }
     }
     open fun generateModule(module: Module) {
@@ -162,10 +162,11 @@ open class JSCodegen {
         }
         val extendsStr = if (extends != null) " extends ${extends.jsName}" else ""
         //println("EXTENDS: ${extends}")
-        indenter.line("class ${clazz.name}$extendsStr") {
+        indenter.line("class ${clazz.jsName}$extendsStr") {
             if (clazz is ObjectDecl) {
                 indenter.line("static #\$_singleton = null; static get #\$singleton() { if (!this.#\$_singleton) this.#\$_singleton = new ${clazz.name}(); return this.#\$_singleton;  }")
             }
+
             if (clazz.primaryConstructor != null) {
                 for (decl in clazz.bodyAll.filterIsInstance<VariableDecl>().filter { !it.delegation }) {
                     val type = decl.getNodeType()
@@ -188,6 +189,8 @@ open class JSCodegen {
 
     open fun generateFunction(func: FunDecl, parent: Decl?) {
         if (Modifier.EXTERNAL in func) return
+
+        val isTopLevel = parent is FileNode
 
         val params = func.params.toJsString()
 
@@ -226,8 +229,8 @@ open class JSCodegen {
                 }
             }
         }
-        if (func.name == "main") {
-            hasMainFunction = true
+        if (func.isTopLevel && func.name == "main") {
+            mainFunction = func
         }
     }
 
@@ -373,7 +376,7 @@ open class JSCodegen {
                     //"Object.getPrototypeOf(${expr.type})"
                     "${expr.type}.constructor"
                 } else {
-                    "${expr.type}"
+                    "${expr.resolveType(expr.type ?: UnknownType)?.jsName}"
                 }
             }
             else -> TODO("generateExpr: $expr")

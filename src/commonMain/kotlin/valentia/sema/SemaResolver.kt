@@ -21,6 +21,7 @@ class SemaResolver : NodeTransformer() {
     override fun transform(decl: ClassLikeDecl): Decl {
         val old = currentClassDecl
         try {
+            decl.fqname = Identifier(((decl.parentDecl as? FileNode?)?._package?.parts ?: emptyList()) + decl.name).fqname
             currentClassDecl = decl
             return super.transform(decl)
         } finally {

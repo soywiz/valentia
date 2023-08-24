@@ -354,6 +354,8 @@ data class UnknownTypeDecl(val name: String) : TypeDecl(name)
 abstract class ClassLikeDecl(open val name: String, open val kind: ClassKind) : TypeDecl(name) {
     var fqname: String? = null
 
+    override val jsName: String get() = (fqname ?: name).replace('.', '$')
+
     // @TODO: Extract primary constructor val/var to Variable declarations
     open val primaryConstructor: PrimaryConstructorDecl? = null
     open val body: List<Decl>? = null
@@ -429,10 +431,17 @@ data class FunDecl constructor(
         addNode(body)
     }
 
+    val isTopLevel get() = parentDecl is FileNode
     val jsHash by lazy { params.map { it.type }.hashCode() and 0x7FFFFFFF }
     override val jsName by lazy {
+        val parentDecl = parentDecl
+        val fqname = if (parentDecl is FileNode) {
+            ((parentDecl._package ?: Identifier(listOf())) + Identifier(name)).fqname.replace('.', '\$')
+        } else {
+            name
+        }
         //if (params.isEmpty()) name else "$name\$${jsHash.toString(16)}"
-        "$name\$${jsHash.toString(16)}"
+        "$fqname\$${jsHash.toString(16)}"
     }
 
     val isSuspend: Boolean get() = FunctionModifier.SUSPEND in modifiers
@@ -533,6 +542,8 @@ data class Identifier(val parts: List<String>) : Expr() {
     val fqname: String = parts.joinToString(".")
     val lastPart: String get() = parts.lastOrNull() ?: ""
     val partsButLast: List<String> get() = parts.dropLast(1)
+    operator fun plus(other: String): Identifier = Identifier(parts + other)
+    operator fun plus(other: Identifier): Identifier = Identifier(parts + other.parts)
     override fun toString(): String = "Identifier($fqname)"
 }
 

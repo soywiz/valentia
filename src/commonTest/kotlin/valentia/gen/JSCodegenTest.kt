@@ -44,8 +44,9 @@ class JSCodegenTest {
     @Test
     fun testGetClassInstanceFromType() {
         assertEquals(
-            "[class Demo]",
+            "[class mypackage\$Demo]",
             genAndRunJs("""
+                package mypackage
                 class Demo
                 fun main() {
                     console.log(Demo::class)
