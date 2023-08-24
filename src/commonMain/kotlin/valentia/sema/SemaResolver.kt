@@ -10,36 +10,20 @@ class SemaResolver : NodeVisitor() {
         }
     }
 
-    override fun visit(pack: Package) {
-        pushResolutionContext(PackageResolutionContext(pack)) {
-            super.visit(pack)
-        }
-    }
-
-    override fun visit(file: FileNode) {
-        pushResolutionContext(FileResolutionContext(file)) {
-            super.visit(file)
-        }
-    }
-
     var currentClassDecl: ClassLikeDecl? = null
 
     override fun visit(decl: ClassLikeDecl) {
         val old = currentClassDecl
         try {
             currentClassDecl = decl
-            pushResolutionContext(ClassResolutionContext(decl)) {
-                super.visit(decl)
-            }
+            super.visit(decl)
         } finally {
             currentClassDecl = old
         }
     }
 
     override fun visit(decl: FunDecl) {
-        pushResolutionContext(FunResolutionContext(decl)) {
-            super.visit(decl)
-        }
+        super.visit(decl)
     }
 
     override fun visit(expr: IdentifierExpr) {
@@ -47,9 +31,8 @@ class SemaResolver : NodeVisitor() {
         // Might be already resolved by the CallExpr
         if (expr.resolvedDecl == null) {
             //val resolved = currentResolutionContext.resolve(expr.id)
-            expr.resolutionContext = currentResolutionContext
-            val decls = currentResolutionContext.resolve(expr.id)
-            val firstDecl = decls.decls.firstOrNull()
+            val decls = expr.resolve(expr.id)
+            val firstDecl = decls.firstOrNull()
             expr.resolvedDecl = firstDecl
             if (firstDecl?.parentNode == currentClassDecl && currentClassDecl != null) {
                 expr.addThis = true
@@ -60,15 +43,15 @@ class SemaResolver : NodeVisitor() {
 
     override fun visit(expr: CallExpr) {
         val cexpr = expr.expr
-        val funcType = expr.getFuncType(currentResolutionContext)
+        val funcType = expr.getFuncType()
         super.visit(expr)
         when (cexpr) {
             is IdentifierExpr -> {
-                val decls = expr.resolve(cexpr.id).toList().distinct()
-                val realDecls: List<CallableDecl> = decls
+                val decls = expr.resolve(cexpr.id).distinct()
+                val realDecls = decls
                     .flatMap { if (it is ClassLikeDecl) it.constructors else listOf(it) }
                     .filterIsInstance<CallableDecl>()
-                val decls2 = DeclCollection(realDecls)
+                val decls2 = DeclCollection(realDecls.toList())
                 val resolved = decls2.findMatch(funcType)
                 cexpr.resolvedDecl = resolved ?: decls.filterIsInstance<ClassLikeDecl>().firstOrNull()
                 if (resolved?.parentNode == currentClassDecl && currentClassDecl != null) {
@@ -78,7 +61,7 @@ class SemaResolver : NodeVisitor() {
             is NavigationExpr -> {
                 val key = cexpr.key
                 if (key is String) {
-                    val exprType = cexpr.expr.getType(currentResolutionContext)
+                    val exprType = cexpr.expr.getNodeType()
                     val exprResolvedDecl = cexpr.resolve(exprType.toString()).firstOrNull()
                     val decls = DeclCollection(exprResolvedDecl?.resolve(key)?.toList())
                     //val decls = currentResolutionContext.resolve(cexpr.key.toString())
@@ -117,16 +100,4 @@ class SemaResolver : NodeVisitor() {
     //        expr.addThis = true
     //    }
     //}
-
-    var currentResolutionContext: ResolutionContext = DummyResolutionContext
-
-    fun <T> pushResolutionContext(resolutionContext: ResolutionContext, block: () -> T): T {
-        val oldResolutionContext = currentResolutionContext
-        try {
-            currentResolutionContext = resolutionContext + currentResolutionContext
-            return block()
-        } finally {
-            currentResolutionContext = oldResolutionContext
-        }
-    }
 }

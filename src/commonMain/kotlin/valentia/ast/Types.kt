@@ -2,7 +2,7 @@ package valentia.ast
 
 // Type
 
-abstract class Type : Node()
+sealed class Type : Node()
 
 //data class PackageName(val parts: List<String>)
 //data class FqName(val parts: List<String>)

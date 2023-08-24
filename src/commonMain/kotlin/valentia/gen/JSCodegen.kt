@@ -37,18 +37,14 @@ open class JSCodegen {
 
     open fun generatePackage(pack: Package) {
         indenter.line("// package: ${pack.identifier}")
-        pushResolutionContext(PackageResolutionContext(pack)) {
-            for (file in pack.files) {
-                generateFile(file)
-            }
+        for (file in pack.files) {
+            generateFile(file)
         }
     }
 
     open fun generateFile(file: FileNode) {
         indenter.line("// topLevelDecls: ${file.topLevelDecls.size}")
-        pushResolutionContext(FileResolutionContext(file)) {
-            generateDecls(file.topLevelDecls, null)
-        }
+        generateDecls(file.topLevelDecls, null)
     }
 
     open fun generateDecls(decls: List<Decl?>?, parent: Decl?, ctx: GenerateContext? = null) {
@@ -120,10 +116,10 @@ open class JSCodegen {
                     if (delegatedCall != null) {
                         when (delegatedCall.kind) {
                             DelegationCallKind.THIS -> {
-                                val callType = delegatedCall.getType(DummyResolutionContext)
+                                val callType = delegatedCall.getNodeType()
                                 val clazz = parent as ClassLikeDecl
                                 val parentConstructor = clazz?.constructors?.firstOrNull {
-                                    val constructorType = it.getTypeSafe()
+                                    val constructorType = it.getNodeType()
                                     TypeMatching.canAssignTo(
                                         callType,
                                         constructorType,
@@ -145,39 +141,38 @@ open class JSCodegen {
     }
 
     open fun generateClass(clazz: ClassLikeDecl) {
-        pushResolutionContext(ClassResolutionContext(clazz)) {
-            val subTypes = clazz.subTypes ?: emptyList()
-            var extends: ClassLikeDecl? = null
-            for (subType in subTypes) {
-                val decl = currentResolutionContext[subType.type]?.decls?.firstOrNull() as? ClassLikeDecl ?: continue
-                if (!decl.kind.isInterface) {
-                    extends = decl
+        val subTypes = clazz.subTypes ?: emptyList()
+        var extends: ClassLikeDecl? = null
+        for (subType in subTypes) {
+            val decl = subType.type.resolveType(subType.type) as? ClassLikeDecl ?: continue
+            //val decl = currentResolutionContext[subType.type]?.decls?.firstOrNull() as? ClassLikeDecl ?: continue
+            if (!decl.kind.isInterface) {
+                extends = decl
+            }
+        }
+        val extendsStr = if (extends != null) " extends ${extends.jsName}" else ""
+        //println("EXTENDS: ${extends}")
+        indenter.line("class ${clazz.name}$extendsStr") {
+            if (clazz is ObjectDecl) {
+                indenter.line("static #\$_singleton = null; static get #\$singleton() { if (!this.#\$_singleton) this.#\$_singleton = new ${clazz.name}(); return this.#\$_singleton;  }")
+            }
+            if (clazz.primaryConstructor != null) {
+                for (decl in clazz.bodyAll.filterIsInstance<VariableDecl>().filter { !it.delegation }) {
+                    val type = decl.getNodeType()
+                    val nullValue = when (type) {
+                        IntType, CharType -> "0"
+                        BoolType -> "false"
+                        else -> "null"
+                    }
+                    indenter.line("${decl.jsName} = $nullValue;")
+                    //generateDecl(decl, clazz)
                 }
             }
-            val extendsStr = if (extends != null) " extends ${extends.jsName}" else ""
-            //println("EXTENDS: ${extends}")
-            indenter.line("class ${clazz.name}$extendsStr") {
-                if (clazz is ObjectDecl) {
-                    indenter.line("static #\$_singleton = null; static get #\$singleton() { if (!this.#\$_singleton) this.#\$_singleton = new ${clazz.name}(); return this.#\$_singleton;  }")
-                }
-                if (clazz.primaryConstructor != null) {
-                    for (decl in clazz.bodyAll.filterIsInstance<VariableDecl>().filter { !it.delegation }) {
-                        val type = decl.getTypeSafe()
-                        val nullValue = when (type) {
-                            IntType, CharType -> "0"
-                            BoolType -> "false"
-                            else -> "null"
-                        }
-                        indenter.line("${decl.jsName} = $nullValue;")
-                        //generateDecl(decl, clazz)
-                    }
-                }
 
-                //generateDecls(clazz.bodyAll, clazz)
-                for (decl in clazz.bodyAll) {
-                    if (clazz.primaryConstructor != null && (decl is VariableDecl && decl.isField)) continue
-                    generateDecl(decl, clazz, null)
-                }
+            //generateDecls(clazz.bodyAll, clazz)
+            for (decl in clazz.bodyAll) {
+                if (clazz.primaryConstructor != null && (decl is VariableDecl && decl.isField)) continue
+                generateDecl(decl, clazz, null)
             }
         }
     }
@@ -226,42 +221,6 @@ open class JSCodegen {
         if (func.name == "main") {
             hasMainFunction = true
         }
-    }
-
-    var currentResolutionContext: ResolutionContext = DummyResolutionContext
-
-    fun <T> pushResolutionContext(resolutionContext: ResolutionContext, block: () -> T): T {
-        val oldResolutionContext = currentResolutionContext
-        try {
-            currentResolutionContext = resolutionContext + currentResolutionContext
-            return block()
-        } finally {
-            currentResolutionContext = oldResolutionContext
-        }
-    }
-
-    fun Node.getTypeSafe(): Type {
-        // @TODO: Get from this context
-        return getTypeSafe(currentResolutionContext)
-    }
-
-    fun Node.getTypeSafe(resolutionContext: ResolutionContext): Type {
-        return try {
-            getType(resolutionContext)
-        } catch (e: Throwable) {
-            println("ERROR[UnknownType]: ${e.message}")
-            //e.printStackTrace()
-            UnknownType
-        }
-    }
-
-    fun IdWithContext.resolveSafe(funcType: Type): Decl? {
-        //try {
-            return resolve(funcType)
-        //} catch (e: Throwable) {
-        //    println("ERROR.resolveSafe[id=$id]: ${e.message} :: [context=$context]")
-        //    return null
-        //}
     }
 
     open fun generateExpr(expr: Expr?): Any {
@@ -330,8 +289,8 @@ open class JSCodegen {
             //    }
             //}
             is BinaryOpExpr -> {
-                val leftType = expr.left.getTypeSafe()
-                val rightType = expr.right.getTypeSafe()
+                val leftType = expr.left.getNodeType()
+                val rightType = expr.right.getNodeType()
                 val leftStr = generateExpr(expr.left)
                 val rightStr = generateExpr(expr.right)
                 val op = when (expr.op) {
@@ -460,7 +419,7 @@ open class JSCodegen {
                         val (pre, expr) = transformer.ensure(stm.expr, transformContext)
                         pre?.let { generateStm(pre, parent) }
                         if (expr != null) {
-                            if (expr is BinaryOpExpr && expr.left.getTypeSafe() == IntType && expr.right.getTypeSafe() == IntType && (expr.op == ".." || expr.op == "..<" || expr.op == "until" || expr.op == "downTo")) {
+                            if (expr is BinaryOpExpr && expr.left.getNodeType() == IntType && expr.right.getNodeType() == IntType && (expr.op == ".." || expr.op == "..<" || expr.op == "until" || expr.op == "downTo")) {
                                 val varg = generateVarDecl(stm.vardecl)
                                 //println("expr=$expr")
                                 val comparisonOp = when (expr.op) {

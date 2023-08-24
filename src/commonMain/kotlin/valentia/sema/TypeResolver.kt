@@ -1,12 +1,31 @@
 package valentia.sema
 
 import valentia.ast.*
+import valentia.util.Extra
 
 
 val Node.program: Program? get() = if (this is Program) this else parentDecl?.program
 
 fun SimpleType.resolveSimpleType(): TypeDecl = resolvedDecl ?: this.resolveSimpleType(this).also {
     this.resolvedDecl = it
+}
+
+fun Type.getSimpleType(): SimpleType {
+    return when (this) {
+        //is DefinitelyNonNullableType -> this.type1.getSimpleType()
+        is DefinitelyNonNullableType -> TODO()
+        //is FuncType -> SimpleType("Function1")
+        is FuncType -> TODO()
+        is GenericType -> this.base.getSimpleType()
+        is MultiType -> this.types.first().getSimpleType()
+        is NullableType -> this.type.getSimpleType()
+        is SimpleType -> this
+        is UnificationExprType -> TODO()
+    }
+}
+
+fun Node.resolveType(type: Type): TypeDecl {
+    return resolveSimpleType(type.getSimpleType())
 }
 
 fun Node.resolveSimpleType(type: SimpleType): TypeDecl = currentDecl!!.resolveSimpleType(type)
@@ -60,4 +79,11 @@ fun Decl.resolveSimpleType(type: SimpleType): TypeDecl {
             else -> parentDecl?.resolveSimpleType(type)
         } ?: UnknownTypeDecl("${type.name}\$Unresolved")
     }
+}
+
+val ClassLikeDecl.directResolvedSubTypes: List<Decl> by Extra.PropertyThis {
+    val subtypes = (this.subTypes ?: emptyList()).map { it.type }
+    println(subtypes)
+    val decls: List<Decl> = subtypes.mapNotNull { resolve(it.toString()).firstOrNull() }
+    decls.distinct()
 }
