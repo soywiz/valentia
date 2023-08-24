@@ -439,7 +439,8 @@ open class JSCodegen {
                         val (pre, expr) = transformer.ensure(stm.expr, transformContext)
                         pre?.let { generateStm(pre, parent) }
                         if (expr != null) {
-                            if (expr is BinaryOpExpr && expr.left.getNodeType() == IntType && expr.right.getNodeType() == IntType && (expr.op == ".." || expr.op == "..<" || expr.op == "until" || expr.op == "downTo")) {
+                            //if (expr is BinaryOpExpr && expr.left.getNodeType() == IntType && expr.right.getNodeType() == IntType && (expr.op == ".." || expr.op == "..<" || expr.op == "until" || expr.op == "downTo")) {
+                            if (expr is BinaryOpExpr && (expr.op == ".." || expr.op == "..<" || expr.op == "until" || expr.op == "downTo")) {
                                 val varg = generateVarDecl(stm.vardecl)
                                 //println("expr=$expr")
                                 val comparisonOp = when (expr.op) {

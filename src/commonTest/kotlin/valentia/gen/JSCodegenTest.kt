@@ -191,6 +191,28 @@ class JSCodegenTest {
     }
 
     @Test
+    fun testLabelledBreak() {
+        // @TODO: This doesn't parse
+        //assertEquals("0\n1\n2\n3", genAndRunJs("fun main() { level2@for (m in 0 .. 4) for (n in 0 .. m) { if (n == 3) break@level2; console.log(m, n) } }", printJs = true))
+        assertEquals("""
+            0 0
+            1 0
+            1 1
+            2 0
+            2 1
+        """.trimIndent(), genAndRunJs("""
+            fun main() {
+                level2@for (m in 0 .. 4) {
+                    for (n in 0 .. m) {
+                        if (n == 2) break@level2
+                        console.log(m, n)
+                    }
+                }
+            }
+        """, printJs = true))
+    }
+
+    @Test
     fun testWhileLoop() {
         assertEquals("1\n2\n3\n4", genAndRunJs("fun main() { var n = 0; while (n++ < 4) console.log(n) }", printJs = true))
         assertEquals("1\n2\n3", genAndRunJs("fun main() { var n = 0; while (++n < 4) console.log(n) }", printJs = true))
