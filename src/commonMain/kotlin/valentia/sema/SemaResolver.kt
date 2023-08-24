@@ -10,6 +10,11 @@ class SemaResolver : NodeVisitor() {
         }
     }
 
+    override fun visit(program: Program) {
+        super.visit(program)
+        program.semaResolved = true
+    }
+
     var currentClassDecl: ClassLikeDecl? = null
 
     override fun visit(decl: ClassLikeDecl) {

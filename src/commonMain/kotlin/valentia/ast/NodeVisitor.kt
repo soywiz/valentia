@@ -5,7 +5,6 @@ open class NodeVisitor {
         for (module in program.modulesById.values) {
             visit(module)
         }
-        program.semaResolved = true
     }
 
     open fun visit(module: Module) {
@@ -34,8 +33,9 @@ open class NodeVisitor {
         }
     }
 
-    open fun visit(list: List<Node>) {
-        for (n in list) visitNode(n)
+    open fun visit(list: List<Node?>?) {
+        if (list == null) return
+        for (n in list) n?.let { visitNode(n) }
     }
 
     open fun visit(import: ImportNode) {
@@ -239,10 +239,19 @@ open class NodeVisitor {
             }
         }
     }
-    open fun visit(expr: LambdaFunctionExpr) { }
-    open fun visit(expr: LiteralExpr) { }
-    open fun visit(expr: ObjectLiteralExpr) { }
-    open fun visit(expr: OpSeparatedBinaryExprs) { }
+    open fun visit(expr: LambdaFunctionExpr) {
+        visit(expr.params)
+        visit(expr.stms)
+    }
+    open fun visit(expr: LiteralExpr) {
+
+    }
+    open fun visit(expr: ObjectLiteralExpr) {
+        visit(expr.body)
+    }
+    open fun visit(expr: OpSeparatedBinaryExprs) {
+        visit(expr.exprs)
+    }
     open fun visit(expr: RangeTestExpr) {
         visit(expr.base)
         visit(expr.container)

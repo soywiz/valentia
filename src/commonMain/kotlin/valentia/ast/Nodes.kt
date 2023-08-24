@@ -567,10 +567,6 @@ data class Temp(val type: Type, val id: Int) : Expr() {
     override fun toString(): String = "\$temp\$$id"
 }
 data class SuperExpr(val label: String? = null, val type: Type? = null) : AssignableExpr() {
-    companion object {
-        const val ID_UNLABELLED = 31
-        const val ID_LABELLED = 32
-    }
 }
 data class TernaryExpr(val cond: Expr, val trueExpr: Expr, val falseExpr: Expr) : Expr() {
     init {
@@ -580,9 +576,6 @@ data class TernaryExpr(val cond: Expr, val trueExpr: Expr, val falseExpr: Expr) 
     }
 }
 data class IfExpr(val cond: Expr, val trueBody: ExprOrStm, val falseBody: ExprOrStm? = null) : Expr() {
-    companion object {
-        const val ID = 30
-    }
     init {
         addNode(cond)
         addNode(trueBody)
