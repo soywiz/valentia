@@ -41,7 +41,7 @@ inline class DeclCollection(val declsNull: List<Decl>?) {
         val items = declsNull ?: return null
         for (item in items) {
             // @TODO: Check constructors
-            if (item is ClassOrObjectDecl) {
+            if (item is ClassLikeDecl) {
                 for (constructor in item.constructors) {
                     val constructorFuncType = constructor.getType(DummyResolutionContext)
                     if (TypeMatching.canAssignTo(type, constructorFuncType)) {
@@ -69,7 +69,7 @@ interface ResolutionContext {
     operator fun get(name: String): DeclCollection = resolve(name)
     operator fun get(type: Type): DeclCollection = resolve(type.toString())
     fun resolve(id: String): DeclCollection
-    fun getCurrentClass(id: String? = null): ClassOrObjectDecl? = null
+    fun getCurrentClass(id: String? = null): ClassLikeDecl? = null
 }
 
 operator fun ResolutionContext.plus(other: ResolutionContext): ResolutionContext {
@@ -84,7 +84,7 @@ operator fun ResolutionContext.plus(other: ResolutionContext): ResolutionContext
 
 open class ParentResolutionContext(val base: ResolutionContext, val parent: ResolutionContext) : ResolutionContext {
     override fun resolve(id: String): DeclCollection = DeclCollection(base.resolve(id).decls + parent.resolve(id).decls)
-    override fun getCurrentClass(id: String?): ClassOrObjectDecl? = base.getCurrentClass(id) ?: parent.getCurrentClass(id)
+    override fun getCurrentClass(id: String?): ClassLikeDecl? = base.getCurrentClass(id) ?: parent.getCurrentClass(id)
 }
 
 //open class ListResolutionContext(val resolutions: List<ResolutionContext>) : ResolutionContext {
@@ -149,14 +149,14 @@ open class ProgramResolutionContext(val program: Program) : ResolutionContext {
     }
 }
 
-val ClassOrObjectDecl.classMembersById: Map<String, List<Decl>> by Extra.PropertyThis {
+val ClassLikeDecl.classMembersById: Map<String, List<Decl>> by Extra.PropertyThis {
     bodyAll.groupBy { it.declName }
 }
-open class ClassResolutionContext(val clazz: ClassOrObjectDecl) : ResolutionContext {
+open class ClassResolutionContext(val clazz: ClassLikeDecl) : ResolutionContext {
     val classMembersById = clazz.classMembersById
     override val node: Node? get() = clazz
     override fun resolve(id: String): DeclCollection = DeclCollection(classMembersById[id] ?: emptyList())
-    override fun getCurrentClass(id: String?): ClassOrObjectDecl? {
+    override fun getCurrentClass(id: String?): ClassLikeDecl? {
         if (id == null) return clazz
         if (id === clazz.name) return clazz
         return null
@@ -175,7 +175,7 @@ open class FunResolutionContext(val func: FunDecl) : ResolutionContext {
 val Decl.resolver: ResolutionContext by Extra.PropertyThis {
     when (this) {
         is FunDecl -> FunResolutionContext(this)
-        is ClassOrObjectDecl -> ClassResolutionContext(this)
+        is ClassLikeDecl -> ClassResolutionContext(this)
         is Package -> PackageResolutionContext(this)
         is Module -> ModuleResolutionContext(this)
         is FileNode -> FileResolutionContext(this)
@@ -184,51 +184,7 @@ val Decl.resolver: ResolutionContext by Extra.PropertyThis {
     }
 }
 
-fun Node.resolve(id: String): Sequence<Decl> = sequence<Decl> {
-    val node = this@resolve
-    println("Resolving $node")
-    val decl = currentDecl ?: return@sequence
-    val parentDecl = decl.parentDecl
-    println("    - $decl -> parentDecl=$parentDecl")
-    //yieldAll(decl.resolver.resolve(id).decls)
-    when (decl) {
-        is Program -> {
-        }
-        is Module -> {
-        }
-        is Package -> {
-            println("  PACKAGE")
-            decl.allDeclsByName[id]?.let { yieldAll(it) }
-        }
-        is FileNode -> {
-            println("  FILE")
-            //yieldAll(decl.topLevelDecls.filter { it.declName == id })
-            //decl?.pack?.allDeclsByName?.values[]
-            decl.pack?.let { yieldAll(it.resolve(id)) }
-        }
-        is ClassOrObjectDecl -> {
-            println("  CLASS")
-            for (subType in decl.directResolvedSubTypes.distinct()) {
-                println("Resolving.subType=$subType")
-                yieldAll(subType.resolve(id))
-            }
-        }
-        is FunDecl -> {
-            println("  FUNC")
-            parentDecl?.resolve(id)?.let { yieldAll(it) }
-        }
-        else -> TODO("$decl")
-    }
-    val parent = decl.parentNode
-    if (parent != null) {
-        println("Resolving.parent=$parent")
-        yieldAll(parent.resolve(id))
-    }
-}
-
-//fun Decl.resolve(id: String): DeclCollection {
-//}
-val ClassOrObjectDecl.directResolvedSubTypes: List<Decl> by Extra.PropertyThis {
+val ClassLikeDecl.directResolvedSubTypes: List<Decl> by Extra.PropertyThis {
     val subtypes = (this.subTypes ?: emptyList()).map { it.type }
     println(subtypes)
     val decls: List<Decl> = subtypes.mapNotNull { resolve(it.toString()).firstOrNull() }
@@ -236,6 +192,6 @@ val ClassOrObjectDecl.directResolvedSubTypes: List<Decl> by Extra.PropertyThis {
 }
 
 val SubTypeInfo.resolvedDecl: Decl? by Extra.PropertyThis {
-    resolve(this.type.toString()).firstOrNull()
+    resolve(type.toString()).firstOrNull()
     //var resolvedDecl: Decl? = null
 }

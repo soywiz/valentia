@@ -5,6 +5,10 @@ import valentia.ast.*
 
 val Node.program: Program? get() = if (this is Program) this else parentDecl?.program
 
+fun SimpleType.resolveSimpleType(): TypeDecl = resolvedDecl ?: this.resolveSimpleType(this).also {
+    this.resolvedDecl = it
+}
+
 fun Node.resolveSimpleType(type: SimpleType): TypeDecl = currentDecl!!.resolveSimpleType(type)
 
 fun Decl.resolveSimpleType(type: SimpleType): TypeDecl {
@@ -34,18 +38,9 @@ fun Decl.resolveSimpleType(type: SimpleType): TypeDecl {
                 // check simple in imports
                 run {
                     val validImport = decl.importsById[type.name]
-                    // @TODO: DO asterisk
-                    //println("FileNode.import: $validImport")
                     if (validImport != null) {
                         program!!.getTypeDeclByIdentifierOrNull(validImport.identifier)
                             ?.let { return@getOrPut it }
-                        //val packages = program!!.getAvailablePackages(Identifier(validImport.identifier.partsButLast))
-                        //for (pack in packages) {
-                        //    pack.symbols[type.name]
-                        //        ?.filterIsInstance<TypeDecl>()
-                        //        ?.firstOrNull()
-                        //        ?.let { return@getOrPut it }
-                        //}
                     }
                 }
                 // check asterisk imports
@@ -56,26 +51,12 @@ fun Decl.resolveSimpleType(type: SimpleType): TypeDecl {
                             ?.let { return@getOrPut it }
                     }
                 }
-                // check in the same package
-                run {
-
-                }
                 parentDecl?.resolveSimpleType(type)
             }
+
             is Package -> {
                 decl.symbols[type.name]?.filterIsInstance<TypeDecl>()?.firstOrNull()
             }
-            //is BaseConstructorDecl -> TODO()
-            //is ClassOrObjectDecl -> TODO()
-            //is CompanionObjectDecl -> TODO()
-            //is FileNode -> TODO()
-            //is FunDecl -> TODO()
-            //is InitDecl -> TODO()
-            //is Module -> TODO()
-            //is Program -> TODO()
-            //is TypeAliasDecl -> TODO()
-            //is MultiVariableDecl -> TODO()
-            //is VariableDecl -> TODO()
             else -> parentDecl?.resolveSimpleType(type)
         } ?: UnknownTypeDecl("${type.name}\$Unresolved")
     }

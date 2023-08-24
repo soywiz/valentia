@@ -22,9 +22,9 @@ class SemaResolver : NodeVisitor() {
         }
     }
 
-    var currentClassDecl: ClassOrObjectDecl? = null
+    var currentClassDecl: ClassLikeDecl? = null
 
-    override fun visit(decl: ClassOrObjectDecl) {
+    override fun visit(decl: ClassLikeDecl) {
         val old = currentClassDecl
         try {
             currentClassDecl = decl
@@ -64,9 +64,13 @@ class SemaResolver : NodeVisitor() {
         super.visit(expr)
         when (cexpr) {
             is IdentifierExpr -> {
-                val decls = currentResolutionContext.resolve(cexpr.id)
-                val resolved = decls.findMatch(funcType)
-                cexpr.resolvedDecl = resolved
+                val decls = expr.resolve(cexpr.id).toList().distinct()
+                val realDecls: List<CallableDecl> = decls
+                    .flatMap { if (it is ClassLikeDecl) it.constructors else listOf(it) }
+                    .filterIsInstance<CallableDecl>()
+                val decls2 = DeclCollection(realDecls)
+                val resolved = decls2.findMatch(funcType)
+                cexpr.resolvedDecl = resolved ?: decls.filterIsInstance<ClassLikeDecl>().firstOrNull()
                 if (resolved?.parentNode == currentClassDecl && currentClassDecl != null) {
                     cexpr.addThis = true
                 }
@@ -79,7 +83,7 @@ class SemaResolver : NodeVisitor() {
                     val decls = DeclCollection(exprResolvedDecl?.resolve(key)?.toList())
                     //val decls = currentResolutionContext.resolve(cexpr.key.toString())
                     val resolved = decls.findMatch(funcType)
-                    if (exprResolvedDecl is ClassOrObjectDecl) {
+                    if (exprResolvedDecl is ClassLikeDecl) {
                         val resolvedSubTypes = exprResolvedDecl.directResolvedSubTypes
                         println("resolvedSubTypes=$resolvedSubTypes")
                     }

@@ -65,14 +65,14 @@ open class JSCodegen {
         //indenter.line("// decl: ${decl}")
         when (decl) {
             null -> Unit
-            is ClassOrObjectDecl -> generateClass(decl)
+            is ClassLikeDecl -> generateClass(decl)
             is FunDecl -> generateFunction(decl, parent)
             is VariableDecl -> {
                 if (FunctionModifier.EXTERNAL !in decl.modifiers) {
                     val settingFieldConstructor = ctx?.settingFieldConstructor == true
                     val letStr = when {
                         settingFieldConstructor -> "this."
-                        parent !is ClassOrObjectDecl -> "let "
+                        parent !is ClassLikeDecl -> "let "
                         else -> ""
                     }
                     if (decl.getter != null) {
@@ -92,7 +92,7 @@ open class JSCodegen {
                 }
             }
             is BaseConstructorDecl -> {
-                val clazzDecl = parent as ClassOrObjectDecl
+                val clazzDecl = parent as ClassLikeDecl
 
                 if (decl is PrimaryConstructorDecl) {
                     for (p in decl.classParams) {
@@ -121,7 +121,7 @@ open class JSCodegen {
                         when (delegatedCall.kind) {
                             DelegationCallKind.THIS -> {
                                 val callType = delegatedCall.getType(DummyResolutionContext)
-                                val clazz = parent as ClassOrObjectDecl
+                                val clazz = parent as ClassLikeDecl
                                 val parentConstructor = clazz?.constructors?.firstOrNull {
                                     val constructorType = it.getTypeSafe()
                                     TypeMatching.canAssignTo(
@@ -144,12 +144,12 @@ open class JSCodegen {
         }
     }
 
-    open fun generateClass(clazz: ClassOrObjectDecl) {
+    open fun generateClass(clazz: ClassLikeDecl) {
         pushResolutionContext(ClassResolutionContext(clazz)) {
             val subTypes = clazz.subTypes ?: emptyList()
-            var extends: ClassOrObjectDecl? = null
+            var extends: ClassLikeDecl? = null
             for (subType in subTypes) {
-                val decl = currentResolutionContext[subType.type]?.decls?.firstOrNull() as? ClassOrObjectDecl ?: continue
+                val decl = currentResolutionContext[subType.type]?.decls?.firstOrNull() as? ClassLikeDecl ?: continue
                 if (!decl.kind.isInterface) {
                     extends = decl
                 }
@@ -194,7 +194,7 @@ open class JSCodegen {
         //    }
         //}
 
-        val functionMod = if (parent is ClassOrObjectDecl) "" else "function "
+        val functionMod = if (parent is ClassLikeDecl) "" else "function "
         val suspendMod = if (func.isSuspend) "*" else ""
         if (func.jsName == "next\$1") {
             indenter.line("*[Symbol.iterator]()") {
@@ -276,10 +276,24 @@ open class JSCodegen {
                 val name = resolved?.jsName ?: expr.id
                 when (resolved) {
                     is BaseConstructorDecl -> "(new ${resolved.parent?.jsName}).$name"
+                    is ClassDecl -> "new ${resolved.jsName}"
                     else -> "$thisStr$name"
                 }
 
             }
+            //is CallIdExpr -> {
+            //    val resolved = expr.resolvedDecl ?: return "\$CALL_ID!!!!"
+            //    val name = resolved.jsName
+            //    val thisStr = if (expr.addThis) "this." else ""
+            //    val paramsStr = "(" + expr.paramsPlusLambda.joinToString(", ") { generateExpr(it).toString() } + ")"
+            //    when (resolved) {
+            //        is ClassOrObjectDecl -> "(new $name$paramsStr)"
+            //        is BaseConstructorDecl -> "(new ${resolved.parent?.jsName}).${resolved.jsName}$paramsStr"
+            //        is FunDecl -> "$thisStr$name$paramsStr"
+            //        //is IdentifierExpr -> "$name$paramsStr"
+            //        else -> TODO("resolved=$resolved, expr=$expr")
+            //    }
+            //}
             is NavigationExpr -> {
                 if (expr.op != ".") error("Unsupported ${expr.op}")
                 val keyStr = when (expr.key) {
@@ -333,19 +347,6 @@ open class JSCodegen {
                     else -> "(($leftStr) $op ($rightStr))"
                 }
             }
-            //is CallIdExpr -> {
-            //    val resolved = expr.resolvedDecl ?: return "\$CALL_ID!!!!"
-            //    val name = resolved.jsName
-            //    val thisStr = if (expr.addThis) "this." else ""
-            //    val paramsStr = "(" + expr.paramsPlusLambda.joinToString(", ") { generateExpr(it).toString() } + ")"
-            //    when (resolved) {
-            //        is ClassOrObjectDecl -> "(new $name$paramsStr)"
-            //        is BaseConstructorDecl -> "(new ${resolved.parent?.jsName}).${resolved.jsName}$paramsStr"
-            //        is FunDecl -> "$thisStr$name$paramsStr"
-            //        //is IdentifierExpr -> "$name$paramsStr"
-            //        else -> TODO("resolved=$resolved, expr=$expr")
-            //    }
-            //}
             is CallExpr -> {
                 //val symbols = symbolProvider[expr.id]
                 //println("expr.id=${expr.id} : $symbols")

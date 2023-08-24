@@ -63,7 +63,7 @@ class TypeResolverTest {
         val module = result.program.getModule(null)
         val test = module.getPackage(Identifier(pack)).symbols["Test"]?.first() as ClassDecl
         val parentType = test.subTypes!!.first().type
-        val resolvedDecl = parentType.resolveSimpleType(parentType as SimpleType)
+        val resolvedDecl = (parentType as SimpleType).resolveSimpleType()
         assertEquals("BaseTest", resolvedDecl.declName)
     }
 }

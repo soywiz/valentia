@@ -176,7 +176,7 @@ open class NodeSerializer : BinaryWriter(), NodeSerializationCommon {
                 for (decl in decl.topLevelDecls) writeDecl(decl)
             }
             is BaseConstructorDecl -> TODO()
-            is ClassOrObjectDecl -> TODO()
+            is ClassLikeDecl -> TODO()
             is CompanionObjectDecl -> TODO()
             is FunDecl -> TODO()
             is InitDecl -> TODO()

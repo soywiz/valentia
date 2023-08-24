@@ -45,7 +45,7 @@ open class NodeVisitor {
         when (decl) {
             null -> Unit
             is BaseConstructorDecl -> visit(decl)
-            is ClassOrObjectDecl -> visit(decl)
+            is ClassLikeDecl -> visit(decl)
             is CompanionObjectDecl -> visit(decl)
             is FunDecl -> visit(decl)
             is InitDecl -> visit(decl)
@@ -62,7 +62,7 @@ open class NodeVisitor {
 
     open fun visit(decl: BaseConstructorDecl) {
     }
-    open fun visit(decl: ClassOrObjectDecl) {
+    open fun visit(decl: ClassLikeDecl) {
         for (decl in (decl.body ?: emptyList())) visit(decl)
     }
     open fun visit(decl: CompanionObjectDecl) {

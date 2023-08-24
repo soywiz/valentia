@@ -263,8 +263,8 @@ data class ConstructorDelegationCall(
         FuncType(parent?.parent?.getType(resolutionContext), exprs.map { FuncType.Item(it.getType(resolutionContext)) })
 }
 
-abstract class BaseConstructorDecl() : Decl("constructor") {
-    var parent: ClassOrObjectDecl? = null
+abstract class BaseConstructorDecl() : CallableDecl("constructor") {
+    var parent: ClassLikeDecl? = null
     abstract val modifiers: Modifiers
     abstract val params: List<FuncValueParam>
     open val constructorDelegationCall: ConstructorDelegationCall? = null
@@ -327,7 +327,7 @@ sealed class TypeDecl(name: String) : Decl(name) {}
 
 data class UnknownTypeDecl(val name: String) : TypeDecl(name)
 
-abstract class ClassOrObjectDecl(open val name: String, open val kind: ClassKind) : TypeDecl(name) {
+abstract class ClassLikeDecl(open val name: String, open val kind: ClassKind) : TypeDecl(name) {
     var fqname: String? = null
 
     // @TODO: Extract primary constructor val/var to Variable declarations
@@ -366,7 +366,7 @@ data class ClassDecl(
     override val subTypes: List<SubTypeInfo>? = null,
     override val body: List<Decl>? = null,
     override val primaryConstructor: PrimaryConstructorDecl? = null,
-) : ClassOrObjectDecl(name, kind) {
+) : ClassLikeDecl(name, kind) {
     init {
         addNode(subTypes)
         addNode(body)
@@ -380,11 +380,14 @@ data class ObjectDecl(
     override val name: String,
     override val body: List<Decl>? = null,
     override val subTypes: List<SubTypeInfo>? = null,
-) : ClassOrObjectDecl(name, ClassKind.OBJECT) {
+) : ClassLikeDecl(name, ClassKind.OBJECT) {
     init {
         addNode(body)
     }
 }
+
+sealed class CallableDecl(name: String) : Decl(name)
+
 data class FunDecl constructor(
     val name: String,
     val params: List<FuncValueParam> = emptyList(),
@@ -393,7 +396,7 @@ data class FunDecl constructor(
     val body: Stm? = null,
     val receiver: Type? = null,
     val modifiers: Modifiers = Modifiers(),
-) : Decl(name) {
+) : CallableDecl(name) {
     init {
         addNode(body)
     }
@@ -647,8 +650,9 @@ data class CallExpr(val expr: Expr, override val params: List<Expr> = emptyList(
     }
 
     override fun getFuncType(resolutionContext: ResolutionContext): FuncType = FuncType(expr.getType(resolutionContext), params.map { FuncType.Item(it.getType(resolutionContext)) })
+    //override fun getFuncType(resolutionContext: ResolutionContext): FuncType = expr.getType(resolutionContext) as FuncType
     override fun getTypeUncached(resolutionContext: ResolutionContext): Type {
-        return getFuncType(resolutionContext)
+        return getFuncType(resolutionContext).ret ?: UnknownType
     }
 
     //var resolvedDecl: Decl? = null
@@ -722,6 +726,19 @@ data class BinaryOpExpr(val left: Expr, val op: String, val right: Expr) : Expr(
     init {
         addNode(left)
         addNode(right)
+    }
+
+    override fun getTypeUncached(resolutionContext: ResolutionContext): Type {
+        // @TODO: Operator overloading
+        val leftType = left.getType(resolutionContext)
+        val rightType = right.getType(resolutionContext)
+        if (leftType != rightType) {
+            println("ERROR: Unsupported BinaryOp type resolution $leftType, $rightType")
+            //error("")
+            //return UnknownType
+        }
+        //return leftType
+        return rightType
     }
 }
 

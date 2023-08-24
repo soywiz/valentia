@@ -12,7 +12,7 @@ data class SimpleType(val name: String) : Type() {
     //val _package: String? = null
     //val _simpleName: String get() = name
     val fullName: String get() = fqname ?: name
-    var resolvedDecl: Decl? = null
+    var resolvedDecl: TypeDecl? = null
     override fun toString(): String = name
     companion object {
         const val ID = 1
