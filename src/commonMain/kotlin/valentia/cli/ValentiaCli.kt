@@ -77,7 +77,7 @@ object ValentiaCli {
                         settings.gradle.kts
                     """.trimIndent())
                     folder["valentia.toml"].writeString("""
-                        name = ${folder.baseName}
+                        name = "${folder.cannonical.baseName}"
                         authors = ["dummy"]
                         [dependencies]
                     """.trimIndent())
@@ -108,7 +108,7 @@ object ValentiaCli {
 
     private fun createGradleProject(folder: LocalFile) {
         folder["settings.gradle.kts"].writeString("""
-            //rootProject.name = "${folder.baseName}"
+            //rootProject.name = "${folder.cannonical.baseName}"
         """.trimIndent())
         folder["build.gradle.kts"].writeString("""
             plugins {

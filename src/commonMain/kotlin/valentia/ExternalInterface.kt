@@ -19,6 +19,7 @@ open class ExternalInterfaceBase {
     fun fileWriteString(path: String, content: String): Unit = fileWrite(path, content.encodeToByteArray())
     fun fileReadString(path: String): String = fileRead(path).decodeToString()
     open fun makeExecutable(path: String): Unit = Unit
+    open fun canonical(path: String): String = path
 }
 
 expect object ExternalInterface : ExternalInterfaceBase

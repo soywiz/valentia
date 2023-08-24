@@ -8,6 +8,7 @@ data class LocalFile(val fullPath: String) {
     val baseName: String get() = fullPath.substringAfterLast('/')
 
     val parent: LocalFile get() = LocalFile(path)
+    val cannonical: LocalFile get() = LocalFile(ExternalInterface.canonical(path))
     operator fun get(child: String): LocalFile = LocalFile("$fullPath/$child")
 
     override fun toString(): String = "LocalFile($fullPath)"
