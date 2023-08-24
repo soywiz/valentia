@@ -4149,6 +4149,7 @@ fun BaseTokenReader.peekSkipping(count: Int): Token {
     return peek(n)
 }
 
+// @TODO: Keep last comment before token to generate kdoc and attach it to decls
 interface BaseTokenReader : BaseConsumer {
     fun peek(offset: Int = 0): Token
     fun read(): Token {

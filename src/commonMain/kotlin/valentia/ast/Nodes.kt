@@ -35,11 +35,22 @@ sealed class Node : Extra by Extra.Mixin() {
 
 class Program : Decl("\$program") {
     var semaResolved = false
+    val modules = arrayListOf<Module>()
     val modulesById = LinkedHashMap<String?, Module>()
 
-    fun getModule(id: String?): Module {
-        return modulesById.getOrPut(id) { Module(this, id) }
+    fun getModule(id: String?): Module = modulesById.getOrPut(id) { Module(this, id).also { modules += it } }
+
+    fun getAvailablePackages(id: Identifier?): List<Package> = modulesById.values.mapNotNull { it.getPackageOrNull(id) }
+
+    fun getDeclsByIdentifier(id: Identifier): List<Decl> = modules.flatMap { it.getDeclsByIdentifier(id) }
+
+    fun getTypeDeclByIdentifierOrNull(id: Identifier): TypeDecl? {
+        val types = getDeclsByIdentifier(id).filterIsInstance<TypeDecl>()
+        if (types.size > 1) error("More than one type in $id")
+        return types.singleOrNull()
     }
+
+    override fun toString(): String = "Program($modulesById)"
 }
 
 class Module(val program: Program, val id: String? = null) : Decl("\$module\$$id") {
@@ -48,10 +59,17 @@ class Module(val program: Program, val id: String? = null) : Decl("\$module\$$id
     }
     val packagesById = LinkedHashMap<Identifier?, Package>()
 
+    fun getPackageOrNull(identifier: Identifier?): Package? = packagesById[identifier]
+
     fun getPackage(identifier: Identifier?): Package {
         return packagesById.getOrPut(identifier) {
             Package(this, identifier)
         }
+    }
+
+    fun getDeclsByIdentifier(id: Identifier): List<Decl> {
+        val pack = getPackageOrNull(Identifier(id.partsButLast)) ?: return emptyList()
+        return pack.symbols[id.lastPart] ?: emptyList()
     }
 
     fun addFile(file: FileNode) {
@@ -155,9 +173,11 @@ data class FileNode(
     val imports: List<ImportNode> = emptyList(),
     val topLevelDecls: List<Decl> = emptyList(),
 ) : Decl("\$file\$$filePath"), Extra by Extra.Mixin() {
-    companion object {
-        const val ID = 4
-    }
+    val topLevelDeclsByName = topLevelDecls.groupBy { it.declName }
+
+    val importsById by lazy { imports.associateBy { it.identifier.lastPart } }
+    val asteriskImports by lazy { imports.filter { it.all } }
+
     var pack: Package? = null
 
     init {
@@ -214,6 +234,8 @@ enum class AnnotationUseSite(val id: String) {
 
 sealed class Decl(val declName: String) : Node() {
     open val jsName: String get() = declName
+
+    val simpleTypeCache = LinkedHashMap<String, TypeDecl>()
 }
 
 data class TypeAliasDecl(
@@ -221,7 +243,7 @@ data class TypeAliasDecl(
     val type: Type,
     val types: List<TypeParameter>? = null,
     val modifiers: Modifiers = Modifiers(),
-) : Decl(id) {
+) : TypeDecl(id) {
 }
 enum class DelegationCallKind(val id: String) {
     THIS("this"), SUPER("super");
@@ -301,8 +323,11 @@ enum class ClassKind(
     FUN_INTERFACE(isInterface = true);
 }
 
-abstract class ClassOrObjectDecl(open val name: String, open val kind: ClassKind) : Decl(name) {
+sealed class TypeDecl(name: String) : Decl(name) {}
 
+data class UnknownTypeDecl(val name: String) : TypeDecl(name)
+
+abstract class ClassOrObjectDecl(open val name: String, open val kind: ClassKind) : TypeDecl(name) {
     var fqname: String? = null
 
     // @TODO: Extract primary constructor val/var to Variable declarations
@@ -316,10 +341,13 @@ abstract class ClassOrObjectDecl(open val name: String, open val kind: ClassKind
             ?: emptyList()
     }
 
-    val bodyAll by lazy {
+    val bodyAll: List<Decl> by lazy {
         (primaryVals + listOfNotNull(primaryConstructor) + (body ?: emptyList())).also { list ->
             for (it in list) it.parentNode = this
         }
+    }
+    val bodyAllByName by lazy {
+        bodyAll.groupBy { it.declName }
     }
     val fields by lazy { bodyAll.filterIsInstance<VariableDecl>().filter { it.isField } }
     val properties by lazy { bodyAll.filterIsInstance<VariableDecl>().filter { !it.isField } }
@@ -331,6 +359,7 @@ abstract class ClassOrObjectDecl(open val name: String, open val kind: ClassKind
         }
     }
 }
+
 data class ClassDecl(
     override val kind: ClassKind,
     override val name: String,
@@ -470,6 +499,7 @@ data class Identifier(val parts: List<String>) : Expr() {
     constructor(str: String) : this(str.split("."))
     val fqname: String = parts.joinToString(".")
     val lastPart: String get() = parts.lastOrNull() ?: ""
+    val partsButLast: List<String> get() = parts.dropLast(1)
     override fun toString(): String = "Identifier($fqname)"
 }
 

@@ -125,7 +125,6 @@ private val FileNode.topDeclsByName by Extra.PropertyThis {
         }
     }
 }
-val FileNode.importsById by Extra.PropertyThis { imports.associateBy { it.identifier.lastPart } }
 
 open class ModuleResolutionContext(val module: Module) : ResolutionContext {
     override val node: Node? get() = module
@@ -231,6 +230,7 @@ fun Node.resolve(id: String): Sequence<Decl> = sequence<Decl> {
 //}
 val ClassOrObjectDecl.directResolvedSubTypes: List<Decl> by Extra.PropertyThis {
     val subtypes = (this.subTypes ?: emptyList()).map { it.type }
+    println(subtypes)
     val decls: List<Decl> = subtypes.mapNotNull { resolve(it.toString()).firstOrNull() }
     decls.distinct()
 }

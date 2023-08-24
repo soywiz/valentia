@@ -56,6 +56,7 @@ open class NodeVisitor {
             is Package -> TODO()
             is Program -> TODO()
             is FileNode -> TODO()
+            is TypeDecl -> TODO()
         }
     }
 

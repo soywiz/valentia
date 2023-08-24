@@ -12,7 +12,10 @@ data class FileWithContents(val file: String, val content: String) {
     constructor(content: String) : this("unknown.kt", content)
 }
 
-data class CompileResult(val codegen: JSCodegen) {
+data class CompileResult(
+    val codegen: JSCodegen,
+    val program: Program,
+) {
     val jsString by lazy {
         codegen.indenter.indentToString()
     }
@@ -41,7 +44,7 @@ object ValentiaCompiler {
         }
 
         println("parsingTime=$parsingTime, semanticAnalysisTime=$semanticAnalysisTime, generateCodeTime=$generateCodeTime")
-        return CompileResult(codegen)
+        return CompileResult(codegen, program)
     }
 
     fun compileAndRun(files: List<String>) {

@@ -183,6 +183,7 @@ open class NodeSerializer : BinaryWriter(), NodeSerializationCommon {
             is TypeAliasDecl -> TODO()
             is MultiVariableDecl -> TODO()
             is VariableDecl -> TODO()
+            is UnknownTypeDecl -> TODO()
         }
     }
 
