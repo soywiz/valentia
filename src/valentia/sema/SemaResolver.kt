@@ -19,7 +19,7 @@ class SemaResolver : NodeTransformer() {
     }
 
     override fun transform(body: FunctionBody): FunctionBody {
-        println("transform.FunctionBody: ${body.parentNode}")
+        //println("transform.FunctionBody: ${body.parentNode}")
         body.cfg
         return super.transform(body)
     }

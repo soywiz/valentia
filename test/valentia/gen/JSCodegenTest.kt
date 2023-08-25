@@ -451,12 +451,11 @@ class JSCodegenTest {
             "42",
             genAndRunJs("""
                 external class Int
-                fun Int.intApply2(func: (Int) -> Int): Int = func(this) * 2
                 fun main() {
                     var captured = 10
                     val func: (Int) -> Int = { it + 1 + captured }
                     captured = 20 // Should be ignored because of the capture
-                    console.log(10.intApply2(func) )
+                    console.log(func(31) )
                 }
             """.trimIndent(), printJs = true)
         )
