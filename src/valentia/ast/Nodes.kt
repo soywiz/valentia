@@ -1,9 +1,11 @@
 package valentia.ast
 
 import valentia.ast.NodeBuilder.Companion.type
+import valentia.ast.cfg.BasicBlock
 import valentia.parser.BaseConsumer
 import valentia.sema.*
 import valentia.util.Extra
+import valentia.util.quoted
 
 sealed class Node : Extra by Extra.Mixin() {
     var reader: BaseConsumer? = null
@@ -14,6 +16,9 @@ sealed class Node : Extra by Extra.Mixin() {
     var parentNode: Node? = null
     val parentDecl: Decl? by lazy { if (parentNode is Decl) parentNode as Decl else parentNode?.parentDecl }
     val currentDecl: Decl? get() = if (this is Decl) this else parentDecl
+    var basicBlock: BasicBlock? = null
+
+    val currentBasicBlock: BasicBlock? get() = basicBlock ?: parentNode?.basicBlock
 
     fun addNode(item: Node?) {
         item?.parentNode = this
@@ -504,6 +509,18 @@ data class VariableDecl(
     override fun getTypeUncached(): Type {
         return type ?: expr?.getNodeType() ?: UnknownType
     }
+
+    override fun toString(): String {
+        return buildString {
+            append(kind.toString().toLowerCase()).append(" ").append(id).append(": ").append(type)
+            if (expr != null) {
+                if (delegation) append(" by ") else append(" = ")
+                append(expr)
+            }
+            if (getter != null) append(" get() = ...")
+            if (setter != null) append(" set() = ...")
+        }
+    }
 }
 data class MultiVariableDecl(
     val decls: List<VariableDecl>,
@@ -563,7 +580,11 @@ data class Identifier(val parts: List<String>) : Expr() {
 
 // Expressions
 
-sealed class Expr : ExprOrStm()
+sealed class ExprWithFlow : ExprOrStm()
+
+
+
+sealed class Expr : ExprWithFlow()
 
 data class LambdaFunctionExpr(val stms: Stms = Stms(), val params: List<VariableDeclBase>? = null) : Expr() {
     val allParams = if (params == null) listOf(VariableDecl("it", UnknownType)) else params
@@ -750,6 +771,8 @@ data class NavigationExpr(val op: String, val expr: Expr, val key: Any) : Assign
     override fun getTypeUncached(): Type {
         return resolvedDecl?.getNodeType() ?: UnknownType
     }
+
+    override fun toString(): String = "$expr$op$key"
 }
 data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : AssignableExpr() {
     init {
@@ -914,6 +937,7 @@ data class IntLiteralExpr(val value: Long, val isLong: Boolean = false, val isUn
 }
 data class StringLiteralExpr(val value: String) : LiteralExpr(value) {
     override fun getTypeUncached(): Type = StringType
+    override fun toString(): String = value.quoted()
 }
 data class InterpolatedStringExpr(val chunks: List<Chunk>) : Expr() {
     init {
@@ -933,6 +957,8 @@ data class TypeTestExpr(val base: Expr, val kind: String, val type: Type) : Expr
     init {
         addNode(base)
     }
+
+    override fun toString(): String = "$base $kind $type"
 }
 data class RangeTestExpr(val base: Expr, val kind: String, val container: Expr) : Expr() {
     init {
@@ -949,8 +975,15 @@ data class ThisExpr(val id: String?) : AssignableExpr() {
 
 // Statements
 
-
 sealed class Stm : ExprOrStm()
+
+fun Stm.toList(): List<Stm> {
+    return when (this) {
+        is EmptyStm -> emptyList()
+        is Stms -> stms
+        else -> listOf(this)
+    }
+}
 
 fun Stm.withModifiers(mods: Modifiers): Stm {
     if (mods.isEmpty()) return this
@@ -977,6 +1010,10 @@ data class TryCatchStm(val body: Stm, val catches: List<Catch> = emptyList(), va
 data class ReturnStm(val expr: Expr?) : Stm() {
     init {
         addNode(expr)
+    }
+
+    override fun toString(): String {
+        return "RETURN $expr;"
     }
 }
 data class IfStm(val cond: Expr, val btrue: Stm, val bfalse: Stm? = null) : Stm() {

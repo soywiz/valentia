@@ -81,6 +81,8 @@ val BoolType = SimpleType("Boolean")
 val CharType = SimpleType("Char")
 val StringType = SimpleType("String")
 val IntType = SimpleType("Int")
+val AnyType = SimpleType("Any")
+val AnyOptType = AnyType.nullable()
 val FloatType = SimpleType("Float")
 val ClassType = SimpleType("KClass")
 

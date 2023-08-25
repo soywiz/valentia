@@ -71,13 +71,22 @@ interface StmBuilder : DeclBuilder {
                 override fun addStm(stm: Stm) {
                     stms += stm
                 }
+
+                override fun replaceStm(stm: Stm, new: Stm) {
+                    val index = stms.indexOf(stm)
+                    if (index >= 0) stms[index] = new
+                }
             }
             block(builder)
             return stms
         }
     }
 
+    fun buildStmList(block: StmBuilder.() -> Unit): List<Stm> = StmBuilder.buildStmList(block)
+
     fun addStm(stm: Stm) {
+    }
+    fun replaceStm(stm: Stm, new: Stm) {
     }
 
     fun <T : Stm> T.addStm(): T {
@@ -107,6 +116,18 @@ interface StmBuilder : DeclBuilder {
         return LambdaFunctionExpr(Stms(buildStmList { block() }), if (params.isNotEmpty()) params.toList() else null)
     }
 
+    fun DECL_STM(decl: Decl): DeclStm = DeclStm(decl).addStm()
+
+    fun VAL_STM(name: String, expr: Expr? = null, type: Type? = null, delegation: Boolean = false): DeclStm = DECL_STM(VAL(name, expr, type, delegation))
+    fun VAR_STM(name: String, expr: Expr? = null, type: Type? = null, delegation: Boolean = false): DeclStm = DECL_STM(VAR(name, expr, type, delegation))
+
+    fun RETURN_STM(expr: Expr? = null): ReturnStm = ReturnStm(expr).addStm()
+
+    fun IF_STM(cond: Expr, trueBody: Stm): IfStm = IfStm(cond, trueBody).addStm()
+    fun IF_STM(cond: Expr, trueBody: StmBuilder.() -> Unit): IfStm = IfStm(cond, StmBuilder.buildStmCompact { trueBody() }).addStm()
+    infix fun IfStm.ELSE(falseBody: Stm): IfStm = copy(bfalse = falseBody).also { replaceStm(this, it) }
+    infix fun IfStm.ELSE(falseBody: StmBuilder.() -> Unit): IfStm = copy(bfalse = StmBuilder.buildStmCompact { falseBody() }).also { replaceStm(this, it) }
+
 }
 
 class WhenBuilder {
@@ -135,7 +156,7 @@ interface NodeBuilder {
             }
         })
     }
-    val IntType: Type get() = "Int".type
+    //val IntType: Type get() = "Int".type
     val Boolean.lit: BoolLiteralExpr get() = BoolLiteralExpr(this)
     val Int.lit: IntLiteralExpr get() = IntLiteralExpr(this.toLong())
     val Char.lit: CharLiteralExpr get() = CharLiteralExpr(this)
