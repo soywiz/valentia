@@ -23,6 +23,7 @@ kotlin {
         withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
+            testLogging { exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
         }
     }
     js(IR) {
@@ -40,29 +41,43 @@ kotlin {
         //    }
         }
     }
+
     sourceSets {
-        val commonMain by getting
+        val commonMain by getting {
+            kotlin.setSrcDirs(listOf("src"))
+            resources.setSrcDirs(listOf("resources"))
+        }
         val commonTest by getting {
+            kotlin.setSrcDirs(listOf("test"))
+            resources.setSrcDirs(listOf("testresources"))
             dependencies {
                 implementation(kotlin("test"))
             }
         }
         val jvmMain by getting {
+            kotlin.setSrcDirs(listOf("srcJvm"))
             dependencies {
             }
         }
         val jvmTest by getting {
+            kotlin.setSrcDirs(listOf("testJvm"))
             dependencies {
                 api("org.antlr:antlr4-runtime:4.13.0")
             }
         }
         val jsMain by getting {
+            kotlin.setSrcDirs(listOf("srcJs"))
             dependencies {
             }
         }
-        val jsTest by getting
+        val jsTest by getting {
+            kotlin.setSrcDirs(listOf("testJs"))
+        }
     }
 }
+
+java.sourceSets.main.get().java.setSrcDirs(setOf(file("srcJvm")))
+java.sourceSets.test.get().java.setSrcDirs(setOf(file("testJvm")))
 
 application {
     mainClass.set("valentia.MainKt")
@@ -108,4 +123,8 @@ tasks {
     "build" {
         dependsOn(fatJar)
     }
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
 }

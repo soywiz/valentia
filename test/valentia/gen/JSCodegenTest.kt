@@ -290,7 +290,8 @@ class JSCodegenTest {
         assertEquals("0\n1\n2\n3", genAndRunJs("fun main() { var n = 0; do console.log(n) while (++n < 4) }", printJs = true))
     }
 
-    val RESOURCES_PREFIX = "src/commonTest/resources"
+    //val RESOURCES_PREFIX = "src/commonTest/resources"
+    val RESOURCES_PREFIX = "testresources"
 
     @Test
     fun testClassInstantiationValGetter() =
