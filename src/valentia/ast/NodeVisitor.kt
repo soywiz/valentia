@@ -241,8 +241,13 @@ open class NodeVisitor {
     }
     open fun visit(expr: LambdaFunctionExpr) {
         visit(expr.params)
-        visit(expr.stms)
+        visit(expr.body)
     }
+
+    open fun visit(body: FunctionBody?) {
+        visit(body?.stms)
+    }
+
     open fun visit(expr: LiteralExpr) {
 
     }

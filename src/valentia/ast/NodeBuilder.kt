@@ -42,8 +42,11 @@ interface DeclBuilder : NodeBuilder {
         ret: Type? = null,
         vararg params: Pair<String, Type>,
         block: (StmBuilder.() -> Unit)? = null
-    ): FunDecl =
-        FunDecl(name, params.map { FuncValueParam(it.first, it.second) }, retType = ret, body = block?.let { func -> StmBuilder.buildStms { func() } }).also { addDecl(it) }
+    ): FunDecl {
+        val body = block?.let { func -> StmBuilder.buildStms { func() } }?.let { FunctionBody(it) }
+        return FunDecl(name, params.map { FuncValueParam(it.first, it.second) }, retType = ret, body = body)
+            .also { addDecl(it) }
+    }
 
     fun FILE(
         shebang: String? = null,
@@ -113,7 +116,7 @@ interface StmBuilder : DeclBuilder {
         return WhenExpr(WhenExpr.Subject(expr), builder.entries)
     }
     fun LAMBDA(vararg params: VariableDeclBase, block: StmBuilder.() -> Unit = {}): LambdaFunctionExpr {
-        return LambdaFunctionExpr(Stms(buildStmList { block() }), if (params.isNotEmpty()) params.toList() else null)
+        return LambdaFunctionExpr(FunctionBody(buildStmList { block() }), if (params.isNotEmpty()) params.toList() else null)
     }
 
     fun DECL_STM(decl: Decl): DeclStm = DeclStm(decl).addStm()

@@ -86,6 +86,16 @@ open class NodeTransformer {
         }
     }
 
+    open fun transformNull(body: FunctionBody?): FunctionBody? {
+        if (body == null) return null
+        return transform(body)
+    }
+
+    open fun transform(body: FunctionBody): FunctionBody {
+        val stms = transform(body.stms)
+        return if (stms !== body.stms) FunctionBody(stms).copyFrom(body) else body
+    }
+
     open fun transform(decl: BaseConstructorDecl): Decl {
         return decl
     }
@@ -339,7 +349,8 @@ open class NodeTransformer {
     }
 
     open fun transform(expr: LambdaFunctionExpr): Expr {
-        return expr
+        val body = transform(expr.body)
+        return if (body === expr.body) expr else LambdaFunctionExpr(body, expr.params).copyFrom(expr)
     }
     open fun transform(expr: LiteralExpr): Expr {
         return expr

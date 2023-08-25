@@ -2,6 +2,7 @@ package valentia.ast
 
 import valentia.ast.NodeBuilder.Companion.type
 import valentia.ast.cfg.BasicBlock
+import valentia.ast.cfg.BasicBlockBuilder
 import valentia.parser.BaseConsumer
 import valentia.sema.*
 import valentia.util.Extra
@@ -16,9 +17,14 @@ sealed class Node : Extra by Extra.Mixin() {
     var parentNode: Node? = null
     val parentDecl: Decl? by lazy { if (parentNode is Decl) parentNode as Decl else parentNode?.parentDecl }
     val currentDecl: Decl? get() = if (this is Decl) this else parentDecl
-    var basicBlock: BasicBlock? = null
+    var _basicBlock: BasicBlock? = null
 
-    val currentBasicBlock: BasicBlock? get() = basicBlock ?: parentNode?.basicBlock
+    val currentNodeWithBasicBlock: Node? get() = if (this._basicBlock != null) this else parentNode?.currentNodeWithBasicBlock
+    val parentNodeWithBasicBlock: Node? get() = currentNodeWithBasicBlock?.parentNode?.currentNodeWithBasicBlock
+
+    val nextBasicBlock: BasicBlock? get() = parentNodeWithBasicBlock?._basicBlock
+    val currentBasicBlock: BasicBlock? get() = currentNodeWithBasicBlock?._basicBlock
+    val currentFunctionBody: FunctionBody? get() = if (this is FunctionBody) this else parentNode?.currentFunctionBody
 
     fun addNode(item: Node?) {
         item?.parentNode = this
@@ -30,10 +36,10 @@ sealed class Node : Extra by Extra.Mixin() {
     }
 
     private var _cachedType: Type? = null
-    protected open fun getTypeUncached(): Type =
+    protected open fun getNodeTypeUncached(): Type =
         TODO("${this::class} $this")
     fun getNodeType(): Type {
-        if (_cachedType == null) _cachedType = getTypeUncached()
+        if (_cachedType == null) _cachedType = getNodeTypeUncached()
         return _cachedType!!
     }
 }
@@ -278,7 +284,7 @@ data class ConstructorDelegationCall(
         addNode(exprs)
     }
     var parent: BaseConstructorDecl? = null
-    override fun getTypeUncached(): Type =
+    override fun getNodeTypeUncached(): Type =
         FuncType(parent?.parent?.getNodeType(), exprs.map { FuncType.Item(it.getNodeType()) })
 }
 
@@ -299,7 +305,7 @@ abstract class BaseConstructorDecl() : CallableDecl("constructor") {
             if (params.isEmpty()) "\$constructor" else "\$constructor\$${jsHash.toString(16)}"
         }
     }
-    override fun getTypeUncached(): Type {
+    override fun getNodeTypeUncached(): Type {
         val retType = parent?.declName?.type ?: UnknownType
         return FuncType(retType, params.map { it.toNamedTypeNode() })
     }
@@ -414,7 +420,7 @@ data class ClassDecl constructor(
         addNode(body)
         addNode(primaryConstructor)
     }
-    override fun getTypeUncached(): Type {
+    override fun getNodeTypeUncached(): Type {
         return SimpleType(name) // @TODO: FqNAme
     }
 }
@@ -436,7 +442,7 @@ data class FunDecl constructor(
     val params: List<FuncValueParam> = emptyList(),
     val retType: Type? = null,
     val where: List<TypeConstraint>? = null,
-    val body: Stm? = null,
+    val body: FunctionBody? = null,
     val receiver: Type? = null,
     override val modifiers: Modifiers = Modifiers.EMPTY,
 ) : CallableDecl(name), ModifiersContainer {
@@ -467,7 +473,7 @@ data class FunDecl constructor(
     }
 
 
-    override fun getTypeUncached(): Type {
+    override fun getNodeTypeUncached(): Type {
         return FuncType(UnknownType, params.map { FuncType.Item(it.type) })
         //TODO("${this::class} $this")
     }
@@ -506,7 +512,7 @@ data class VariableDecl(
     }
     val isField get() = !delegation && getter == null && setter == null
 
-    override fun getTypeUncached(): Type {
+    override fun getNodeTypeUncached(): Type {
         return type ?: expr?.getNodeType() ?: UnknownType
     }
 
@@ -582,19 +588,38 @@ data class Identifier(val parts: List<String>) : Expr() {
 
 sealed class ExprWithFlow : ExprOrStm()
 
+data class FunctionBody(val stms: Stms) : Node() {
+    constructor() : this(Stms())
+    constructor(stms: List<Stm>) : this(Stms(stms))
+    constructor(stm: Stm) : this(Stms(stm.toList()))
 
+    val varCaptures = arrayListOf<VariableDecl>()
+
+    init{
+        addNode(stms)
+    }
+
+    val cfg by lazy {
+        BasicBlockBuilder.build(stms).also {
+            _basicBlock = it.blocks.first()
+        }
+    }
+
+    override fun getNodeTypeUncached(): Type = stms.getNodeType()
+}
 
 sealed class Expr : ExprWithFlow()
 
-data class LambdaFunctionExpr(val stms: Stms = Stms(), val params: List<VariableDeclBase>? = null) : Expr() {
-    val allParams = if (params == null) listOf(VariableDecl("it", UnknownType)) else params
+data class LambdaFunctionExpr(val body: FunctionBody = FunctionBody(), val params: List<VariableDeclBase>? = null) : Expr() {
+    val allParams = params ?: listOf(VariableDecl("it", UnknownType))
+
     init {
-        addNode(stms)
+        addNode(body)
         addNode(allParams)
     }
 
-    override fun getTypeUncached(): Type {
-        return FuncType(stms.getNodeType(), allParams.map { FuncType.Item(it.getNodeType()) })
+    override fun getNodeTypeUncached(): Type {
+        return FuncType(body.getNodeType(), allParams.map { FuncType.Item(it.getNodeType()) })
     }
 }
 
@@ -607,7 +632,7 @@ data class TypeArgumentsAssignableSuffixExpr(val expr: Expr, val types: List<Typ
 data class CallableReferenceExt(val type: Type?, val kind: String) : Expr() {
     var _variableDecl: VariableDeclBase? = null
 
-    override fun getTypeUncached(): Type {
+    override fun getNodeTypeUncached(): Type {
         return when (kind) {
             "class" -> GenericType(ClassType, type ?: UnknownType)
             else -> TODO()
@@ -631,7 +656,7 @@ data class WhenExpr(
     data class ConditionIn(val op: String? = null, val expr: Expr = EmptyExpr()) : ConditionBase
     data class ConditionIs(val op: String? = null, val type: Type? = null) : ConditionBase
 
-    override fun getTypeUncached(): Type = UnificationExprType(entries.map { it.body })
+    override fun getNodeTypeUncached(): Type = UnificationExprType(entries.map { it.body })
 }
 data class CollectionLiteralExpr(val items: List<Expr>) : Expr()
 data class TryCatchExpr(val body: Node, val catches: List<Catch> = emptyList(), val finally: Stm? = null) : Expr() {
@@ -656,7 +681,7 @@ data class IfExpr(val cond: Expr, val trueBody: ExprOrStm, val falseBody: ExprOr
         addNode(falseBody)
     }
 
-    override fun getTypeUncached(): Type {
+    override fun getNodeTypeUncached(): Type {
         return UnificationExprType(trueBody, falseBody)
     }
 }
@@ -667,14 +692,14 @@ data class ReturnExpr(val expr: Expr?, val label: String? = null) : Expr() {
         addNode(expr)
     }
 
-    override fun getTypeUncached(): Type = NothingType
+    override fun getNodeTypeUncached(): Type = NothingType
 }
 data class ThrowExpr(val expr: Expr) : Expr() {
     init {
         addNode(expr)
     }
 
-    override fun getTypeUncached(): Type = NothingType
+    override fun getNodeTypeUncached(): Type = NothingType
 }
 
 data class Parameter(val id: String, val type: Type) : Node()
@@ -749,7 +774,7 @@ data class CallExpr(val expr: Expr, override val params: List<Expr> = emptyList(
         return FuncType(expr.getNodeType(), paramsWithLambda.map { FuncType.Item(it.getNodeType()) })
     }
     //override fun getFuncType(): FuncType = expr.getType() as FuncType
-    override fun getTypeUncached(): Type {
+    override fun getNodeTypeUncached(): Type {
         return getFuncType().ret ?: UnknownType
     }
 
@@ -768,7 +793,7 @@ data class NavigationExpr(val op: String, val expr: Expr, val key: Any) : Assign
 
     var resolvedDecl: Decl? = null
 
-    override fun getTypeUncached(): Type {
+    override fun getNodeTypeUncached(): Type {
         return resolvedDecl?.getNodeType() ?: UnknownType
     }
 
@@ -779,11 +804,12 @@ data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : AssignableExpr
         addNode(expr)
     }
 
-    override fun getTypeUncached(): Type {
+    override fun getNodeTypeUncached(): Type {
         val arrayType = expr.getNodeType()
         return when (arrayType) {
             is GenericType -> arrayType.generics.first()
             UnknownType -> UnknownType
+            IntArrayType -> IntType
             else -> TODO("arrayType=$arrayType")
         }
     }
@@ -793,7 +819,7 @@ data class UnaryPostOpExpr(val expr: Expr, val op: UnaryPostOp) : AssignableExpr
         addNode(expr)
     }
 
-    override fun getTypeUncached(): Type {
+    override fun getNodeTypeUncached(): Type {
         return expr.getNodeType()
     }
 }
@@ -801,7 +827,7 @@ data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr() {
     init {
         addNode(expr)
     }
-    override fun getTypeUncached(): Type {
+    override fun getNodeTypeUncached(): Type {
         val type = expr.getNodeType()
         if (type == IntType) return type
         //TODO("UnaryPreOpExpr type=$type, expr=$expr")
@@ -814,7 +840,7 @@ data class IdentifierExpr(val id: String) : AssignableExpr() {
     var addThis: Boolean = false
     var resolvedDecl: Decl? = null
 
-    override fun getTypeUncached(): Type {
+    override fun getNodeTypeUncached(): Type {
         return resolvedDecl?.getNodeType() ?: resolve(id).firstOrNull()?.getNodeType() ?: UnknownType
     }
 }
@@ -872,7 +898,7 @@ data class BinaryOpExpr(val left: Expr, val op: String, val right: Expr) : Expr(
         }
     }
 
-    override fun getTypeUncached(): Type {
+    override fun getNodeTypeUncached(): Type {
         // @TODO: Operator overloading
         val leftType = left.getNodeType()
         val rightType = right.getNodeType()
@@ -918,11 +944,11 @@ sealed class LiteralExpr(val literal: Any?) : Expr()
 data class NullLiteralExpr(val dummy: Unit = Unit) : LiteralExpr(null) {
 }
 data class BoolLiteralExpr(val value: Boolean) : LiteralExpr(value) {
-    override fun getTypeUncached(): Type = BoolType
+    override fun getNodeTypeUncached(): Type = BoolType
     override fun toString(): String = "$value"
 }
 data class CharLiteralExpr(val value: Char) : LiteralExpr(value) {
-    override fun getTypeUncached(): Type = CharType
+    override fun getNodeTypeUncached(): Type = CharType
     override fun toString(): String = when (value) {
         '\r' -> "'\\r'"
         '\n' -> "'\\n'"
@@ -933,10 +959,10 @@ data class CharLiteralExpr(val value: Char) : LiteralExpr(value) {
 data class IntLiteralExpr(val value: Long, val isLong: Boolean = false, val isUnsigned: Boolean = false) : LiteralExpr(value) {
     override fun toString(): String = "$value${if (isUnsigned) "U" else ""}${if (isLong) "L" else ""}.lit"
     //override fun toString(): String = "IntLiteralExpr($value${if (isUnsigned) "U" else ""}${if (isLong) "L" else ""})"
-    override fun getTypeUncached(): Type = IntType
+    override fun getNodeTypeUncached(): Type = IntType
 }
 data class StringLiteralExpr(val value: String) : LiteralExpr(value) {
-    override fun getTypeUncached(): Type = StringType
+    override fun getNodeTypeUncached(): Type = StringType
     override fun toString(): String = value.quoted()
 }
 data class InterpolatedStringExpr(val chunks: List<Chunk>) : Expr() {
@@ -947,7 +973,7 @@ data class InterpolatedStringExpr(val chunks: List<Chunk>) : Expr() {
     sealed class Chunk : Node()
     data class StringChunk(val string: String) : Chunk()
     data class ExpressionChunk(val expr: Expr) : Chunk()
-    override fun getTypeUncached(): Type = StringType
+    override fun getNodeTypeUncached(): Type = StringType
 }
 
 open class IncompleteExpr(val message: String) : Expr()
@@ -968,7 +994,7 @@ data class RangeTestExpr(val base: Expr, val kind: String, val container: Expr) 
 }
 
 data class ThisExpr(val id: String?) : AssignableExpr() {
-    override fun getTypeUncached(): Type {
+    override fun getNodeTypeUncached(): Type {
         return this.getAscendantClassByName(id)?.getNodeType() ?: UnknownType
     }
 }
@@ -1050,7 +1076,7 @@ data class Stms(val stms: List<Stm>) : Stm() {
         addNode(stms)
     }
 
-    override fun getTypeUncached(): Type = stms.lastOrNull()?.getNodeType() ?: UnitType
+    override fun getNodeTypeUncached(): Type = stms.lastOrNull()?.getNodeType() ?: UnitType
 }
 
 data class EmptyStm(val dummy: Unit = Unit) : Stm() {
@@ -1062,7 +1088,7 @@ data class ExprStm(val expr: Expr) : Stm() {
         addNode(expr)
     }
 
-    override fun getTypeUncached(): Type = expr.getNodeType()
+    override fun getNodeTypeUncached(): Type = expr.getNodeType()
 }
 data class DeclStm(val decl: Decl) : Stm() {
     init {

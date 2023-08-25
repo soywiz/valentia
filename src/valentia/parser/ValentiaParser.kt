@@ -650,15 +650,15 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : block
     //    | ASSIGNMENT NL* expression
     //    ;
-    fun functionBody(): Stm? {
+    fun functionBody(): FunctionBody? {
         return when (peek().str) {
             "=" -> {
                 expect("=")
                 NLs()
-                ReturnStm(expression())
+                FunctionBody(ReturnStm(expression()))
             }
 
-            "{" -> block()
+            "{" -> block()?.let { FunctionBody(it) }
             else -> null
         }
         //debug("TODO: functionBody")
@@ -796,7 +796,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun getter(modifiers: Modifiers = modifiers()): FunDecl? {
         if (!expectOpt("get")) return null
         var retType: Type? = null
-        var body: Stm? = null
+        var body: FunctionBody? = null
         opt {
             NLs()
             val res = expectAndRecover("(", ")", nullIfNotMatching = true) { NLs() } ?: return@opt null
@@ -818,7 +818,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     fun setter(modifiers: Modifiers = modifiers()): FunDecl? {
         if (!expectOpt("set")) return null
         var retType: Type? = null
-        var body: Stm? = null
+        var body: FunctionBody? = null
         var params: List<FuncValueParam> = emptyList()
         opt {
             NLs()
@@ -2242,7 +2242,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             NLs()
             params to stms
         }
-        return LambdaFunctionExpr(Stms(stms), params)
+        return LambdaFunctionExpr(FunctionBody(stms), params)
     }
 
     //lambdaParameters

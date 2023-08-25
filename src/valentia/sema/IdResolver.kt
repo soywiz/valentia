@@ -2,7 +2,27 @@ package valentia.sema
 
 import valentia.ast.*
 
-fun Node.resolve(id: String): Sequence<Decl> = currentDecl?.resolve(id) ?: emptySequence()
+fun Node.resolve(id: String): Sequence<Decl> = sequence {
+    val node = this@resolve
+    val body = this@resolve.currentFunctionBody
+    if (body != null) {
+        body.cfg
+        var currentNode: Node? = node.currentNodeWithBasicBlock
+        var basicBlock = currentNode?._basicBlock
+        //println("RESOLVE: '$id' in ${node._basicBlock} : $body")
+        while (basicBlock != null) {
+            //println(" -> $basicBlock")
+            val vv = basicBlock.locateVar(id)
+            vv?.decl?.let { yield(it) }
+            //println(" -> vv=$vv")
+            currentNode = currentNode?.parentNodeWithBasicBlock
+            basicBlock = currentNode?._basicBlock
+            //println(" -> $currentNode")
+        }
+        //TODO()
+    }
+    yieldAll(currentDecl?.resolve(id) ?: emptySequence())
+}
 
 fun Stm.getDecls(): List<Decl> {
     return when (this) {

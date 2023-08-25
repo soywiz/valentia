@@ -13,7 +13,7 @@ open class ValentiaParserObjectLiteralExprTest : StmBuilder {
             ValentiaParser.expression("""object { }""")
         )
         assertEquals(
-            ObjectLiteralExpr(body = listOf(FunDecl(name="test", params=emptyList(), body= Stms()))),
+            ObjectLiteralExpr(body = listOf(FunDecl(name="test", params=emptyList(), body=FunctionBody()))),
             ValentiaParser.expression("""object { fun test() { } }""")
         )
     }

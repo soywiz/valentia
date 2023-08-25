@@ -118,7 +118,7 @@ open class ValentiaParserVarStmTest : StmBuilder {
         assertEquals(
             VariableDecl(
                 "lit", type="BoolLiteralExpr".type,
-                getter = FunDecl("get", body = ReturnStm("BoolLiteralExpr".id(THIS)))
+                getter = FunDecl("get", body = FunctionBody(ReturnStm("BoolLiteralExpr".id(THIS))))
             ),
             ValentiaParser.topLevelDecl("""
                 val Boolean.lit: BoolLiteralExpr get() = BoolLiteralExpr(this)

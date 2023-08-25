@@ -83,7 +83,7 @@ class BasicBlock(val cfg: CFG, val id: Int, val label: String? = null) {
     }
 
     fun addNode(node: Node) {
-        node.basicBlock = this
+        node._basicBlock = this
         nodes += node
     }
 

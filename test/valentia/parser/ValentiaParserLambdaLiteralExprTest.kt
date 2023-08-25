@@ -8,7 +8,7 @@ open class ValentiaParserLambdaLiteralExprTest : StmBuilder {
     @Test
     fun testAnonymousFunctionLiteral1() {
         assertEquals(
-            DeclStm(decl= VariableDecl(id="a", expr=AnonymousFunctionExpr(decl=FunDecl(name="", params=listOf(FuncValueParam(id="a", type=IntType)), body=ReturnStm(10.lit))))),
+            DeclStm(decl= VariableDecl(id="a", expr=AnonymousFunctionExpr(decl=FunDecl(name="", params=listOf(FuncValueParam(id="a", type=IntType)), body=FunctionBody(ReturnStm(10.lit)))))),
             ValentiaParser.statement("val a = fun(a: Int) = 10") as Any
         )
     }

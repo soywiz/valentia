@@ -1,6 +1,9 @@
 package valentia.sema
 
 import valentia.ast.*
+import valentia.ast.cfg.BasicBlock
+import valentia.ast.cfg.BasicBlockBuilder
+import valentia.ast.cfg.CFG
 
 class SemaResolver : NodeTransformer() {
     companion object {
@@ -13,6 +16,12 @@ class SemaResolver : NodeTransformer() {
         return super.transform(program).also {
             it.semaResolved = true
         }
+    }
+
+    override fun transform(body: FunctionBody): FunctionBody {
+        println("transform.FunctionBody: ${body.parentNode}")
+        body.cfg
+        return super.transform(body)
     }
 
     // @TODO: Is this required?
@@ -29,6 +38,10 @@ class SemaResolver : NodeTransformer() {
         }
     }
 
+    override fun transform(expr: LambdaFunctionExpr): Expr {
+        return super.transform(expr)
+    }
+
     override fun transform(expr: IdentifierExpr): AssignableExpr {
         // Might be already resolved by the CallExpr
         if (expr.resolvedDecl == null) {
@@ -36,6 +49,16 @@ class SemaResolver : NodeTransformer() {
             val decls = expr.resolve(expr.id)
             val firstDecl = decls.firstOrNull()
             expr.resolvedDecl = firstDecl
+            if (firstDecl != null) {
+                val cfgExpr = expr.currentBasicBlock?.cfg
+                val cfgDecl = firstDecl.currentBasicBlock?.cfg
+                if (cfgExpr !== cfgDecl && cfgDecl != null) {
+                    //println("RESOLVE.id : ${expr.id} : $firstDecl : $cfgExpr, $cfgDecl")
+                    if (firstDecl is VariableDecl) {
+                        expr.currentFunctionBody?.varCaptures?.add(firstDecl)
+                    }
+                }
+            }
             if (firstDecl?.parentNode == currentClassDecl && currentClassDecl != null) {
                 expr.addThis = true
             }

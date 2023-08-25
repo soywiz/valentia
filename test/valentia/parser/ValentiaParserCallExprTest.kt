@@ -1,6 +1,5 @@
 package valentia.parser
 
-import valentia.ast.LambdaFunctionExpr
 import valentia.ast.StmBuilder
 import kotlin.test.Test
 import kotlin.test.assertEquals

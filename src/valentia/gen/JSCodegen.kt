@@ -75,7 +75,7 @@ open class JSCodegen {
                     }
                     if (decl.getter != null) {
                         indenter.line("get ${letStr}${decl.jsName}()") {
-                            generateStm(decl.getter.body, parent)
+                            generateStm(decl.getter.body?.stms, parent)
                         }
                     } else {
                         val expr = decl.expr
@@ -223,7 +223,7 @@ open class JSCodegen {
                 val headerLine = indenter.line("").also { it.opt = true }
                 try {
                     transformContext = TransformUnsupportedNodes.TransformContext()
-                    generateStmsCompact(transformer.transform(it), func)
+                    generateStmsCompact(transformer.transform(it.stms), func)
                 } finally {
                     if (transformContext.temps.isNotEmpty()) {
                         headerLine.str += "let " + transformContext.temps.joinToString(", ") { "$it" } + ";"
@@ -376,7 +376,7 @@ open class JSCodegen {
                 //   () => 1 + captured
 
                 val str = initLambdaBlock {
-                    val stms = expr.stms.stms
+                    val stms = expr.body.stms.stms
                     for ((index, stm) in stms.withIndex()) {
                         val isLast = (index == stms.size - 1)
                         if (isLast && stm is ExprStm) {
@@ -389,8 +389,12 @@ open class JSCodegen {
                 val params = expr.allParams.map { it.jsName }
                 val paramsStr = params.joinToString(", ")
                 // TODO: determine locals from upper scopes
-                //if (capturedArgs != "") "(($capturedArgs) => () => { $str })($capturedArgs)" else
-                "($paramsStr) => { $str }"
+                val capturedArgs = expr.body.varCaptures.map { it.declName }
+                val capturedArgsStr = capturedArgs.joinToString(", ")
+                when {
+                    capturedArgsStr != "" -> "(($capturedArgsStr) => ($paramsStr) => { $str })($capturedArgsStr)"
+                    else -> "($paramsStr) => { $str }"
+                }
             }
             is BreakExpr -> throw UnsupportedOperationException("break expression not supported")
             is ContinueExpr -> throw UnsupportedOperationException("continue expression not supported")

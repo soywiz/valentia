@@ -65,7 +65,7 @@ data class DefinitelyNonNullableType(
 data class UnificationExprType(val exprs: List<ExprOrStm>) : Type() {
     constructor(vararg exprs: ExprOrStm?) : this(exprs.filterNotNull())
 
-    override fun getTypeUncached(): Type {
+    override fun getNodeTypeUncached(): Type {
         return TypeUnification.unify(*exprs.map { it.getNodeType() }.toTypedArray())
     }
 }
@@ -81,6 +81,7 @@ val BoolType = SimpleType("Boolean")
 val CharType = SimpleType("Char")
 val StringType = SimpleType("String")
 val IntType = SimpleType("Int")
+val IntArrayType = SimpleType("IntArray")
 val AnyType = SimpleType("Any")
 val AnyOptType = AnyType.nullable()
 val FloatType = SimpleType("Float")

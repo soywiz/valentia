@@ -3,6 +3,9 @@ package valentia.ast.cfg
 import valentia.ast.*
 
 class BasicBlockBuilder(private val cfg: CFG = CFG()) {
+    companion object {
+        fun build(stm: Stm): CFG = BasicBlockBuilder().also { it.build(stm) }.finalize()
+    }
     // This assumes expressions don't have control flow instructions. So it cannot include a return or an if in an expression
 
     fun build(stm: Stm): Pair<BasicBlock, BasicBlock> = build(stm.toList())
