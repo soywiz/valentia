@@ -108,7 +108,7 @@ interface StmBuilder : DeclBuilder {
     fun STM(decl: Decl): DeclStm = DeclStm(decl).addStm()
     fun WHILE(expr: Expr, compact: Boolean = true, block: StmBuilder.() -> Unit): WhileLoopStm = WhileLoopStm(expr, buildStm(compact) { block() }).addStm()
     fun FOR(id: String, expr: Expr, block: (StmBuilder.() -> Unit)? = null): ForLoopStm =
-        ForLoopStm(expr, VariableDecl(id), body = block?.let { buildStmCompact { block() } })
+        ForLoopStm(expr, VariableDecl(id), body = block?.let { buildStmCompact { block() } } ?: EmptyStm())
     fun RETURN(expr: Expr? = null, label: String? = null): ReturnExpr = ReturnExpr(expr, label).addStm()
     fun THROW(expr: Expr): ThrowExpr = ThrowExpr(expr).addStm()
     fun WHEN(expr: Expr? = null, block: WhenBuilder.() -> Unit): WhenExpr {

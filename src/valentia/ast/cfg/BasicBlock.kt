@@ -8,6 +8,8 @@ class CFG {
     val blocks = arrayListOf<BasicBlock>()
     val edges = arrayListOf<BasicBlock.Edge>()
 
+    val firstBasicBlock get() = blocks.first()
+
     fun create(): BasicBlock {
         return BasicBlock(this, lastId++).also { blocks += it }
     }

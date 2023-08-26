@@ -73,6 +73,7 @@ open class JSCodegen {
                         parent !is ClassLikeDecl -> "let "
                         else -> ""
                     }
+                    //println("LET: $letStr : ${decl.declName}")
                     if (decl.getter != null) {
                         indenter.line("get ${letStr}${decl.jsName}()") {
                             generateStm(decl.getter.body?.stms, parent)
@@ -204,6 +205,7 @@ open class JSCodegen {
         //}
 
         val functionMod = if (parent is ClassLikeDecl) "" else "function "
+        val functionTypeMode = if (func.typeParams != null) " /* ${func.typeParams.joinToString(", ")} */ " else ""
         val suspendMod = if (func.isSuspend) "*" else ""
         if (func.jsName == "next\$1") {
             indenter.line("*[Symbol.iterator]()") {
@@ -217,7 +219,7 @@ open class JSCodegen {
             //    line("return { value: this.next\$1(), done: false };")
             //}
         }
-        indenter.line("${functionMod}${suspendMod}${func.jsName}($params)") {
+        indenter.line("${functionMod}$functionTypeMode${suspendMod}${func.jsName}($params)") {
             func.body?.let {
                 val oldContext = transformContext
                 val headerLine = indenter.line("").also { it.opt = true }
@@ -266,7 +268,13 @@ open class JSCodegen {
                         }
                     }
                     is ClassDecl -> "new ${resolved.jsName}"
-                    else -> "$thisStr$name"
+                    is VariableDecl -> "$thisStr$name"
+                    is FuncValueParam -> "$thisStr$name"
+                    is FunDecl -> "$thisStr${resolved.jsName}"
+                    else -> {
+                        TODO("resolved=$resolved, thisStr=$thisStr, name=$name")
+                        "$thisStr$name"
+                    }
                 }
 
             }
@@ -285,6 +293,7 @@ open class JSCodegen {
             //}
             is NavigationExpr -> {
                 if (expr.op != ".") error("Unsupported ${expr.op}")
+                //println("expr.resolvedDecl=${expr.resolvedDecl}")
                 val keyStr = when (expr.key) {
                     is Expr -> generateExpr(expr.key)
                     else -> expr.resolvedDecl?.jsName ?: expr.key.toString()
@@ -593,6 +602,7 @@ open class JSCodegen {
         return when (vardecl) {
             is MultiVariableDecl -> "(" + vardecl.decls.joinToString(", ") { it.id } + ")"
             is VariableDecl -> vardecl.id
+            is FuncValueParam -> vardecl.id
             null -> TODO("vardecl=null")
         }
     }

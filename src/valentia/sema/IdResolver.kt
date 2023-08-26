@@ -2,7 +2,7 @@ package valentia.sema
 
 import valentia.ast.*
 
-fun Node.resolve(id: String): Sequence<Decl> = sequence {
+fun INode.resolve(id: String): Sequence<IDecl> = sequence {
     val node = this@resolve
     val body = this@resolve.currentFunctionBody
     if (body != null) {
@@ -24,7 +24,7 @@ fun Node.resolve(id: String): Sequence<Decl> = sequence {
     yieldAll(currentDecl?.resolve(id) ?: emptySequence())
 }
 
-fun Stm.getDecls(): List<Decl> {
+fun Stm.getDecls(): List<IDecl> {
     return when (this) {
         is Stms -> this.stms.flatMap { it.getDecls() }
         is DeclStm -> listOf(this.decl)
@@ -32,20 +32,31 @@ fun Stm.getDecls(): List<Decl> {
     }
 }
 
-fun Decl.resolve(id: String): Sequence<Decl> = sequence<Decl> {
+fun IDecl.resolve(id: String): Sequence<IDecl> = sequence<IDecl> {
     val decl = this@resolve
     //println("type=$type -> decl=$decl")
     when (decl) {
-        //is FunDecl -> {
-        //    decl.body?.getDecls()?.let { yieldAll(it) }
-        //    parentDecl?.resolve(id)?.let { yieldAll(it) }
-        //}
+        is LambdaFunctionExpr -> {
+            if (id == "it") {
+                yield(decl.implicitIdDecl)
+            }
+            //TODO("id=$id")
+            parentDecl?.resolve(id)?.let { yieldAll(it) }
+        }
+        is FunDecl -> {
+            decl.allParamsById[id]?.let { yield(it) }
+            parentDecl?.resolve(id)?.let { yieldAll(it) }
+        }
         is ClassDecl -> {
             // Check subtypes
             val potential = decl.bodyAllByName[id]
             if (potential != null) {
                 yieldAll(potential)
             }
+
+            // Check parameters without this if we are in the right place (init block, or expressions in body)
+            decl.primaryConstructor?.paramsById?.get(id)?.let { yield(it) } // Add this
+
             //println("ClassDecl: $potential")
             parentDecl?.resolve(id)?.let { yieldAll(it) }
         }

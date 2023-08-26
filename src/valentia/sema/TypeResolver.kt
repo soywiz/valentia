@@ -4,7 +4,7 @@ import valentia.ast.*
 import valentia.util.Extra
 
 
-val Node.program: Program? get() = if (this is Program) this else parentDecl?.program
+val INode.program: Program? get() = if (this is Program) this else parentDecl?.program
 
 fun SimpleType.resolveSimpleType(): TypeDecl = resolvedDecl ?: this.resolveSimpleType(this).also {
     this.resolvedDecl = it
@@ -19,20 +19,29 @@ fun Type.getSimpleType(): SimpleType {
         is NullableType -> this.type.getSimpleType()
         is SimpleType -> this
         is UnificationExprType -> TODO()
+        is TemplateType -> TODO()
     }
 }
 
-fun Node.resolveType(type: Type): TypeDecl {
+fun INode.resolveType(type: Type): TypeDecl {
     return resolveSimpleType(type.getSimpleType())
 }
 
-fun Node.resolveSimpleType(type: SimpleType): TypeDecl = currentDecl!!.resolveSimpleType(type)
+fun INode.resolveSimpleType(type: SimpleType): TypeDecl = currentDecl!!.resolveSimpleType(type)
 
-fun Decl.resolveSimpleType(type: SimpleType): TypeDecl {
+fun IDecl.resolveSimpleType(type: SimpleType): TypeDecl {
     val decl = this
     //println("type=$type -> decl=$decl")
     return decl.simpleTypeCache.getOrPut(type.name) {
         when (decl) {
+            is LambdaFunctionExpr -> {
+                //TODO("IDecl.resolveSimpleType: $type")
+                parentDecl?.resolveSimpleType(type)
+            }
+            is FunDecl -> {
+                decl.typeParamsById[type.name]?.let { return@getOrPut it }
+                parentDecl?.resolveSimpleType(type)
+            }
             is ClassDecl -> {
                 // Check subtypes
                 val potential = decl.bodyAllByName[type.name]?.filterIsInstance<TypeDecl>()
@@ -79,9 +88,9 @@ fun Decl.resolveSimpleType(type: SimpleType): TypeDecl {
     }
 }
 
-val ClassLikeDecl.directResolvedSubTypes: List<Decl> by Extra.PropertyThis {
+val ClassLikeDecl.directResolvedSubTypes: List<IDecl> by Extra.PropertyThis {
     val subtypes = (this.subTypes ?: emptyList()).map { it.type }
-    println(subtypes)
-    val decls: List<Decl> = subtypes.mapNotNull { resolve(it.toString()).firstOrNull() }
+    //println("ClassLikeDecl.directResolvedSubTypes: $subtypes")
+    val decls: List<IDecl> = subtypes.mapNotNull { resolve(it.toString()).firstOrNull() }
     decls.distinct()
 }

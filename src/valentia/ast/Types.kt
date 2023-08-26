@@ -9,6 +9,10 @@ sealed class Type : Node()
 //data class PackageName(val parts: List<String>)
 //data class FqName(val parts: List<String>)
 
+data class TemplateType(val id: String, val type: Type = AnyOptType) : Type() {
+
+}
+
 data class SimpleType(val name: String) : Type() {
     var fqname: String? = null
     //val _package: String? = null
@@ -70,6 +74,8 @@ data class UnificationExprType(val exprs: List<ExprOrStm>) : Type() {
     }
 }
 
+fun UnknownType(message: String) = SimpleType("Unknown\$$message")
+
 val DynamicType = SimpleType("dynamic")
 val NothingType = SimpleType("Nothing")
 val UnknownType = SimpleType("Unknown")
@@ -86,6 +92,9 @@ val AnyType = SimpleType("Any")
 val AnyOptType = AnyType.nullable()
 val FloatType = SimpleType("Float")
 val ClassType = SimpleType("KClass")
+
+val DynamicTypeDecl = VariableDecl("dynamic", DynamicType, modifiers = Modifiers(Modifier.EXTERNAL))
+val UnknownTypeDecl2 = VariableDecl("Unknown", DynamicType, modifiers = Modifiers(Modifier.EXTERNAL))
 
 fun FuncType.suspendable(): FuncType = this.copy(suspendable = true)
 

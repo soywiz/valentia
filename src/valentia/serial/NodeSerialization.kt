@@ -184,6 +184,8 @@ open class NodeSerializer : BinaryWriter(), NodeSerializationCommon {
             is MultiVariableDecl -> TODO()
             is VariableDecl -> TODO()
             is UnknownTypeDecl -> TODO()
+            is TypeParameter -> TODO()
+            is FuncValueParam -> TODO()
         }
     }
 

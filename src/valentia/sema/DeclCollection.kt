@@ -1,14 +1,11 @@
 package valentia.sema
 
-import valentia.ast.ClassLikeDecl
-import valentia.ast.Decl
-import valentia.ast.FuncType
-import valentia.ast.Type
+import valentia.ast.*
 
-inline class DeclCollection(val declsNull: List<Decl>?) {
-    val decls: List<Decl> get() = declsNull ?: emptyList()
+inline class DeclCollection(val declsNull: List<IDecl>?) {
+    val decls: List<IDecl> get() = declsNull ?: emptyList()
 
-    fun findMatch(type: Type): Decl? {
+    fun findMatch(type: Type): IDecl? {
         val items = declsNull ?: return null
         for (item in items) {
             // @TODO: Check constructors

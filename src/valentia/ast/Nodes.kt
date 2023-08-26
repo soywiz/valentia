@@ -3,34 +3,60 @@ package valentia.ast
 import valentia.ast.NodeBuilder.Companion.type
 import valentia.ast.cfg.BasicBlock
 import valentia.ast.cfg.BasicBlockBuilder
+import valentia.ast.cfg.CFG
 import valentia.parser.BaseConsumer
 import valentia.sema.*
 import valentia.util.Extra
 import valentia.util.quoted
 
-sealed class Node : Extra by Extra.Mixin() {
-    var reader: BaseConsumer? = null
-    var spos: Int = -1
-    var epos: Int = -1
-    val rangeStr: String? get() = reader?.readAbsoluteRange(spos, epos)
-    var nodeAnnotations: Annotations? = null
-    var parentNode: Node? = null
-    val parentDecl: Decl? by lazy { if (parentNode is Decl) parentNode as Decl else parentNode?.parentDecl }
-    val currentDecl: Decl? get() = if (this is Decl) this else parentDecl
-    var _basicBlock: BasicBlock? = null
+interface IDeclContainer
 
-    val currentNodeWithBasicBlock: Node? get() = if (this._basicBlock != null) this else parentNode?.currentNodeWithBasicBlock
-    val parentNodeWithBasicBlock: Node? get() = currentNodeWithBasicBlock?.parentNode?.currentNodeWithBasicBlock
+interface INode : Extra {
+    var reader: BaseConsumer?
+    var spos: Int
+    var epos: Int
+    val rangeStr: String?
+    var nodeAnnotations: Annotations?
+    var parentNode: Node?
+    val parentDecl: IDecl?
+    val currentDecl: IDecl?
+    var _basicBlock: BasicBlock?
 
-    val nextBasicBlock: BasicBlock? get() = parentNodeWithBasicBlock?._basicBlock
-    val currentBasicBlock: BasicBlock? get() = currentNodeWithBasicBlock?._basicBlock
-    val currentFunctionBody: FunctionBody? get() = if (this is FunctionBody) this else parentNode?.currentFunctionBody
+    val currentNodeWithBasicBlock: Node?
+    val parentNodeWithBasicBlock: Node?
 
-    fun addNode(item: Node?) {
+    val nextBasicBlock: BasicBlock?
+    val currentBasicBlock: BasicBlock?
+    val currentFunctionBody: FunctionBody?
+
+    fun addNode(item: Node?)
+    fun addNode(items: List<Node?>?)
+    fun getNodeType(): Type
+}
+
+sealed class Node : INode, Extra by Extra.Mixin() {
+    override var reader: BaseConsumer? = null
+    override var spos: Int = -1
+    override var epos: Int = -1
+    override val rangeStr: String? get() = reader?.readAbsoluteRange(spos, epos)
+    override var nodeAnnotations: Annotations? = null
+    override var parentNode: Node? = null
+    override val parentDecl: IDecl? by lazy { if (parentNode is IDecl) parentNode as IDecl else parentNode?.parentDecl }
+    override val currentDecl: IDecl? get() = if (this is IDecl) this else parentDecl
+    override var _basicBlock: BasicBlock? = null
+
+    override val currentNodeWithBasicBlock: Node? get() = if (this._basicBlock != null) this else parentNode?.currentNodeWithBasicBlock
+    override val parentNodeWithBasicBlock: Node? get() = currentNodeWithBasicBlock?.parentNode?.currentNodeWithBasicBlock
+
+    override val nextBasicBlock: BasicBlock? get() = parentNodeWithBasicBlock?._basicBlock
+    override val currentBasicBlock: BasicBlock? get() = currentNodeWithBasicBlock?._basicBlock
+    override val currentFunctionBody: FunctionBody? get() = if (this is FunctionBody) this else parentNode?.currentFunctionBody
+
+    override fun addNode(item: Node?) {
         item?.parentNode = this
     }
 
-    fun addNode(items: List<Node?>?) {
+    override fun addNode(items: List<Node?>?) {
         if (items == null) return
         for (item in items) addNode(item)
     }
@@ -38,7 +64,7 @@ sealed class Node : Extra by Extra.Mixin() {
     private var _cachedType: Type? = null
     protected open fun getNodeTypeUncached(): Type =
         TODO("${this::class} $this")
-    fun getNodeType(): Type {
+    override fun getNodeType(): Type {
         if (_cachedType == null) _cachedType = getNodeTypeUncached()
         return _cachedType!!
     }
@@ -257,10 +283,15 @@ enum class AnnotationUseSite(val id: String) {
 
 // Decl
 
-sealed class Decl(val declName: String) : Node() {
-    open val jsName: String get() = declName
+sealed interface IDecl : INode {
+    val simpleTypeCache: LinkedHashMap<String, TypeDecl>
+    val jsName: String
+}
 
-    val simpleTypeCache = LinkedHashMap<String, TypeDecl>()
+sealed class Decl(val declName: String) : Node(), IDecl {
+    override val jsName: String get() = declName
+
+    override val simpleTypeCache = LinkedHashMap<String, TypeDecl>()
 }
 
 data class TypeAliasDecl(
@@ -325,6 +356,8 @@ data class PrimaryConstructorDecl(
     override val params: List<FuncValueParam> = classParams.map {
         FuncValueParam(it.id, it.type)
     }
+
+    val paramsById by lazy { params.associateBy { it.id } }
 }
 data class ConstructorDecl(
     override val params: List<FuncValueParam> = emptyList(),
@@ -444,11 +477,14 @@ data class FunDecl constructor(
     val where: List<TypeConstraint>? = null,
     val body: FunctionBody? = null,
     val receiver: Type? = null,
+    val typeParams: List<TypeParameter>? = null,
     override val modifiers: Modifiers = Modifiers.EMPTY,
 ) : CallableDecl(name), ModifiersContainer {
     init {
         addNode(body)
     }
+
+    val typeParamsById by lazy { (typeParams ?: emptyList()).associateBy { it.id } }
 
     val isSuspend: Boolean get() = FunctionModifier.SUSPEND in modifiers
 
@@ -456,6 +492,9 @@ data class FunDecl constructor(
     val allParams: List<FuncValueParam> by lazy {
         listOfNotNull(receiver?.let { FuncValueParam("\$this", receiver) }, *params.toTypedArray(), if (isSuspend) FuncValueParam("\$coroutineContext", CoroutineContextType) else null)
     }
+
+    val allParamsById by lazy { allParams.associateBy { it.id } }
+
     val isTopLevel get() = parentDecl is FileNode
     val jsHash by lazy { params.map { it.type }.hashCode() and 0x7FFFFFFF }
     override val jsName by lazy {
@@ -610,8 +649,17 @@ data class FunctionBody(val stms: Stms) : Node() {
 
 sealed class Expr : ExprWithFlow()
 
-data class LambdaFunctionExpr(val body: FunctionBody = FunctionBody(), val params: List<VariableDeclBase>? = null) : Expr() {
-    val allParams = params ?: listOf(VariableDecl("it", UnknownType))
+data class LambdaFunctionExpr(val body: FunctionBody = FunctionBody(), val params: List<VariableDeclBase>? = null) : Expr(), IDecl {
+    val implicitIdDecl by lazy {
+        VariableDecl("it", UnknownType).also {
+            it._basicBlock = body.cfg.firstBasicBlock
+        }
+    }
+    val allParams by lazy {
+        params ?: listOf(implicitIdDecl)
+    }
+    override val simpleTypeCache = LinkedHashMap<String, TypeDecl>()
+    override val jsName: String get() = "\$lambda"
 
     init {
         addNode(body)
@@ -708,8 +756,17 @@ data class ParameterOptType(val id: String, val type: Type?, val modifiers: Modi
         addNode(expr)
     }
 }
-data class FuncValueParam(val id: String, val type: Type?) : Node()
-data class TypeParameter(val id: String, val type: Type?) : Node()
+data class FuncValueParam(val id: String, val type: Type?) : VariableDeclBase(id) {
+    override val modifiers: Modifiers get() = Modifiers.EMPTY
+    override val kind: VariableKind get() = VariableKind.VAL
+
+    override fun getNodeTypeUncached(): Type {
+        return type ?: UnknownType
+    }
+}
+data class TypeParameter(val id: String, val type: Type?) : TypeDecl(id) {
+    val ttype = TemplateType(id, type ?: UnknownType)
+}
 
 fun ParameterOptType.toFuncValueParam(): FuncValueParam = FuncValueParam(id, type ?: UnknownType)
 fun FuncValueParam.toNamedTypeNode(): FuncType.Item = FuncType.Item(this.type, this.id)
@@ -756,7 +813,7 @@ sealed class BaseCallExpr : Expr() {
     abstract val typeArgs: List<Type>?
     val paramsPlusLambda by lazy { params + listOfNotNull(lambdaArg) }
 
-    var resolvedDecl: Decl? = null
+    var resolvedDecl: IDecl? = null
     var addThis: Boolean = false
 
     open fun getFuncType(): FuncType = FuncType(null, params.map { FuncType.Item(it.getNodeType()) })
@@ -791,7 +848,7 @@ data class NavigationExpr(val op: String, val expr: Expr, val key: Any) : Assign
         if (key is Node) addNode(key)
     }
 
-    var resolvedDecl: Decl? = null
+    var resolvedDecl: IDecl? = null
 
     override fun getNodeTypeUncached(): Type {
         return resolvedDecl?.getNodeType() ?: UnknownType
@@ -810,7 +867,7 @@ data class IndexedExpr(val expr: Expr, val indices: List<Expr>) : AssignableExpr
             is GenericType -> arrayType.generics.first()
             UnknownType -> UnknownType
             IntArrayType -> IntType
-            else -> TODO("arrayType=$arrayType")
+            else -> UnknownType("Unknown $arrayType")
         }
     }
 }
@@ -838,7 +895,7 @@ data class UnaryPreOpExpr(val op: UnaryPreOp, val expr: Expr) : Expr() {
 
 data class IdentifierExpr(val id: String) : AssignableExpr() {
     var addThis: Boolean = false
-    var resolvedDecl: Decl? = null
+    var resolvedDecl: IDecl? = null
 
     override fun getNodeTypeUncached(): Type {
         return resolvedDecl?.getNodeType() ?: resolve(id).firstOrNull()?.getNodeType() ?: UnknownType
@@ -1102,7 +1159,7 @@ sealed class LoopStm(
 }
 
 /** Iterates over a collection */
-data class ForLoopStm(val expr: Expr, val vardecl: VariableDeclBase?, val body: Stm? = null, val annotations: Annotations = Annotations.EMPTY, override val modifiers: Modifiers = Modifiers.EMPTY) : LoopStm() {
+data class ForLoopStm constructor(val expr: Expr, val vardecl: VariableDeclBase, val body: Stm, val annotations: Annotations = Annotations.EMPTY, override val modifiers: Modifiers = Modifiers.EMPTY) : LoopStm() {
     init {
         addNode(expr)
         addNode(vardecl)

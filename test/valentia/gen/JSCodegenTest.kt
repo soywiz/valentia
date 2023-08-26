@@ -10,10 +10,51 @@ import kotlin.test.assertEquals
 
 class JSCodegenTest {
     @Test
+    fun testFuncParam() {
+        assertEquals(
+            "7",
+            genAndRunJs("""
+                external class Int
+                external val console: dynamic
+                
+                fun Int.sample(): Int = this - 2
+                fun test(demo: Int): Int {
+                    return demo.sample()
+                }
+                fun main() {
+                    console.log(test(9))
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
+    fun testFuncGeneric() {
+        assertEquals(
+            "7",
+            genAndRunJs("""
+                external val console: dynamic
+                
+                class Demo(val a: Int) {
+                    fun a(): Int = a
+                }
+                fun <T : Demo> test(demo: T): Int {
+                    console.log(T::class)
+                    return demo.a()
+                }
+                fun main() {
+                    console.log(test(Demo(7)))
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
     fun testIfTernary() {
         assertEquals(
             "a\nb",
             genAndRunJs("""
+                external val console: dynamic
                 fun main() {
                     val a = 10
                     val b = if (a == 10) "a" else "b"
@@ -30,6 +71,7 @@ class JSCodegenTest {
         assertEquals(
             "9",
             genAndRunJs("""
+                external val console: dynamic
                 external class Int
                 fun Int.squared(): Int = this * this                 
 
@@ -45,6 +87,7 @@ class JSCodegenTest {
         assertEquals(
             "ab",
             genAndRunJs("""
+                external val console: dynamic
                 class Demo(val a: String) {
                     operator fun plus(other: Demo): String = a + other.a
                 }                
@@ -62,6 +105,7 @@ class JSCodegenTest {
             "[class mypackage\$Demo]",
             genAndRunJs("""
                 package mypackage
+                external val console: dynamic
                 class Demo
                 fun main() {
                     console.log(Demo::class)
@@ -75,6 +119,7 @@ class JSCodegenTest {
         assertEquals(
             "true",
             genAndRunJs("""
+                external val console: dynamic
                 class Demo
                 val demo = Demo()
                 fun main() {
@@ -89,7 +134,9 @@ class JSCodegenTest {
         assertEquals(
             "0\n2\n4\n6\n8\n10",
             genAndRunJs("""
+                external val console: dynamic
                 external fun println(v: Any?)
+                external class NoSuchElementException
                 
                 interface Iterator<out T> {
                     operator fun next(): T
@@ -110,7 +157,7 @@ class JSCodegenTest {
                     override fun nextInt(): Int {
                         val value = next
                         if (value >= finalElement) {
-                            if (!hasNext) throw kotlin.NoSuchElementException()
+                            if (!hasNext) throw NoSuchElementException()
                             hasNext = false
                         } else {
                             next += step
@@ -162,6 +209,7 @@ class JSCodegenTest {
         assertEquals(
             "7",
             genAndRunJs("""
+                external val console: dynamic
                 class Demo { val a = 7 }
                 fun main() = console.log(Demo().a)
             """.trimIndent(), printJs = true)
@@ -173,6 +221,7 @@ class JSCodegenTest {
         assertEquals(
             "7",
             genAndRunJs("""
+                external val console: dynamic
                 class Demo { fun a() = 7 }
                 fun main() = console.log(Demo().a())
             """.trimIndent(), printJs = true)
@@ -185,6 +234,7 @@ class JSCodegenTest {
         assertEquals(
             "8\n9",
             genAndRunJs("""
+                external val console: dynamic
                 class Demo1 {
                     fun b() = 7
                     open fun a() = 1 + this.b() 
@@ -200,10 +250,10 @@ class JSCodegenTest {
 
     @Test
     fun testSimpleForLoop() {
-        assertEquals("0\n1\n2\n3", genAndRunJs("fun main() { for (n in 0 .. 3) console.log(n) }", printJs = true))
-        assertEquals("0\n1\n2", genAndRunJs("fun main() { for (n in 0 ..< 3) console.log(n) }", printJs = true))
-        assertEquals("0\n1\n2", genAndRunJs("fun main() { for (n in 0 until 3) console.log(n) }", printJs = true))
-        assertEquals("3\n2\n1\n0", genAndRunJs("fun main() { for (n in 3 downTo 0) console.log(n) }", printJs = true))
+        assertEquals("0\n1\n2\n3", genAndRunJs("external val console: dynamic\nfun main() { for (n in 0 .. 3) console.log(n) }", printJs = true))
+        assertEquals("0\n1\n2", genAndRunJs("external val console: dynamic\nfun main() { for (n in 0 ..< 3) console.log(n) }", printJs = true))
+        assertEquals("0\n1\n2", genAndRunJs("external val console: dynamic\nfun main() { for (n in 0 until 3) console.log(n) }", printJs = true))
+        assertEquals("3\n2\n1\n0", genAndRunJs("external val console: dynamic\nfun main() { for (n in 3 downTo 0) console.log(n) }", printJs = true))
     }
 
     @Test
@@ -211,6 +261,7 @@ class JSCodegenTest {
         assertEquals(
             "0\n1\n2\n3\n1 1",
             genAndRunJs("""
+                external val console: dynamic
                 var count1 = 0
                 var count2 = 0
                 fun func1(): Int {
@@ -261,6 +312,7 @@ class JSCodegenTest {
             12
             123
         """.trimIndent(), genAndRunJs("""
+            external val console: dynamic
             @JsName("Int32Array")
             @JsBody("Int32Array.prototype.hashCode = () => 0;")
             external class IntArray {
@@ -280,14 +332,15 @@ class JSCodegenTest {
 
     @Test
     fun testWhileLoop() {
-        assertEquals("1\n2\n3\n4", genAndRunJs("fun main() { var n = 0; while (n++ < 4) console.log(n) }", printJs = true))
-        assertEquals("1\n2\n3", genAndRunJs("fun main() { var n = 0; while (++n < 4) console.log(n) }", printJs = true))
+        assertEquals("1\n2\n3\n4", genAndRunJs("external val console: dynamic\nfun main() { var n = 0; while (n++ < 4) console.log(n) }", printJs = true))
+        assertEquals("1\n2\n3", genAndRunJs("external val console: dynamic\nfun main() { var n = 0; while (++n < 4) console.log(n) }", printJs = true))
     }
 
     @Test
     fun testDoWhileLoop() {
-        assertEquals("0\n1\n2\n3\n4", genAndRunJs("fun main() { var n = 0; do console.log(n) while (n++ < 4) }", printJs = true))
-        assertEquals("0\n1\n2\n3", genAndRunJs("fun main() { var n = 0; do console.log(n) while (++n < 4) }", printJs = true))
+
+        assertEquals("0\n1\n2\n3\n4", genAndRunJs("external val console: dynamic\nfun main() { var n = 0; do console.log(n) while (n++ < 4) }", printJs = true))
+        assertEquals("0\n1\n2\n3", genAndRunJs("external val console: dynamic\nfun main() { var n = 0; do console.log(n) while (++n < 4) }", printJs = true))
     }
 
     //val RESOURCES_PREFIX = "src/commonTest/resources"
@@ -320,6 +373,7 @@ class JSCodegenTest {
         assertEquals(
             "String\nChar",
             genAndRunJs("""
+                external val console: dynamic
                 fun foverload(a: Int): String { return "Int" }
                 fun foverload(a: String): String { return "String" }
                 fun foverload(a: Char): String { return "Char" }
@@ -337,6 +391,7 @@ class JSCodegenTest {
         assertEquals(
             "1\n-3",
             genAndRunJs("""
+                external val console: dynamic
                 fun min(a: Int, b: Int): Int { return if (a < b) a else b }
                 fun main() {
                     console.log(min(1, 2))
@@ -351,6 +406,7 @@ class JSCodegenTest {
         assertEquals(
             "27",
             genAndRunJs("""
+                external val console: dynamic
                 class Demo() {
                     var a = 1
                     init { this.a += 3 }
@@ -388,6 +444,7 @@ class JSCodegenTest {
         assertEquals(
             "-1073741824\n2\n949312677\n1018518717\n69206040\n2\n44\n-1\n1073741823",
             genAndRunJs("""
+                external val console: dynamic
                 fun main() {
                     console.log(2147483648 + 1073741824)
                     console.log(-2147483647 + -2147483647)
@@ -408,6 +465,7 @@ class JSCodegenTest {
         assertEquals(
             "false\ntrue\ntrue",
             genAndRunJs("""
+                external val console: dynamic
                 fun main() {
                     console.log(true && false)
                     console.log(true || false)
@@ -422,6 +480,7 @@ class JSCodegenTest {
         assertEquals(
             "12",
             genAndRunJs("""
+                external val console: dynamic
                 fun sum(a: Int, b: Int): Int { return a + b }
                 fun main() {
                     console.log(sum(1, 3) * 3)
@@ -435,6 +494,7 @@ class JSCodegenTest {
         assertEquals(
             "22",
             genAndRunJs("""
+                external val console: dynamic
                 external class Int
                 fun Int.intApply2(func: (Int) -> Int): Int = func(this) * 2
                 fun main() {
@@ -450,12 +510,30 @@ class JSCodegenTest {
         assertEquals(
             "42",
             genAndRunJs("""
+                external val console: dynamic
                 external class Int
                 fun main() {
                     var captured = 10
                     val func: (Int) -> Int = { it + 1 + captured }
                     captured = 20 // Should be ignored because of the capture
                     console.log(func(31) )
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
+    fun testGenericArraySimple() {
+        assertEquals(
+            "hello world",
+            genAndRunJs("""
+                external val console: dynamic
+                external class Array<T>
+                fun main() {
+                    val array = Array<String>(10)
+                    array[0] = "hello"
+                    array[1] = "world"
+                    console.log(array[0], array[1])
                 }
             """.trimIndent(), printJs = true)
         )

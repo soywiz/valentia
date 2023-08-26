@@ -58,6 +58,16 @@ class BasicBlockBuilder(private val cfg: CFG = CFG()) {
                     current.connect(new)
                     current = new
                 }
+                is ForLoopStm -> {
+                    createNewBlock()
+                    val before = current
+                    val (start, end) = build(stm.body)
+                    start.decls.add(BasicBlock.DeclWithInfo(stm.vardecl))
+                    before.connect(start)
+                    end.connect(before)
+                    createNewBlock()
+                    before.connect(current)
+                }
                 is ReturnStm -> {
                     current.leaf = true
                     current.addNode(stm)

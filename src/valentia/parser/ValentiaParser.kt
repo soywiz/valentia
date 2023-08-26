@@ -242,8 +242,10 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         NLs()
         val types = if (matches("<")) typeParameters() else null
         NLs()
-        val mods = modifiers()
-        val primaryConstructor = if (matches("constructor") || matches("(")) primaryConstructor(mods) else null
+        val primaryConstructor = opt {
+            val mods = modifiers()
+            if (matches("constructor") || matches("(")) primaryConstructor(mods) else null
+        }
         //val primaryConstructor = if (matches("constructor") || matches("(")) primaryConstructor() else null
         NLs()
         val subTypes = if (expectOpt(":")) {
@@ -639,7 +641,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         val typeConstraints = typeConstraints()
         NLs()
         val body = if (matches("=") || matches("{")) functionBody() else null
-        return FunDecl(funcName, params, retType = retType, where = typeConstraints, body = body, modifiers = modifiers, receiver = receiver)
+        return FunDecl(funcName, params, retType = retType, where = typeConstraints, body = body, modifiers = modifiers, receiver = receiver, typeParams = typeParams)
         //} catch (e: Throwable) {
         //    Throwable("Function was not able to be parsed '$funcNameOpt' :: ${readAbsoluteRange(spos, pos)}", e).printStackTrace()
         //    TODO("Function was not able to be parsed '$funcNameOpt': ${readAbsoluteRange(spos, pos)} :: $e")
@@ -1374,7 +1376,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
 
         val body = if (expectOpt(";")) null else controlStructureBody()
         //val body = controlStructureBody()
-        ForLoopStm(expr, vardecl, body, annotations, modifiers)
+        ForLoopStm(expr, vardecl!!, body ?: EmptyStm(), annotations, modifiers)
     }
 
     // whileStatement

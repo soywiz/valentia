@@ -63,6 +63,7 @@ class SemaResolver : NodeTransformer() {
                 expr.addThis = true
             }
         }
+        if (expr.resolvedDecl == null) error("expr.resolvedDecl = null : $expr")
         //println("expr.addThis=${expr.addThis}, expr=$expr, firstDecl=$firstDecl, currentClassDecl=$currentClassDecl, firstDecl.parentNode=${firstDecl?.parentNode}")
         return super.transform(expr)
     }
@@ -79,7 +80,6 @@ class SemaResolver : NodeTransformer() {
     override fun transform(expr: CallExpr): Expr {
         val cexpr = expr.expr
         val funcType = expr.getFuncType()
-        val res = super.transform(expr)
         when (cexpr) {
             is IdentifierExpr -> {
                 val decls = expr.resolve(cexpr.id).distinct()
@@ -97,7 +97,11 @@ class SemaResolver : NodeTransformer() {
                 val key = cexpr.key
                 if (key is String) {
                     val exprType = cexpr.expr.getNodeType()
-                    val exprResolvedDecl = cexpr.resolve(exprType.toString()).firstOrNull()
+                    val exprResolvedDecl = when (exprType) {
+                        DynamicType -> DynamicTypeDecl
+                        UnknownType -> UnknownTypeDecl2
+                        else -> cexpr.resolve(exprType.toString()).firstOrNull() ?: error("Can't find decl for '$exprType'")
+                    }
                     val decls = DeclCollection(exprResolvedDecl?.resolve(key)?.toList())
                     //val decls = currentResolutionContext.resolve(cexpr.key.toString())
                     val resolved = decls.findMatch(funcType)
@@ -105,6 +109,7 @@ class SemaResolver : NodeTransformer() {
                         val resolvedSubTypes = exprResolvedDecl.directResolvedSubTypes
                         //println("resolvedSubTypes=$resolvedSubTypes")
                     }
+                    //if (resolved == null) error("Can't resolve expr '$expr'")
                     cexpr.resolvedDecl = resolved
                     expr.resolvedDecl = resolved
                 } else {
@@ -124,6 +129,7 @@ class SemaResolver : NodeTransformer() {
             expr.addThis = true
         }
          */
+        val res = super.transform(expr)
         return res
     }
 

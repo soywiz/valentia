@@ -30,7 +30,10 @@ class ValentiaParserFunTest : DeclBuilder, StmBuilder {
         assertEquals(
             STM(FUN("test", IntType, "a" to "T".type, "b" to "T2".type) {
                 RETURN(1.lit)
-            }.copy(where = listOf(TypeConstraint("T", IntType), TypeConstraint("Int", IntType)))),
+            }.copy(
+                where = listOf(TypeConstraint("T", IntType), TypeConstraint("Int", IntType)),
+                typeParams = listOf(TypeParameter("T", IntType), TypeParameter("T2", StringType)),
+            )),
             ValentiaParser.statement("""
                 fun <reified T : Int, T2 : String> test(a:T, b: T2): Int where T : Int, Int: Int {
                     return 1
@@ -83,4 +86,5 @@ class ValentiaParserFunTest : DeclBuilder, StmBuilder {
             ): String = genFiles(*filesContent).indentToString()
         """.trimIndent())
     }
+
 }

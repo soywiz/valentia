@@ -57,6 +57,7 @@ open class NodeVisitor {
             is Program -> TODO()
             is FileNode -> TODO()
             is TypeDecl -> TODO()
+            is FuncValueParam -> TODO()
         }
     }
 

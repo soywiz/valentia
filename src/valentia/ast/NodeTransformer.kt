@@ -83,6 +83,7 @@ open class NodeTransformer {
             is Program -> TODO()
             is FileNode -> TODO()
             is TypeDecl -> TODO()
+            is FuncValueParam -> TODO()
         }
     }
 
@@ -197,10 +198,10 @@ open class NodeTransformer {
         return if (cond === stm.cond && body === stm.body) stm else DoWhileLoopStm(body, cond!!, stm.modifiers).copyFrom(stm)
     }
     open fun transform(stm: ForLoopStm): Stm {
-        val vardecl = transformNull(stm.vardecl) as? VariableDeclBase?
+        val vardecl = transformNull(stm.vardecl) as VariableDeclBase
         val cexpr = transform(stm.expr)
         val body = transformNull(stm.body)
-        return if (vardecl === stm.vardecl && cexpr === stm.expr && body === stm.body) stm else ForLoopStm(cexpr, vardecl, body, stm.annotations, stm.modifiers).copyFrom(stm)
+        return if (vardecl === stm.vardecl && cexpr === stm.expr && body === stm.body) stm else ForLoopStm(cexpr, vardecl, body ?: EmptyStm(), stm.annotations, stm.modifiers).copyFrom(stm)
     }
     open fun transform(stm: WhileLoopStm): Stm {
         val cond = transform(stm.cond)
