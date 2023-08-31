@@ -52,13 +52,14 @@ class JSCodegenTest {
     @Test
     fun testIfTernary() {
         assertEquals(
-            "a\nb",
+            "10\na\nb",
             genAndRunJs("""
                 external val console: dynamic
                 fun main() {
                     val a = 10
                     val b = if (a == 10) "a" else "b"
                     val c = if (a != 10) "a" else "b"
+                    console.log(a)
                     console.log(b)
                     console.log(c)
                 }
@@ -292,6 +293,7 @@ class JSCodegenTest {
             2 0
             2 1
         """.trimIndent(), genAndRunJs("""
+            external val console: dynamic
             fun main() {
                 level2@for (m in 0 .. 4) {
                     for (n in 0 .. m) {
@@ -353,6 +355,22 @@ class JSCodegenTest {
     @Test
     fun testClassMultipleConstructor() =
         testFile("$RESOURCES_PREFIX/cases/testClassMultipleConstructor.kt.txt")
+
+    @Test
+    fun testClassMultipleConstructor2() {
+        assertEquals(
+            "10",
+            genAndRunJs("""
+                external val console: dynamic
+        
+                class Demo(val a: String) {
+                    constructor(a: Int) : this("${'$'}{a * 2}")
+                }
+            """.trimIndent(), """
+                fun main() = console.log(Demo(5).a)
+            """.trimIndent(), printJs = true)
+        )
+    }
 
     @Test
     fun testAllFiles() {

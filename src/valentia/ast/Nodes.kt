@@ -41,6 +41,10 @@ sealed class Node : INode, Extra by Extra.Mixin() {
     override val rangeStr: String? get() = reader?.readAbsoluteRange(spos, epos)
     override var nodeAnnotations: Annotations? = null
     override var parentNode: Node? = null
+        set(value) {
+            //if (this is BinaryOpExpr && value is OpSeparatedBinaryExprs) TODO()
+            field = value
+        }
     override val parentDecl: IDecl? by lazy { if (parentNode is IDecl) parentNode as IDecl else parentNode?.parentDecl }
     override val currentDecl: IDecl? get() = if (this is IDecl) this else parentDecl
     override var _basicBlock: BasicBlock? = null
@@ -307,7 +311,7 @@ enum class DelegationCallKind(val id: String) {
         val BY_ID = entries.associateBy { it.id }
     }
 }
-data class ConstructorDelegationCall(
+data class ConstructorDelegationCall constructor(
     val kind: DelegationCallKind?,
     val exprs: List<Expr>,
 ) : Node() {
@@ -319,7 +323,7 @@ data class ConstructorDelegationCall(
         FuncType(parent?.parent?.getNodeType(), exprs.map { FuncType.Item(it.getNodeType()) })
 }
 
-abstract class BaseConstructorDecl() : CallableDecl("constructor") {
+sealed class BaseConstructorDecl() : CallableDecl("constructor") {
     var parent: ClassLikeDecl? = null
     abstract val modifiers: Modifiers
     abstract val params: List<FuncValueParam>
@@ -366,10 +370,13 @@ data class ConstructorDecl(
     override val modifiers: Modifiers = Modifiers.EMPTY,
 ) : BaseConstructorDecl() {
     init {
-        constructorDelegationCall?.parent = this
+        //constructorDelegationCall?.parent = this
         addNode(params)
         addNode(body)
+        addNode(constructorDelegationCall)
     }
+
+    val paramsByName = params.associateBy { it.id }
 }
 data class InitDecl(val stm: Stm) : Decl("init") {
     init {
@@ -908,13 +915,32 @@ data class OpSeparatedBinaryExprs(val ops: List<String>, val exprs: List<Expr>) 
         addNode(exprs)
     }
 
-    fun toSimpleOps(): Expr {
-        check(ops.size == exprs.size - 1)
-        var out = exprs.first()
-        for (n in ops.indices) {
-            out = BinaryOpExpr(out, ops[n], exprs[n + 1])
+    //fun toSimpleOps(): Expr {
+    //    check(ops.size == exprs.size - 1)
+    //    var out = exprs.first()
+    //    out.parentNode = this.parentNode
+    //    for (n in ops.indices) {
+    //        out = BinaryOpExpr(out, ops[n], exprs[n + 1])
+    //        if (out.parentNode is OpSeparatedBinaryExprs) {
+    //            TODO()
+    //        }
+    //    }
+    //    if (out.parentNode is OpSeparatedBinaryExprs) {
+    //        TODO()
+    //    }
+    //    return out
+    //}
+
+    companion object {
+        fun toSimpleOps(ops: List<String>, exprs: List<Expr>): Expr {
+            check(ops.size == exprs.size - 1)
+            var out = exprs.first()
+            for (n in ops.indices) {
+                out = BinaryOpExpr(out, ops[n], exprs[n + 1])
+            }
+            //if (out.parentNode is OpSeparatedBinaryExprs) TODO()
+            return out
         }
-        return out
     }
 }
 
@@ -936,7 +962,7 @@ enum class BinaryOp(val symbol: String, val operatorName: String) {
     ;
 }
 
-data class BinaryOpExpr(val left: Expr, val op: String, val right: Expr) : Expr() {
+data class BinaryOpExpr constructor(val left: Expr, val op: String, val right: Expr) : Expr() {
     init {
         addNode(left)
         addNode(right)
@@ -1029,7 +1055,11 @@ data class InterpolatedStringExpr(val chunks: List<Chunk>) : Expr() {
 
     sealed class Chunk : Node()
     data class StringChunk(val string: String) : Chunk()
-    data class ExpressionChunk(val expr: Expr) : Chunk()
+    data class ExpressionChunk(val expr: Expr) : Chunk() {
+        init {
+            addNode(expr)
+        }
+    }
     override fun getNodeTypeUncached(): Type = StringType
 }
 

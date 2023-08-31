@@ -21,7 +21,7 @@ class CFG {
     fun finalize() {
         for (block in blocks) {
             val conds = block.predecessors.mapNotNull { it.condition?.expr }
-            block.conditions = if (conds.isEmpty()) null else OpSeparatedBinaryExprs(conds.dropLast(1).map { "||" }, conds)
+            block.conditions = if (conds.isEmpty()) null else OpSeparatedBinaryExprs.toSimpleOps(conds.dropLast(1).map { "||" }, conds)
         }
         // @TODO: Evaluate smart casts in order
     }
@@ -67,14 +67,18 @@ class BasicBlock(val cfg: CFG, val id: Int, val label: String? = null) {
         }
     }
 
-    fun locateVar(id: String): DeclWithInfo? {
+    fun locateVar(id: String, explored: MutableSet<BasicBlock> = mutableSetOf()): DeclWithInfo? {
+        if (this in explored) return null
         varsById[id]?.let { return it }
+        explored += this
         for (predecessor in predecessors) {
             val pred = predecessor.from
+            pred?.locateVar(id, explored)?.let { return it }
             //OpSeparatedBinaryExprs(listOf("||"), )
         }
-        for (item in ancestors()) {
-        }
+        //for (item in ancestors()) {
+        //    item?.locateVar(id, explored)?.let { return it }
+        //}
         return null
     }
 

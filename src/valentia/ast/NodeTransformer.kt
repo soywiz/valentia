@@ -40,16 +40,30 @@ open class NodeTransformer {
         }
     }
 
+    open fun transformNodeNull(node: Node?): Node? {
+        return when (node) {
+            null -> null
+            else -> transformNode(node)
+        }
+    }
+
+
     open fun transformNode(node: Node): Node {
         return when (node) {
             is Stm -> transform(node)
             is Decl -> transform(node)
             is Expr -> transform(node)
+            is ConstructorDelegationCall -> transform(node)
             else -> TODO()
         }
     }
 
-    open fun <T : Node> transform(list: List<T>): List<T> {
+    open fun transform(call: ConstructorDelegationCall): ConstructorDelegationCall {
+        val exprs = transformList(call.exprs)
+        return if (exprs === call.exprs) call else ConstructorDelegationCall(call.kind, exprs)
+    }
+
+    open fun <T : Node> transformList(list: List<T>): List<T> {
         var mod = false
         val nodes = list.map {
             val node = transformNode(it)
@@ -83,8 +97,12 @@ open class NodeTransformer {
             is Program -> TODO()
             is FileNode -> TODO()
             is TypeDecl -> TODO()
-            is FuncValueParam -> TODO()
+            is FuncValueParam -> transform(decl)
         }
+    }
+
+    open fun transform(param: FuncValueParam): FuncValueParam {
+        return param
     }
 
     open fun transformNull(body: FunctionBody?): FunctionBody? {
@@ -98,8 +116,25 @@ open class NodeTransformer {
     }
 
     open fun transform(decl: BaseConstructorDecl): Decl {
-        return decl
+        return when (decl) {
+            is ConstructorDecl -> transform(decl)
+            is PrimaryConstructorDecl -> transform(decl)
+        }
     }
+    open fun transform(decl: PrimaryConstructorDecl): Decl {
+        val params = transformList(decl.classParams)
+        return if (params === decl.params) decl else PrimaryConstructorDecl(decl.classParams, decl.modifiers).copyFrom(decl)
+    }
+    open fun transform(decl: ConstructorDecl): Decl {
+        val params = transformList(decl.params)
+        val body = transformNull(decl.body)
+        val constructorDelegationCall = transformNodeNull(decl.constructorDelegationCall)
+        return when {
+            params === decl.params && body === decl.body && constructorDelegationCall === decl.constructorDelegationCall -> decl
+            else -> ConstructorDecl(params, body, constructorDelegationCall as ConstructorDelegationCall?, decl.modifiers).copyFrom(decl)
+        }
+    }
+
     open fun transform(decl: ClassLikeDecl): Decl {
         for (decl in (decl.body ?: emptyList())) transform(decl)
         return decl
@@ -289,12 +324,12 @@ open class NodeTransformer {
             is CallExpr -> transform(expr)
             //is CallIdExpr -> transform(expr)
         }
-        transform(expr.paramsPlusLambda)
+        transformList(expr.paramsPlusLambda)
         return expr
     }
     open fun transform(expr: CallExpr): Expr {
         val cexpr = transform(expr.expr)
-        val params = transform(expr.params)
+        val params = transformList(expr.params)
         val lambdaArg = transformNull(expr.lambdaArg)
         return if (cexpr === expr.expr && params == expr.params && lambdaArg === expr.lambdaArg) expr else CallExpr(cexpr, params, lambdaArg, expr.typeArgs)
     }
@@ -308,7 +343,7 @@ open class NodeTransformer {
         return if (cexpr === expr.expr) expr else CastExpr(cexpr, expr.targetType, expr.safe).copyFrom(expr)
     }
     open fun transform(expr: CollectionLiteralExpr): Expr {
-        val items = transform(expr.items)
+        val items = transformList(expr.items)
         return if (items === expr.items) expr else expr.copy(items).copyFrom(expr)
     }
     open fun transform(expr: ContinueExpr): Expr {
@@ -346,6 +381,18 @@ open class NodeTransformer {
     }
 
     open fun transform(chunk: InterpolatedStringExpr.Chunk): InterpolatedStringExpr.Chunk {
+        return when (chunk) {
+            is InterpolatedStringExpr.ExpressionChunk -> transform(chunk)
+            is InterpolatedStringExpr.StringChunk -> transform(chunk)
+        }
+    }
+
+    open fun transform(chunk: InterpolatedStringExpr.ExpressionChunk): InterpolatedStringExpr.Chunk {
+        val expr = transform(chunk.expr)
+        return if (expr !== chunk.expr) InterpolatedStringExpr.ExpressionChunk(expr) else chunk
+    }
+
+    open fun transform(chunk: InterpolatedStringExpr.StringChunk): InterpolatedStringExpr.StringChunk {
         return chunk
     }
 
@@ -360,7 +407,7 @@ open class NodeTransformer {
         return expr
     }
     open fun transform(expr: OpSeparatedBinaryExprs): Expr {
-        val exprs = transform(expr.exprs)
+        val exprs = transformList(expr.exprs)
         return if (exprs === expr.exprs) expr else OpSeparatedBinaryExprs(expr.ops, exprs)
     }
     open fun transform(expr: RangeTestExpr): Expr {
@@ -433,7 +480,7 @@ open class NodeTransformer {
     }
     open fun transform(expr: IndexedExpr): AssignableExpr {
         val cexpr = transform(expr.expr)
-        val indices = transform(expr.indices)
+        val indices = transformList(expr.indices)
         return if (cexpr === expr.expr && indices === expr.indices) expr else IndexedExpr(cexpr, indices).copyFrom(expr)
     }
     open fun transform(expr: NavigationExpr): AssignableExpr {

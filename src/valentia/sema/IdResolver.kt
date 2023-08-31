@@ -36,16 +36,17 @@ fun IDecl.resolve(id: String): Sequence<IDecl> = sequence<IDecl> {
     val decl = this@resolve
     //println("type=$type -> decl=$decl")
     when (decl) {
+        is ConstructorDecl -> {
+            decl.paramsByName[id]?.let { yield(it) }
+        }
         is LambdaFunctionExpr -> {
             if (id == "it") {
                 yield(decl.implicitIdDecl)
             }
             //TODO("id=$id")
-            parentDecl?.resolve(id)?.let { yieldAll(it) }
         }
         is FunDecl -> {
             decl.allParamsById[id]?.let { yield(it) }
-            parentDecl?.resolve(id)?.let { yieldAll(it) }
         }
         is ClassDecl -> {
             // Check subtypes
@@ -58,7 +59,6 @@ fun IDecl.resolve(id: String): Sequence<IDecl> = sequence<IDecl> {
             decl.primaryConstructor?.paramsById?.get(id)?.let { yield(it) } // Add this
 
             //println("ClassDecl: $potential")
-            parentDecl?.resolve(id)?.let { yieldAll(it) }
         }
 
         is FileNode -> {
@@ -76,9 +76,6 @@ fun IDecl.resolve(id: String): Sequence<IDecl> = sequence<IDecl> {
                 val id = Identifier(import.identifier.parts + id)
                 yieldAll(program!!.getDeclsByIdentifier(id))
             }
-            parentDecl?.resolve(id)?.let {
-                yieldAll(it)
-            }
         }
 
         is Package -> {
@@ -86,8 +83,7 @@ fun IDecl.resolve(id: String): Sequence<IDecl> = sequence<IDecl> {
                 yieldAll(it)
             }
         }
-        else -> parentDecl?.resolve(id)?.let {
-            yieldAll(it)
-        }
+        else -> Unit
     }
+    parentDecl?.resolve(id)?.let { yieldAll(it) }
 }

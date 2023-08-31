@@ -272,7 +272,7 @@ open class JSCodegen {
                     is FuncValueParam -> "$thisStr$name"
                     is FunDecl -> "$thisStr${resolved.jsName}"
                     else -> {
-                        TODO("resolved=$resolved, thisStr=$thisStr, name=$name")
+                        TODO("resolved=$resolved, thisStr=$thisStr, name='$name'")
                         "$thisStr$name"
                     }
                 }

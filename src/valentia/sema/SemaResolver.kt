@@ -63,7 +63,9 @@ class SemaResolver : NodeTransformer() {
                 expr.addThis = true
             }
         }
-        if (expr.resolvedDecl == null) error("expr.resolvedDecl = null : $expr")
+        if (expr.resolvedDecl == null) {
+            error("expr.resolvedDecl = null : $expr")
+        }
         //println("expr.addThis=${expr.addThis}, expr=$expr, firstDecl=$firstDecl, currentClassDecl=$currentClassDecl, firstDecl.parentNode=${firstDecl?.parentNode}")
         return super.transform(expr)
     }
@@ -89,6 +91,7 @@ class SemaResolver : NodeTransformer() {
                 val decls2 = DeclCollection(realDecls.toList())
                 val resolved = decls2.findMatch(funcType)
                 cexpr.resolvedDecl = resolved ?: decls.filterIsInstance<ClassLikeDecl>().firstOrNull()
+                        ?: error("Can't find '${cexpr.id}'")
                 if (resolved?.parentNode == currentClassDecl && currentClassDecl != null) {
                     cexpr.addThis = true
                 }
@@ -109,7 +112,9 @@ class SemaResolver : NodeTransformer() {
                         val resolvedSubTypes = exprResolvedDecl.directResolvedSubTypes
                         //println("resolvedSubTypes=$resolvedSubTypes")
                     }
-                    //if (resolved == null) error("Can't resolve expr '$expr'")
+                    if (resolved == null && exprType != DynamicType) {
+                        error("Can't resolve exprType=$exprType, expr '$expr'")
+                    }
                     cexpr.resolvedDecl = resolved
                     expr.resolvedDecl = resolved
                 } else {

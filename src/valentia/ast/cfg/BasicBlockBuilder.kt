@@ -32,6 +32,7 @@ class BasicBlockBuilder(private val cfg: CFG = CFG()) {
                     val old = current
                     val new = cfg.create()
                     val (start, end) = build(stm.btrue.toList())
+                    start.addNode(stm)
                     old.connect(start, stm.cond)
                     if (!end.leaf) {
                         end.connect(new)
@@ -49,6 +50,7 @@ class BasicBlockBuilder(private val cfg: CFG = CFG()) {
                 }
                 is WhileLoopStm -> {
                     createNewBlock()
+                    current.addNode(stm)
                     val (start, end) = build(stm.body)
                     current.connect(start, stm.cond)
                     if (!end.leaf) {
@@ -63,6 +65,7 @@ class BasicBlockBuilder(private val cfg: CFG = CFG()) {
                     val before = current
                     val (start, end) = build(stm.body)
                     start.decls.add(BasicBlock.DeclWithInfo(stm.vardecl))
+                    start.addNode(stm)
                     before.connect(start)
                     end.connect(before)
                     createNewBlock()
@@ -73,11 +76,13 @@ class BasicBlockBuilder(private val cfg: CFG = CFG()) {
                     current.addNode(stm)
                     break
                 }
+                //is WhenExpr -> TODO()
                 is DeclStm -> {
                     // @TODO: Expression might require another subgraph? maybe not if we have preprocessed so control flow cannot happen in expressions
                     // DECLS should start a basic block
                     createNewBlockIfRequired()
                     current.decls += BasicBlock.DeclWithInfo(stm.decl)
+                    current.addNode(stm)
                 }
                 else -> {
                     current.addNode(stm)
