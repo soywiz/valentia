@@ -91,7 +91,7 @@ class SemaResolver : NodeTransformer() {
                 val decls2 = DeclCollection(realDecls.toList())
                 val resolved = decls2.findMatch(funcType)
                 cexpr.resolvedDecl = resolved ?: decls.filterIsInstance<ClassLikeDecl>().firstOrNull()
-                        ?: error("Can't find '${cexpr.id}'")
+                        //?: error("Can't find '${cexpr.id}'")
                 if (resolved?.parentNode == currentClassDecl && currentClassDecl != null) {
                     cexpr.addThis = true
                 }
@@ -103,7 +103,10 @@ class SemaResolver : NodeTransformer() {
                     val exprResolvedDecl = when (exprType) {
                         DynamicType -> DynamicTypeDecl
                         UnknownType -> UnknownTypeDecl2
-                        else -> cexpr.resolve(exprType.toString()).firstOrNull() ?: error("Can't find decl for '$exprType'")
+                        else -> {
+                            cexpr.resolveType(exprType)
+                            //cexpr.resolve(exprType.toString()).firstOrNull() ?: error("Can't find decl for type '$exprType'")
+                        }
                     }
                     val decls = DeclCollection(exprResolvedDecl?.resolve(key)?.toList())
                     //val decls = currentResolutionContext.resolve(cexpr.key.toString())
@@ -113,7 +116,7 @@ class SemaResolver : NodeTransformer() {
                         //println("resolvedSubTypes=$resolvedSubTypes")
                     }
                     if (resolved == null && exprType != DynamicType) {
-                        error("Can't resolve exprType=$exprType, expr '$expr'")
+                        error("Can't resolve exprType=$exprType, expr=$expr")
                     }
                     cexpr.resolvedDecl = resolved
                     expr.resolvedDecl = resolved

@@ -36,6 +36,11 @@ fun IDecl.resolve(id: String): Sequence<IDecl> = sequence<IDecl> {
     val decl = this@resolve
     //println("type=$type -> decl=$decl")
     when (decl) {
+        is TypeParameter -> {
+            val resolvedTypeDecl = decl.resolvedTypeDecl
+            yieldAll(resolvedTypeDecl.resolve(id))
+            return@sequence
+        }
         is ConstructorDecl -> {
             decl.paramsByName[id]?.let { yield(it) }
         }

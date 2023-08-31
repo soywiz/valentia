@@ -38,8 +38,8 @@ class JSCodegenTest {
                 class Demo(val a: Int) {
                     fun a(): Int = a
                 }
-                fun <T : Demo> test(demo: T): Int {
-                    console.log(T::class)
+                inline fun <reified T : Demo> test(demo: T): Int {
+                    //console.log(T::class)
                     return demo.a()
                 }
                 fun main() {

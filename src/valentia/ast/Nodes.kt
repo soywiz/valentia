@@ -3,7 +3,6 @@ package valentia.ast
 import valentia.ast.NodeBuilder.Companion.type
 import valentia.ast.cfg.BasicBlock
 import valentia.ast.cfg.BasicBlockBuilder
-import valentia.ast.cfg.CFG
 import valentia.parser.BaseConsumer
 import valentia.sema.*
 import valentia.util.Extra
@@ -304,6 +303,10 @@ data class TypeAliasDecl(
     val types: List<TypeParameter>? = null,
     val modifiers: Modifiers = Modifiers(),
 ) : TypeDecl(id) {
+    init {
+        addNode(type)
+        addNode(types)
+    }
 }
 enum class DelegationCallKind(val id: String) {
     THIS("this"), SUPER("super");
@@ -488,7 +491,11 @@ data class FunDecl constructor(
     override val modifiers: Modifiers = Modifiers.EMPTY,
 ) : CallableDecl(name), ModifiersContainer {
     init {
+        addNode(params)
+        addNode(where)
         addNode(body)
+        addNode(receiver)
+        addNode(typeParams)
     }
 
     val typeParamsById by lazy { (typeParams ?: emptyList()).associateBy { it.id } }
@@ -773,6 +780,14 @@ data class FuncValueParam(val id: String, val type: Type?) : VariableDeclBase(id
 }
 data class TypeParameter(val id: String, val type: Type?) : TypeDecl(id) {
     val ttype = TemplateType(id, type ?: UnknownType)
+    init {
+        addNode(type)
+    }
+
+    val resolvedTypeDecl: TypeDecl by lazy {
+        this.parentNode?.resolveType(type ?: AnyOptType)
+            ?: error("TypeParameter")
+    }
 }
 
 fun ParameterOptType.toFuncValueParam(): FuncValueParam = FuncValueParam(id, type ?: UnknownType)
