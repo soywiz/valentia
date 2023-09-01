@@ -21,13 +21,13 @@ class TransformUnsupportedNodes(val supported: (Node) -> Boolean) {
             is ExprStm -> {
                 val expr = stm.expr
                 when (expr) {
-                    is IfExpr -> IfStm(expr.cond, expr.trueBody.toStm(), expr.falseBody?.toStm())
-                    is ThrowExpr -> ThrowStm(expr.expr)
+                    is IfExpr -> IfStm(expr.cond, expr.trueBody.toStm(), expr.falseBody?.toStm()).copyFrom(stm)
+                    is ThrowExpr -> ThrowStm(expr.expr).copyFrom(stm)
                     else -> stm
                 }
             }
             is Stms -> {
-                Stms(stm.stms.mapNotNull { ensure(it, ctx) })
+                Stms(stm.stms.mapNotNull { ensure(it, ctx) }).copyFrom(stm)
             }
             else -> return stm
         }

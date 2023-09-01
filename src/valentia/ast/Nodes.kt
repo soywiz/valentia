@@ -492,6 +492,7 @@ data class FunDecl constructor(
 ) : CallableDecl(name), ModifiersContainer {
     init {
         addNode(params)
+        addNode(retType)
         addNode(where)
         addNode(body)
         addNode(receiver)
@@ -545,7 +546,7 @@ enum class VariableKind(val id: String) {
     }
 }
 
-data class VariableDecl(
+data class VariableDecl constructor(
     val id: String,
     val type: Type? = null,
     val expr: Expr? = null,
@@ -559,6 +560,7 @@ data class VariableDecl(
     val synth: Boolean = false,
 ) : VariableDeclBase(id) {
     init {
+        addNode(receiver)
         addNode(expr)
         addNode(getter)
         addNode(setter)
@@ -571,7 +573,7 @@ data class VariableDecl(
 
     override fun toString(): String {
         return buildString {
-            append(kind.toString().toLowerCase()).append(" ").append(id).append(": ").append(type)
+            append(kind.toString().lowercase()).append(" ").append(id).append(": ").append(type)
             if (expr != null) {
                 if (delegation) append(" by ") else append(" = ")
                 append(expr)
@@ -598,7 +600,7 @@ data class MultiVariableDecl(
 }
 
 fun <T : VariableDeclBase> T.withSetter(
-    setter: FunDecl?
+    setter: FunDecl?,
 ): T = when (this) {
     is VariableDecl -> this.copy(setter = setter) as T
     is MultiVariableDecl -> TODO("Unsupported setter for destructuring")
@@ -614,13 +616,13 @@ fun <T : VariableDeclBase> T.withGetter(
 }
 
 fun <T : VariableDeclBase> T.withAssignment(
-    expr: Expr,
+    expr: Expr?,
     delegation: Boolean = false,
     receiver: Type? = null
 ): T {
     return when (this) {
-        is VariableDecl -> this.copy(expr = expr, delegation = delegation, receiver = receiver) as T
-        is MultiVariableDecl -> this.copy(expr = expr, delegation = delegation, receiver = receiver) as T
+        is VariableDecl -> this.copy(expr = expr, delegation = delegation, receiver = receiver).copyFrom(this) as T
+        is MultiVariableDecl -> this.copy(expr = expr, delegation = delegation, receiver = receiver).copyFrom(this) as T
         else -> TODO()
     }
 }
@@ -977,7 +979,7 @@ enum class BinaryOp(val symbol: String, val operatorName: String) {
     ;
 }
 
-data class BinaryOpExpr constructor(val left: Expr, val op: String, val right: Expr) : Expr() {
+data class BinaryOpExpr(val left: Expr, val op: String, val right: Expr) : Expr() {
     init {
         addNode(left)
         addNode(right)
@@ -1000,6 +1002,11 @@ data class BinaryOpExpr constructor(val left: Expr, val op: String, val right: E
         // @TODO: Operator overloading
         val leftType = left.getNodeType()
         val rightType = right.getNodeType()
+
+        if (op == "==" || op == "===" || op == "!=" || op == "!==") {
+            return BoolType
+        }
+
         if (leftType == IntType && rightType == IntType) {
             return leftType
         }

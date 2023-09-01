@@ -679,9 +679,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
         NLs()
         val id = simpleIdentifierOpt() ?: return null.also { pos = spos }
         NLs()
-        val type = if (expectOpt(":")) {
-            NLs(); type()
-        } else null
+        val type = if (expectOpt(":")) { NLs(); type() } else null
         return VariableDecl(id, type, annotations = annotations, modifiers = modifiers, kind = kind)
     }
 
@@ -763,8 +761,8 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             zeroOrMore {
                 val mods = modifiers()
                 when {
-                    matches("get") -> decl = decl.withGetter(getter(mods))
-                    matches("set") -> decl = decl.withSetter(setter(mods))
+                    matches("get") -> decl = decl.withGetter(getter(mods, receiver))
+                    matches("set") -> decl = decl.withSetter(setter(mods, receiver))
                     else -> return@zeroOrMore null
                 }
                 NLs()
@@ -774,7 +772,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             null
         }
         return decl.let {
-            if (expr != null) it.withAssignment(
+            if (expr != null || delegation || receiver != null) it.withAssignment(
                 expr,
                 delegation = delegation,
                 receiver = receiver,
@@ -795,7 +793,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
     //    : modifiers? GET
     //      (NL* LPAREN NL* RPAREN (NL* COLON NL* type)? NL* functionBody)?
     //    ;
-    fun getter(modifiers: Modifiers = modifiers()): FunDecl? {
+    fun getter(modifiers: Modifiers = modifiers(), receiver: Type? = null): FunDecl? {
         if (!expectOpt("get")) return null
         var retType: Type? = null
         var body: FunctionBody? = null
@@ -810,14 +808,14 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             NLs()
             body = functionBody()
         }
-        return FunDecl("get", retType = retType, body = body, modifiers = modifiers)
+        return FunDecl("get", retType = retType, body = body, modifiers = modifiers, receiver = receiver)
     }
 
     //setter
     //    : modifiers? SET
     //      (NL* LPAREN NL* functionValueParameterWithOptionalType (NL* COMMA)? NL* RPAREN (NL* COLON NL* type)? NL* functionBody)?
     //    ;
-    fun setter(modifiers: Modifiers = modifiers()): FunDecl? {
+    fun setter(modifiers: Modifiers = modifiers(), receiver: Type? = null): FunDecl? {
         if (!expectOpt("set")) return null
         var retType: Type? = null
         var body: FunctionBody? = null
@@ -837,7 +835,7 @@ open class KotlinParser(tokens: List<Token>) : TokenReader(tokens), BaseTokenPar
             NLs()
             body = functionBody()
         }
-        return FunDecl("set", params = params, retType = retType, body = body, modifiers = modifiers)
+        return FunDecl("set", params = params, retType = retType, body = body, modifiers = modifiers, receiver = receiver)
     }
 
     //parametersWithOptionalType

@@ -3,7 +3,7 @@ package valentia.sema
 import valentia.ast.*
 
 fun INode.getAscendantClassByName(id: String? = null): ClassLikeDecl? =
-    currentDecl!!.getAscendantClassByName(id)
+    currentDecl?.getAscendantClassByName(id)
 
 fun IDecl.getAscendantClassByName(id: String? = null): ClassLikeDecl? {
     if (this is ClassLikeDecl) {

@@ -27,7 +27,12 @@ fun INode.resolveType(type: Type): TypeDecl {
     return resolveSimpleType(type.getSimpleType())
 }
 
-fun INode.resolveSimpleType(type: SimpleType): TypeDecl = currentDecl!!.resolveSimpleType(type)
+fun INode.resolveSimpleType(type: SimpleType): TypeDecl {
+    if (currentDecl == null) {
+        TODO()
+    }
+    return currentDecl!!.resolveSimpleType(type)
+}
 
 fun IDecl.resolveSimpleType(type: SimpleType): TypeDecl {
     val decl = this

@@ -75,8 +75,12 @@ open class JSCodegen {
                     }
                     //println("LET: $letStr : ${decl.declName}")
                     if (decl.getter != null) {
-                        indenter.line("get ${letStr}${decl.jsName}()") {
-                            generateStm(decl.getter.body?.stms, parent)
+                        if (decl.receiver != null) {
+                            generateFunction(decl.getter, parent)
+                        } else {
+                            indenter.line("get ${letStr}${decl.jsName}()") {
+                                generateStm(decl.getter.body?.stms, parent)
+                            }
                         }
                     } else {
                         val expr = decl.expr
@@ -294,11 +298,22 @@ open class JSCodegen {
             is NavigationExpr -> {
                 if (expr.op != ".") error("Unsupported ${expr.op}")
                 //println("expr.resolvedDecl=${expr.resolvedDecl}")
+                val resolvedDecl = expr.resolvedDecl
                 val keyStr = when (expr.key) {
                     is Expr -> generateExpr(expr.key)
-                    else -> expr.resolvedDecl?.jsName ?: expr.key.toString()
+                    else -> {
+                        resolvedDecl?.jsName ?: expr.key.toString()
+                    }
                 }
-                "${generateExpr(expr.expr)}.$keyStr"
+
+                run {
+                //if (resolvedDecl is FunDecl && resolvedDecl.receiver != null && exprExpr is NavigationExpr) {
+                //    val args2 = listOf(generateExpr(exprExpr.expr), *args.toTypedArray())
+                //    val paramsStr = "(" + args2.joinToString(", ") + ")"
+                //    "${resolvedDecl.jsName}$paramsStr"
+                //} else {
+                    "${generateExpr(expr.expr)}.$keyStr"
+                }
             }
             is BoolLiteralExpr -> "${expr.value}"
             is IntLiteralExpr -> "${expr.value}"
@@ -320,7 +335,6 @@ open class JSCodegen {
                     UnaryPreOp.EXCL -> "!($exprStr)"
                     UnaryPreOp.INCR -> "++($exprStr)"
                     UnaryPreOp.DECR -> "--($exprStr)"
-                    else -> TODO("Unsupported $expr")
                 }
             }
             //is OpSeparatedBinaryExprs -> {
@@ -347,9 +361,9 @@ open class JSCodegen {
                         "ushr" -> ">>>"
                         else -> expr.op
                     }
-                    when {
-                        leftType == BoolType && rightType == BoolType -> "((($leftStr) $op ($rightStr))!=0)"
-                        leftType == IntType && rightType == IntType -> "((($leftStr) $op ($rightStr))|0)"
+                    when (expr.getNodeType()) {
+                        BoolType -> "((($leftStr) $op ($rightStr))!=0)"
+                        IntType -> "((($leftStr) $op ($rightStr))|0)"
                         else -> "(($leftStr) $op ($rightStr))"
                     }
                 }
@@ -612,7 +626,7 @@ open class JSCodegen {
         else -> "$this"
     }
 
-    fun  List<FuncValueParam>.toJsString(): String {
+    fun List<FuncValueParam>.toJsString(): String {
         return this.joinToString(", ") { "${it.id} /*: ${it.type?.toJsString()}*/" }
     }
 

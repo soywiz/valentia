@@ -10,6 +10,22 @@ import kotlin.test.assertEquals
 
 class JSCodegenTest {
     @Test
+    fun testPropertyWithReceiver() {
+        assertEquals(
+            "42",
+            genAndRunJs("""
+                external class Int
+                external val console: dynamic
+                
+                val Int.twice: Int get() = this * 2
+                fun main() {
+                    console.log(21.twice)
+                }
+            """.trimIndent(), printJs = true)
+        )
+    }
+
+    @Test
     fun testFuncParam() {
         assertEquals(
             "7",
