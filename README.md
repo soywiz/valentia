@@ -17,6 +17,7 @@ The compiler can be embedded as library and also allows compiling code in the br
 * [ ] Extra: Support for source-code-based plugins for AST transformation and code generation
 * [ ] Extra: API support for passing the AST to functions like C# LINQ
 * [ ] Extra: Reflection support: annotation, types, etc. for annotated elements.
+* [ ] Extra: Template classes to support efficient DS with just one definition
 * [ ] Project descriptor: Create project descriptor using TOML. For example cargo.toml
 * [ ] No multiple folders for targets. Use annotations, static ifs, etc.. Just `src`, `test`, `resources` and `testresources` by default. For Kotlin compatibility it can use `src/commonMain` and `src/jsMain`
 * [ ] Resources are copied along the generated `.js`/executable file.
